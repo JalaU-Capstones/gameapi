@@ -1,0 +1,355 @@
+{
+  "info": {
+    "name": "Game API",
+    "description": "REST API for users and gameplays. The collection automatically logs in and stores the JWT in {{token}}.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const requiresAuth = pm.request.headers.has('X-Requires-Auth');",
+          "if (requiresAuth) {",
+          "    pm.request.headers.remove('X-Requires-Auth');",
+          "    const loginRequest = {",
+          "        url: pm.collectionVariables.get('baseUrl') + '/api/users/login',",
+          "        method: 'POST',",
+          "        header: { 'Content-Type': 'application/json' },",
+          "        body: {",
+          "            mode: 'raw',",
+          "            raw: JSON.stringify({",
+          "                email: pm.collectionVariables.get('testEmail'),",
+          "                password: pm.collectionVariables.get('testPassword')",
+          "            })",
+          "        }",
+          "    };",
+          "    pm.sendRequest(loginRequest, function (err, res) {",
+          "        if (err) { console.error('Login failed', err); return; }",
+          "        if (res.code === 200) {",
+          "            pm.collectionVariables.set('token', res.json().token);",
+          "        } else {",
+          "            console.warn('Login returned', res.code);",
+          "        }",
+          "    });",
+          "}"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "testEmail",
+      "value": "sandra@mail.com",
+      "type": "string"
+    },
+    {
+      "key": "testPassword",
+      "value": "password123",
+      "type": "string"
+    },
+    {
+      "key": "userId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "gameplayId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Register user",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set('userId', body.id);",
+                  "    pm.collectionVariables.set('testEmail', body.email);",
+                  "    console.log('Saved userId:', body.id);",
+                  "}",
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Response has id', () => pm.response.json().id !== undefined);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Sandra Dee\",\n  \"email\": \"sandra@mail.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users"]
+            }
+          }
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    pm.collectionVariables.set('token', pm.response.json().token);",
+                  "    pm.collectionVariables.set('userId', pm.response.json().user.id);",
+                  "    console.log('Token stored');",
+                  "}",
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response has token', () => pm.response.json().token !== undefined);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"sandra@mail.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/users/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "login"]
+            }
+          }
+        },
+        {
+          "name": "Get all users",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users"]
+            }
+          }
+        },
+        {
+          "name": "Get user by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "{{userId}}"]
+            }
+          }
+        },
+        {
+          "name": "Update my user",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Sandra Dee Updated\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "{{userId}}"]
+            }
+          }
+        },
+        {
+          "name": "Delete my user",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "{{userId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Gameplays",
+      "item": [
+        {
+          "name": "Create gameplay",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    pm.collectionVariables.set('gameplayId', pm.response.json().id);",
+                  "    console.log('Saved gameplayId:', pm.response.json().id);",
+                  "}",
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPositions\": \"{\\\"board\\\": [[0,0,0],[0,0,0],[0,0,0]], \\\"lastMove\\\": null}\",\n  \"hostPlayer\": \"{{userId}}\",\n  \"playerTurn\": \"{{userId}}\",\n  \"matchResult\": null\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/gameplays",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "gameplays"]
+            }
+          }
+        },
+        {
+          "name": "Get all gameplays",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/gameplays",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "gameplays"]
+            }
+          }
+        },
+        {
+          "name": "Get my gameplays",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/gameplays/my-gameplays",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "gameplays", "my-gameplays"]
+            }
+          }
+        },
+        {
+          "name": "Get gameplays by player",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/gameplays/player/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "gameplays", "player", "{{userId}}"]
+            }
+          }
+        },
+        {
+          "name": "Get gameplay by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/gameplays/{{gameplayId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "gameplays", "{{gameplayId}}"]
+            }
+          }
+        },
+        {
+          "name": "Update gameplay",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPositions\": \"{\\\"board\\\": [[1,0,0],[0,2,0],[0,0,0]], \\\"lastMove\\\": {\\\"x\\\":0,\\\"y\\\":0}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/gameplays/{{gameplayId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "gameplays", "{{gameplayId}}"]
+            }
+          }
+        },
+        {
+          "name": "Delete gameplay",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/gameplays/{{gameplayId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "gameplays", "{{gameplayId}}"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
