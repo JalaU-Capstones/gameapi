@@ -23,9 +23,6 @@ dev:
 run:
 	uv run uvicorn gameapi.main:app --host $${APP_HOST:-0.0.0.0} --port $${APP_PORT:-8080}
 
-test:
-	uv run pytest -v
-
 lint:
 	uv run ruff check .
 
@@ -52,3 +49,18 @@ docker-logs:
 
 docker-reset:
 	docker compose down -v
+
+.PHONY: help install dev run test test-cov lint format typecheck pre-commit clean docker-up docker-down docker-logs docker-reset
+
+test:
+	uv run pytest -v
+
+test-cov:
+	uv run pytest --cov=gameapi --cov-report=term-missing --cov-report=html
+	@echo "HTML report: htmlcov/index.html"
+
+pre-commit:
+	uv run pre-commit run --all-files
+
+pre-commit-install:
+	uv run pre-commit install
