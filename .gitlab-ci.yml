@@ -16,6 +16,14 @@ default:
 variables:
   UV_CACHE_DIR: "$CI_PROJECT_DIR/.cache/uv"
   PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  MONGO_CONNECTION_STRING: "mongodb://localhost:27017"
+  MONGO_DATABASE_NAME: "GameDB"
+  JWT_SECRET_KEY: "Una_Clave_Secreta_Super_Segura_con_Minimo_32_Caracteres_123456789"
+  JWT_ALGORITHM: "HS256"
+  JWT_ISSUER: "GameAPI"
+  JWT_AUDIENCE: "GameAPI"
+  JWT_EXPIRE_MINUTES: "60"
+  APP_ENV: "development"
 
 stages:
   - quality
