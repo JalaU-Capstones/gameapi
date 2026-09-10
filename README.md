@@ -3,9 +3,10 @@
 REST API para gestión de usuarios y partidas de Tic-Tac-Toe.
 
 [![Python](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
+[![codecov](https://codecov.io/gh/JalaU-Capstones/gameapi/branch/main/graph/badge.svg)](https://codecov.io/gh/JalaU-Capstones/gameapi)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg)](https://fastapi.tiangolo.com/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![Tests](https://img.shields.io/badge/tests-33%20passed-success.svg)](#pruebas)
+[![Tests](https://img.shields.io/badge/tests-55%20passed-success.svg)](#pruebas)
 
 **Stack:** Python 3.12+ · FastAPI · MongoDB (Motor) · Pydantic v2 · JWT · uv · Docker
 
