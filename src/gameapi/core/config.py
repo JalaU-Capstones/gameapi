@@ -8,14 +8,17 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 class MongoSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="MONGO_", env_file=".env", extra="ignore")
 
-    connection_string: str = Field(..., min_length=1)
-    database_name: str = Field(..., min_length=1)
+    connection_string: str = Field(default="mongodb://localhost:27017", min_length=1)
+    database_name: str = Field(default="GameDB", min_length=1)
 
 
 class JWTSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="JWT_", env_file=".env", extra="ignore")
 
-    secret_key: str = Field(..., min_length=32)
+    secret_key: str = Field(
+        default="Una_Clave_Secreta_Super_Segura_con_Minimo_32_Caracteres_123456789",
+        min_length=32,
+    )
     algorithm: str = "HS256"
     issuer: str = "GameAPI"
     audience: str = "GameAPI"
