@@ -12,6 +12,7 @@ coverage.xml
 htmlcov/
 build/
 dist/
+.cache/
 
 .env
 .env.local

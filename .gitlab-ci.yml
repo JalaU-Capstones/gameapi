@@ -1,8 +1,8 @@
 default:
   image: python:3.12-slim
   before_script:
-    - pip install uv
-    - uv venv
+    - pip install --no-cache-dir uv
+    - uv python install
     - uv sync --frozen --all-extras --dev
   cache:
     key:
@@ -10,11 +10,12 @@ default:
         - uv.lock
         - pyproject.toml
     paths:
-      - .venv/
       - .cache/uv/
 
 variables:
   UV_CACHE_DIR: "$CI_PROJECT_DIR/.cache/uv"
+  UV_LINK_MODE: "copy"
+  UV_PYTHON_DOWNLOADS: "automatic"
   PIP_DISABLE_PIP_VERSION_CHECK: "1"
   MONGO_CONNECTION_STRING: "mongodb://localhost:27017"
   MONGO_DATABASE_NAME: "GameDB"
@@ -49,10 +50,14 @@ lint:mypy:
 
 test:python:
   stage: test
+  image: python:${PYTHON_VERSION}-slim
   parallel:
     matrix:
       - PYTHON_VERSION: ["3.12", "3.13"]
-  image: python:${PYTHON_VERSION}-slim
+  before_script:
+    - pip install --no-cache-dir uv
+    - uv python install ${PYTHON_VERSION}
+    - uv sync --frozen --all-extras --dev --python ${PYTHON_VERSION}
   script:
     - uv run pytest --cov=gameapi --cov-report=term-missing --cov-report=xml:coverage.xml
   artifacts:
