@@ -213,17 +213,39 @@ make test
 Salida esperada:
 
 ```
-33 passed in 9.52s
+55 passed in ~13s
+Required test coverage of 85.0% reached. Total coverage: 87.96%
 ```
 
 Los tests usan `mongomock-motor`, así que **no necesitan MongoDB real** ni levantarlo con Docker.
 
 ### Cobertura
 
-- **`tests/test_security.py`** (4): hashing bcrypt, JWT create/decode, token manipulado.
-- **`tests/test_health.py`** (1): endpoint `/health` con DB mockeada.
-- **`tests/test_users.py`** (14): registro, duplicado, validación, login, CRUD con permisos.
-- **`tests/test_gameplays.py`** (14): CRUD, validación JSON, permisos host/guest.
+**Umbral mínimo:** 85% (configurado en `pyproject.toml` → `[tool.coverage.report] fail_under`).
+
+**Cobertura actual:** 87.96% (537 statements, 86 branches).
+
+| Archivo | Tests | Cobertura | Qué cubre |
+|---|---|---|---|
+| `tests/test_security.py` | 4 | 100% | Hashing bcrypt, JWT create/decode, token manipulado. |
+| `tests/test_health.py` | 1 | 78% (`main.py`) | Endpoint `/health` con DB mockeada. |
+| `tests/test_users.py` | 14 | 88% | Registro, duplicado, validación, login, CRUD con permisos. |
+| `tests/test_gameplays.py` | 14 | 83% | CRUD, validación JSON, permisos host/guest. |
+| `tests/test_edge_cases.py` | 22 | — | Edge cases: ObjectId inválido, errores de dominio, `PyObjectId` validation, auth malformado, lifecycle de DB, guest inexistente, jugadores ajenos. |
+
+**Reporte HTML** (local, tras `make test`):
+
+```bash
+open htmlcov/index.html
+```
+
+**Reporte XML** (generado por pytest-cov para CI): `coverage.xml` → subido a Codecov en cada push a `main`.
+
+**Módulos con menor cobertura** (por diseño — requieren integración con Mongo real):
+
+- `core/database.py` (72%): branches de `connect()` / `disconnect()` reales.
+- `main.py` (78%): `lifespan` real y algunos branches del exception handler.
+- `api/v1/gameplays.py` (83%): branches secundarios del update / list.
 
 ### Calidad de código
 
@@ -232,6 +254,27 @@ make lint        # ruff check
 make format      # ruff format
 make typecheck   # mypy strict
 ```
+
+Pre-commit ejecuta automáticamente todos los checks antes de cada `git commit`:
+
+```bash
+make pre-commit-install   # instala los hooks (una sola vez)
+make pre-commit           # corre todos los hooks manualmente
+```
+
+Hooks configurados: `ruff`, `ruff-format`, `mypy`, `trailing-whitespace`, `end-of-file-fixer`, `check-yaml`, `check-toml`, `check-added-large-files`, `check-merge-conflict`, `mixed-line-ending`.
+
+### Integración continua
+
+**GitHub Actions** (`.github/workflows/ci.yml`) — 3 jobs:
+
+- `quality`: ruff + mypy.
+- `test`: matriz Python 3.12 / 3.13 con cobertura.
+- `docker`: build de la imagen + smoke test.
+
+**GitLab CI** (`.gitlab-ci.yml`) — mismo flujo, cacheando solo `$UV_CACHE_DIR`.
+
+**Dependabot** (`.github/dependabot.yml`) — PR semanal para actualizar `uv.lock` y GitHub Actions.
 
 ---
 
