@@ -1,36 +1,18 @@
 services:
-  mongodb:
-    image: mongo:7.0
-    container_name: game-mongodb
-    restart: unless-stopped
-    ports:
-      - "27017:27017"
-    environment:
-      MONGO_INITDB_DATABASE: GameDB
-    volumes:
-      - mongodb_data:/data/db
-      - mongodb_config:/data/configdb
-    healthcheck:
-      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 15s
-
   postgres:
     image: postgres:16-alpine
     container_name: game-postgres
     restart: unless-stopped
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     environment:
-      POSTGRES_USER: gameapi
-      POSTGRES_PASSWORD: gameapi
-      POSTGRES_DB: gameapi
+      POSTGRES_USER: ${POSTGRES_USER:-gameapi}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gameapi}
+      POSTGRES_DB: ${POSTGRES_DB:-gameapi}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U gameapi"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-gameapi}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -43,23 +25,19 @@ services:
     container_name: game-api
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "${APP_PORT:-8080}:8080"
     environment:
-      MONGO_CONNECTION_STRING: mongodb://mongodb:27017
-      MONGO_DATABASE_NAME: GameDB
-      POSTGRES_URI: postgresql+asyncpg://gameapi:gameapi@postgres:5432/gameapi
+      POSTGRES_URI: ${POSTGRES_URI:-postgresql+asyncpg://gameapi:gameapi@postgres:5432/gameapi}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-Una_Clave_Secreta_Super_Segura_con_Minimo_32_Caracteres_123456789}
-      JWT_ALGORITHM: HS256
-      JWT_ISSUER: GameAPI
-      JWT_AUDIENCE: GameAPI
-      JWT_EXPIRE_MINUTES: 60
-      APP_ENV: development
-      APP_HOST: 0.0.0.0
-      APP_PORT: 8080
-      CORS_ORIGINS: "*"
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      JWT_ISSUER: ${JWT_ISSUER:-GameAPI}
+      JWT_AUDIENCE: ${JWT_AUDIENCE:-GameAPI}
+      JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES:-60}
+      APP_ENV: ${APP_ENV:-development}
+      APP_HOST: ${APP_HOST:-0.0.0.0}
+      APP_PORT: ${APP_PORT:-8080}
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
     depends_on:
-      mongodb:
-        condition: service_healthy
       postgres:
         condition: service_healthy
     healthcheck:
@@ -74,6 +52,4 @@ services:
       start_period: 20s
 
 volumes:
-  mongodb_data:
-  mongodb_config:
   postgres_data:
