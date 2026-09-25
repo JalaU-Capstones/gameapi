@@ -6,7 +6,7 @@ REST API para gestión de usuarios y partidas de Tic-Tac-Toe.
 [![codecov](https://codecov.io/gh/JalaU-Capstones/gameapi/branch/main/graph/badge.svg)](https://codecov.io/gh/JalaU-Capstones/gameapi)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg)](https://fastapi.tiangolo.com/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![Tests](https://img.shields.io/badge/tests-55%20passed-success.svg)](#pruebas)
+[![Tests](https://img.shields.io/badge/tests-49%20passed-success.svg)](#pruebas)
 
 **Stack:** Python 3.12+ · FastAPI · PostgreSQL 16 · SQLAlchemy 2.0 async · Pydantic v2 · JWT · uv · Docker
 
@@ -48,13 +48,13 @@ REST API para gestión de usuarios y partidas de Tic-Tac-Toe.
 
 Antes de instalar, asegúrate de tener:
 
-| Herramienta | Versión mínima | Instalación |
-|---|---|---|
-| **Python** | 3.12+ | <https://www.python.org/downloads/> |
-| **uv** | 0.4+ | `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
-| **Git** | 2.30+ | <https://git-scm.com/downloads> |
-| **PostgreSQL** | 16 | <https://www.postgresql.org/download/> |
-| **Docker** + **Compose** | 24+ / v2 (opcional) | <https://docs.docker.com/get-docker/> |
+| Herramienta              | Versión mínima      | Instalación                                        |
+|--------------------------|---------------------|----------------------------------------------------|
+| **Python**               | 3.12+               | <https://www.python.org/downloads/>                |
+| **uv**                   | 0.4+                | `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
+| **Git**                  | 2.30+               | <https://git-scm.com/downloads>                    |
+| **PostgreSQL**           | 16                  | <https://www.postgresql.org/download/>             |
+| **Docker** + **Compose** | 24+ / v2 (opcional) | <https://docs.docker.com/get-docker/>              |
 
 > **Recomendado:** usa Docker para levantar PostgreSQL y la API sin instalar nada más. Si prefieres desarrollo local, instala PostgreSQL 16.
 
@@ -91,22 +91,22 @@ cp .env.example .env
 
 Todas las variables se leen desde `.env` (ver `.env.example`):
 
-| Variable | Descripción | Default |
-|---|---|---|
-| `POSTGRES_URI` | URI de PostgreSQL para SQLAlchemy async | `postgresql+asyncpg://gameapi:gameapi@localhost:5432/gameapi` |
-| `POSTGRES_USER` | Usuario de PostgreSQL (para Docker Compose) | `gameapi` |
-| `POSTGRES_PASSWORD` | Contraseña de PostgreSQL (para Docker Compose) | `gameapi` |
-| `POSTGRES_DB` | Nombre de la base de datos PostgreSQL | `gameapi` |
-| `POSTGRES_PORT` | Puerto host de PostgreSQL (para Docker Compose) | `5432` |
-| `JWT_SECRET_KEY` | Clave secreta para firmar JWT (mín. 32 caracteres) | *(requerido)* |
-| `JWT_ALGORITHM` | Algoritmo de firma | `HS256` |
-| `JWT_ISSUER` | Emisor del token | `GameAPI` |
-| `JWT_AUDIENCE` | Audiencia del token | `GameAPI` |
-| `JWT_EXPIRE_MINUTES` | Expiración del token en minutos | `60` |
-| `APP_ENV` | Entorno (`development` / `staging` / `production`) | `development` |
-| `APP_HOST` | Host de escucha | `0.0.0.0` |
-| `APP_PORT` | Puerto de escucha | `8080` |
-| `CORS_ORIGINS` | Orígenes permitidos (coma-separados o `*`) | `*` |
+| Variable             | Descripción                                        | Default                                                       |
+|----------------------|----------------------------------------------------|---------------------------------------------------------------|
+| `POSTGRES_URI`       | URI de PostgreSQL para SQLAlchemy async            | `postgresql+asyncpg://gameapi:gameapi@localhost:5432/gameapi` |
+| `POSTGRES_USER`      | Usuario de PostgreSQL (para Docker Compose)        | `gameapi`                                                     |
+| `POSTGRES_PASSWORD`  | Contraseña de PostgreSQL (para Docker Compose)     | `gameapi`                                                     |
+| `POSTGRES_DB`        | Nombre de la base de datos PostgreSQL              | `gameapi`                                                     |
+| `POSTGRES_PORT`      | Puerto host de PostgreSQL (para Docker Compose)    | `5432`                                                        |
+| `JWT_SECRET_KEY`     | Clave secreta para firmar JWT (mín. 32 caracteres) | *(requerido)*                                                 |
+| `JWT_ALGORITHM`      | Algoritmo de firma                                 | `HS256`                                                       |
+| `JWT_ISSUER`         | Emisor del token                                   | `GameAPI`                                                     |
+| `JWT_AUDIENCE`       | Audiencia del token                                | `GameAPI`                                                     |
+| `JWT_EXPIRE_MINUTES` | Expiración del token en minutos                    | `60`                                                          |
+| `APP_ENV`            | Entorno (`development` / `staging` / `production`) | `development`                                                 |
+| `APP_HOST`           | Host de escucha                                    | `0.0.0.0`                                                     |
+| `APP_PORT`           | Puerto de escucha                                  | `8080`                                                        |
+| `CORS_ORIGINS`       | Orígenes permitidos (coma-separados o `*`)         | `*`                                                           |
 
 ---
 
@@ -161,13 +161,13 @@ Las migraciones versionadas se almacenan en `migrations/versions/`.
 
 ### URLs
 
-| Recurso | URL |
-|---|---|
-| API | <http://localhost:8080> |
-| Swagger UI | <http://localhost:8080/docs> |
-| ReDoc | <http://localhost:8080/redoc> |
+| Recurso      | URL                                  |
+|--------------|--------------------------------------|
+| API          | <http://localhost:8080>              |
+| Swagger UI   | <http://localhost:8080/docs>         |
+| ReDoc        | <http://localhost:8080/redoc>        |
 | OpenAPI JSON | <http://localhost:8080/openapi.json> |
-| Health check | <http://localhost:8080/health> |
+| Health check | <http://localhost:8080/health>       |
 
 ---
 
@@ -175,26 +175,26 @@ Las migraciones versionadas se almacenan en `migrations/versions/`.
 
 ### Users
 
-| Método | Ruta | Auth | Descripción |
-|---|---|---|---|
-| `POST` | `/api/users` | ❌ | Registrar usuario |
-| `GET` | `/api/users` | ❌ | Listar usuarios |
-| `GET` | `/api/users/{id}` | ❌ | Obtener un usuario |
-| `PUT` | `/api/users/{id}` | ✅ | Actualizar **tu propia** cuenta |
-| `DELETE` | `/api/users/{id}` | ✅ | Eliminar **tu propia** cuenta |
-| `POST` | `/api/users/login` | ❌ | Login (devuelve JWT) |
+| Método   | Ruta               | Auth | Descripción                     |
+|----------|--------------------|------|---------------------------------|
+| `POST`   | `/api/users`       | ❌   | Registrar usuario               |
+| `GET`    | `/api/users`       | ❌   | Listar usuarios                 |
+| `GET`    | `/api/users/{id}`  | ❌   | Obtener un usuario              |
+| `PUT`    | `/api/users/{id}`  | ✅   | Actualizar **tu propia** cuenta |
+| `DELETE` | `/api/users/{id}`  | ✅   | Eliminar **tu propia** cuenta   |
+| `POST`   | `/api/users/login` | ❌   | Login (devuelve JWT)            |
 
 ### Gameplays
 
-| Método | Ruta | Auth | Descripción |
-|---|---|---|---|
-| `GET` | `/api/gameplays` | ❌ | Listar todas las partidas |
-| `GET` | `/api/gameplays/my-gameplays` | ✅ | Partidas del usuario autenticado |
-| `GET` | `/api/gameplays/player/{id}` | ❌ | Partidas de un jugador |
-| `GET` | `/api/gameplays/{id}` | ❌ | Obtener una partida |
-| `POST` | `/api/gameplays` | ✅ | Crear partida (host = tú) |
-| `PUT` | `/api/gameplays/{id}` | ✅ | Actualizar (solo participantes) |
-| `DELETE` | `/api/gameplays/{id}` | ✅ | Eliminar (solo host) |
+| Método   | Ruta                          | Auth | Descripción                      |
+|----------|-------------------------------|------|----------------------------------|
+| `GET`    | `/api/gameplays`              | ❌   | Listar todas las partidas        |
+| `GET`    | `/api/gameplays/my-gameplays` | ✅   | Partidas del usuario autenticado |
+| `GET`    | `/api/gameplays/player/{id}`  | ❌   | Partidas de un jugador           |
+| `GET`    | `/api/gameplays/{id}`         | ❌   | Obtener una partida              |
+| `POST`   | `/api/gameplays`              | ✅   | Crear partida (host = tú)        |
+| `PUT`    | `/api/gameplays/{id}`         | ✅   | Actualizar (solo participantes)  |
+| `DELETE` | `/api/gameplays/{id}`         | ✅   | Eliminar (solo host)             |
 
 ### Ejemplos
 
@@ -248,8 +248,8 @@ make test
 Salida esperada:
 
 ```
-55 passed in ~13s
-Required test coverage of 85.0% reached. Total coverage: 87.96%
+49 passed in ~22s
+Required test coverage of 85.0% reached. Total coverage: 87.41%
 ```
 
 Los tests usan **PostgreSQL** de dos formas según el entorno:
@@ -261,32 +261,41 @@ Los tests usan **PostgreSQL** de dos formas según el entorno:
   variable de entorno `TEST_POSTGRES_URI`. Esto evita la sobrecarga de
   Docker-in-Docker y hace los pipelines más rápidos y fiables.
 
+Para correr los tests con cobertura:
+
+```bash
+make test-cov
+```
+
 ### Cobertura
 
 **Umbral mínimo:** 85% (configurado en `pyproject.toml` → `[tool.coverage.report] fail_under`).
 
-**Cobertura actual:** 87.96% (537 statements, 86 branches).
+**Cobertura actual:** 87.41% (579 statements, 104 branches).
 
-| Archivo | Tests | Cobertura | Qué cubre |
-|---|---|---|---|
-| `tests/test_security.py` | 4 | 100% | Hashing bcrypt, JWT create/decode, token manipulado. |
-| `tests/test_health.py` | 1 | 78% (`main.py`) | Endpoint `/health` con PostgreSQL disponible. |
-| `tests/test_users.py` | 14 | 88% | Registro, duplicado, validación, login, CRUD con permisos. |
-| `tests/test_gameplays.py` | 14 | 83% | CRUD, validación JSON, permisos host/guest. |
-| `tests/test_edge_cases.py` | 22 | — | Edge cases: UUID validation, session lifecycle, auth malformado, guest inexistente, jugadores ajenos, validación de dominio. |
+| Archivo                    | Tests | Qué cubre                                                                                             |
+|----------------------------|-------|-------------------------------------------------------------------------------------------------------|
+| `tests/test_security.py`   | 4     | Hashing bcrypt, JWT create/decode, token manipulado.                                                  |
+| `tests/test_health.py`     | 1     | Endpoint `/health` con PostgreSQL disponible.                                                         |
+| `tests/test_users.py`      | 15    | Registro, duplicado, validación, login, CRUD con permisos.                                            |
+| `tests/test_gameplays.py`  | 13    | CRUD, validación JSON, permisos host/guest.                                                           |
+| `tests/test_edge_cases.py` | 16    | Edge cases: UUID validation, session lifecycle, auth malformado, guest inexistente, jugadores ajenos. |
 
-**Reporte HTML** (local, tras `make test`):
+**Reporte HTML** (local, tras `make test-cov`):
 
 ```bash
 open htmlcov/index.html
 ```
 
-**Reporte XML** (generado por pytest-cov para CI): `coverage.xml` → subido a Codecov en cada push a `main`.
+**Reporte XML** (generado con Coverage.py para CI): `coverage.xml` → subido a Codecov en cada push a `main`.
 
 **Módulos con menor cobertura**:
 
-- `main.py` (78%): `lifespan` real y algunos branches del exception handler.
-- `api/v1/gameplays.py` (83%): branches secundarios del update / list.
+- `services/gameplay_service.py` (79%): branches secundarios del update y
+  validación de estados.
+- `main.py` (81%): `lifespan` real y algunos branches del exception handler.
+- `services/user_service.py` (83%): branches secundarios de update.
+- `api/v1/gameplays.py` (84%): branches secundarios del update / list.
 
 ### Calidad de código
 
@@ -310,7 +319,8 @@ Hooks configurados: `ruff`, `ruff-format`, `mypy`, `trailing-whitespace`, `end-o
 **GitHub Actions** (`.github/workflows/ci.yml`) — 3 jobs:
 
 - `quality`: ruff + mypy.
-- `test`: matriz Python 3.12 / 3.13 con cobertura, contra un servicio PostgreSQL 16.
+- `test`: matriz Python 3.12 / 3.13 con cobertura (`coverage run -m pytest`),
+  contra un servicio PostgreSQL 16.
 - `docker`: build de la imagen + smoke test con PostgreSQL en red dedicada.
 
 **GitLab CI** (`.gitlab-ci.yml`) — mismo flujo, con PostgreSQL 16 provisto como
@@ -372,10 +382,10 @@ HTTP → Router (api/v1) → Deps (auth, DI) → Service → Repository → SQLA
 
 El proyecto mantiene **dos capas con estilos distintos** de forma deliberada:
 
-| Capa | Convención | Motivo |
-|---|---|---|
-| Python interno (`db/`, `repositories/`, `services/`, `core/`) | `snake_case` | PEP 8 — estilo idiomático de Python |
-| API pública (JSON entrada/salida) | `camelCase` | Compatibilidad con clientes existentes (frontend, Postman) |
+| Capa                                                          | Convención   | Motivo                                                     |
+|---------------------------------------------------------------|--------------|------------------------------------------------------------|
+| Python interno (`db/`, `repositories/`, `services/`, `core/`) | `snake_case` | PEP 8 — estilo idiomático de Python                        |
+| API pública (JSON entrada/salida)                             | `camelCase`  | Compatibilidad con clientes existentes (frontend, Postman) |
 
 La conversión es **automática** vía `pydantic.alias_generators.to_camel` en `schemas/base.py::ApiModel`.
 
@@ -383,25 +393,25 @@ La conversión es **automática** vía `pydantic.alias_generators.to_camel` en `
 
 **Usuarios:**
 
-| Python | JSON |
-|---|---|
-| `id` | `id` |
-| `name` | `name` |
-| `email` | `email` |
+| Python          | JSON           |
+|-----------------|----------------|
+| `id`            | `id`           |
+| `name`          | `name`         |
+| `email`         | `email`        |
 | `register_date` | `registerDate` |
 
 **Partidas:**
 
-| Python | JSON |
-|---|---|
-| `id` | `id` |
+| Python              | JSON               |
+|---------------------|--------------------|
+| `id`                | `id`               |
 | `current_positions` | `currentPositions` |
-| `host_player` | `hostPlayer` |
-| `guest_player` | `guestPlayer` |
-| `player_turn` | `playerTurn` |
-| `match_result` | `matchResult` |
-| `created_date` | `createdDate` |
-| `updated_date` | `updatedDate` |
+| `host_player`       | `hostPlayer`       |
+| `guest_player`      | `guestPlayer`      |
+| `player_turn`       | `playerTurn`       |
+| `match_result`      | `matchResult`      |
+| `created_date`      | `createdDate`      |
+| `updated_date`      | `updatedDate`      |
 
 ### Reglas para contribuir
 
@@ -409,7 +419,7 @@ La conversión es **automática** vía `pydantic.alias_generators.to_camel` en `
 2. **Schemas de API** → declarar en `snake_case`; el alias `camelCase` se genera solo.
 3. **Nunca** exponer los modelos ORM directamente en la API; siempre traducir a schemas Pydantic.
 4. Al agregar un endpoint, exponer el **schema** (nunca el `*Document`).
-5. Antes de commitear: `make format && make lint && make typecheck && make test`.
+5. Antes de commitear: `make format && make lint && make typecheck && make test && make test-cov`.
 
 ---
 
