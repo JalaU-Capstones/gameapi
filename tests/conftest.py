@@ -5,10 +5,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from testcontainers.postgres import PostgresContainer
-
-from gameapi.api.deps import get_session
-from gameapi.main import app
+from testcontainers.community.postgres import PostgresContainer
 
 
 def _to_asyncpg_uri(uri: str) -> str:
@@ -75,7 +72,10 @@ async def _clean_tables(db_session: AsyncSession) -> AsyncIterator[None]:
 
 
 @pytest.fixture(autouse=True)
-def _override_dependencies(db_session: AsyncSession) -> AsyncIterator[None]:
+def _override_dependencies(db_session: AsyncSession) -> Iterator[None]:
+    from gameapi.api.deps import get_session
+    from gameapi.main import app
+
     async def _session() -> AsyncIterator[AsyncSession]:
         yield db_session
 
@@ -86,6 +86,8 @@ def _override_dependencies(db_session: AsyncSession) -> AsyncIterator[None]:
 
 @pytest.fixture
 async def client(_override_dependencies: None) -> AsyncIterator[AsyncClient]:
+    from gameapi.main import app
+
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
