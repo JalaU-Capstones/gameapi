@@ -89,7 +89,7 @@ async def test_get_user_by_id(client: AsyncClient) -> None:
 
 
 async def test_get_user_by_id_not_found(client: AsyncClient) -> None:
-    response = await client.get("/api/users/000000000000000000000000")
+    response = await client.get("/api/users/00000000-0000-0000-0000-000000000000")
     assert response.status_code == 404
     assert response.json()["message"] == "User not found"
 

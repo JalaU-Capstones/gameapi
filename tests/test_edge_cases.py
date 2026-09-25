@@ -1,18 +1,7 @@
 """Edge case tests to raise overall test coverage above the configured threshold."""
 
-import asyncio
-
-import pytest
-from bson import ObjectId
 from httpx import AsyncClient
-from pydantic import BaseModel, ConfigDict, ValidationError
 
-from gameapi.core.database import (
-    MongoDatabase,
-    get_gameplays_collection,
-    get_users_collection,
-)
-from gameapi.models.common import PyObjectId
 from gameapi.services.exceptions import (
     DomainError,
     EmailAlreadyExistsError,
@@ -36,71 +25,6 @@ def test_exception_messages_include_identifier() -> None:
     assert "abc" in str(UserNotFoundError("abc"))
     assert "x@y.com" in str(EmailAlreadyExistsError("x@y.com"))
     assert "def" in str(GameplayNotFoundError("def"))
-
-
-# ------------------------------------------------------- database lifecycle
-
-
-def test_get_db_raises_when_not_connected() -> None:
-    original_db = MongoDatabase.db
-    MongoDatabase.db = None
-    try:
-        with pytest.raises(RuntimeError, match="not connected"):
-            MongoDatabase.get_db()
-    finally:
-        MongoDatabase.db = original_db
-
-
-def test_get_collections_raise_when_not_connected() -> None:
-    original_db = MongoDatabase.db
-    MongoDatabase.db = None
-    try:
-        with pytest.raises(RuntimeError):
-            get_users_collection()
-        with pytest.raises(RuntimeError):
-            get_gameplays_collection()
-    finally:
-        MongoDatabase.db = original_db
-
-
-def test_disconnect_when_never_connected() -> None:
-    original_client = MongoDatabase.client
-    original_db = MongoDatabase.db
-    MongoDatabase.client = None
-    MongoDatabase.db = None
-    try:
-        asyncio.run(MongoDatabase.disconnect())
-        assert MongoDatabase.client is None
-        assert MongoDatabase.db is None
-    finally:
-        MongoDatabase.client = original_client
-        MongoDatabase.db = original_db
-
-
-# ----------------------------------------------------- PyObjectId validation
-
-
-class _PyObjectIdModel(BaseModel):
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
-    id: PyObjectId
-
-
-def test_pyobjectid_rejects_invalid_string() -> None:
-    with pytest.raises(ValidationError):
-        _PyObjectIdModel(id="not-a-valid-objectid")
-
-
-def test_pyobjectid_accepts_valid_string_and_object_id() -> None:
-    valid_str = "65f0a1b2c3d4e5f60718293a"
-    expected = ObjectId(valid_str)
-    assert _PyObjectIdModel(id=valid_str).id == expected
-    assert _PyObjectIdModel(id=expected).id == expected
-
-
-def test_pyobjectid_serializes_to_string() -> None:
-    model = _PyObjectIdModel(id="65f0a1b2c3d4e5f60718293a")
-    assert model.model_dump(mode="json") == {"id": "65f0a1b2c3d4e5f60718293a"}
 
 
 # ------------------------------------------------------- users: edge cases
@@ -180,7 +104,7 @@ async def test_update_gameplay_not_found_returns_404(
     auth_headers: dict[str, str],
 ) -> None:
     response = await client.put(
-        "/api/gameplays/000000000000000000000000",
+        "/api/gameplays/00000000-0000-0000-0000-000000000000",
         json={"currentPositions": VALID_BOARD},
         headers=auth_headers,
     )
@@ -192,7 +116,7 @@ async def test_delete_gameplay_not_found_returns_404(
     auth_headers: dict[str, str],
 ) -> None:
     response = await client.delete(
-        "/api/gameplays/000000000000000000000000",
+        "/api/gameplays/00000000-0000-0000-0000-000000000000",
         headers=auth_headers,
     )
     assert response.status_code == 404
@@ -248,7 +172,7 @@ async def test_update_gameplay_with_nonexistent_guest_returns_400(
 
     response = await client.put(
         f"/api/gameplays/{gameplay_id}",
-        json={"guestPlayer": "000000000000000000000000"},
+        json={"guestPlayer": "00000000-0000-0000-0000-000000000000"},
         headers=auth_headers,
     )
     assert response.status_code == 400
