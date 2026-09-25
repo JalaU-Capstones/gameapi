@@ -89,7 +89,7 @@ async def test_get_user_by_id(client: AsyncClient) -> None:
 
 
 async def test_get_user_by_id_not_found(client: AsyncClient) -> None:
-    response = await client.get("/api/users/000000000000000000000000")
+    response = await client.get("/api/users/00000000-0000-0000-0000-000000000000")
     assert response.status_code == 404
     assert response.json()["message"] == "User not found"
 
@@ -123,6 +123,24 @@ async def test_update_user_with_token(
 
     fetched = await client.get(f"/api/users/{user_id}")
     assert fetched.json()["name"] == "Updated Name"
+
+
+async def test_update_user_with_email_only_updates_email(
+    client: AsyncClient,
+    registered_user: dict,
+    auth_headers: dict[str, str],
+) -> None:
+    user_id = registered_user["id"]
+    response = await client.put(
+        f"/api/users/{user_id}",
+        json={"email": "new@example.com"},
+        headers=auth_headers,
+    )
+    assert response.status_code == 204, response.text
+
+    fetched = await client.get(f"/api/users/{user_id}")
+    assert fetched.status_code == 200, fetched.text
+    assert fetched.json()["email"] == "new@example.com"
 
 
 async def test_update_another_user_returns_403(

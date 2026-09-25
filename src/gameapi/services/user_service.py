@@ -1,77 +1,96 @@
-from datetime import UTC, datetime
+import uuid
 
-from bson import ObjectId
-from motor.motor_asyncio import AsyncIOMotorCollection
-from pymongo.errors import DuplicateKeyError
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from gameapi.core.database import MongoDocument
 from gameapi.core.security import hash_password
-from gameapi.models.user import UserDocument
-from gameapi.schemas.user import UserCreate, UserUpdate
+from gameapi.db.models.user import User
+from gameapi.repositories.user_repository import UserRepository
+from gameapi.schemas.user import UserCreate, UserResponse, UserUpdate
 from gameapi.services.exceptions import EmailAlreadyExistsError, UserNotFoundError
 
 
 class UserService:
-    def __init__(self, collection: AsyncIOMotorCollection[MongoDocument]) -> None:
-        self._collection = collection
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+        self._repo = UserRepository(session)
 
     async def ensure_indexes(self) -> None:
-        await self._collection.create_index("email", unique=True)
+        return None
 
-    async def list_all(self) -> list[UserDocument]:
-        cursor = self._collection.find({})
-        return [UserDocument.from_mongo(doc) async for doc in cursor]
+    async def list_all(self) -> list[UserResponse]:
+        users = await self._repo.list_all()
+        return [UserResponse.model_validate(user) for user in users]
 
-    async def get_by_id(self, user_id: str) -> UserDocument | None:
-        if not ObjectId.is_valid(user_id):
+    async def get_by_id(self, user_id: str) -> UserResponse | None:
+        try:
+            parsed_id = uuid.UUID(user_id)
+        except ValueError:
             return None
-        doc = await self._collection.find_one({"_id": ObjectId(user_id)})
-        return UserDocument.from_mongo(doc) if doc else None
+        user = await self._repo.get_by_id(parsed_id)
+        if user is None:
+            return None
+        return UserResponse.model_validate(user)
 
-    async def get_by_email(self, email: str) -> UserDocument | None:
-        doc = await self._collection.find_one({"email": email.lower()})
-        return UserDocument.from_mongo(doc) if doc else None
+    async def get_by_email(self, email: str) -> User | None:
+        return await self._repo.get_by_email(email.lower())
 
-    async def create(self, data: UserCreate) -> UserDocument:
-        user = UserDocument(
+    async def create(self, data: UserCreate) -> UserResponse:
+        user = User(
             name=data.name,
             email=data.email.lower(),
-            password=hash_password(data.password),
-            register_date=datetime.now(UTC),
+            password_hash=hash_password(data.password),
         )
         try:
-            result = await self._collection.insert_one(user.to_mongo())
-        except DuplicateKeyError as exc:
-            raise EmailAlreadyExistsError(data.email) from exc
-        user.id = result.inserted_id
-        return user
+            created = await self._repo.create(user)
+        except IntegrityError as exc:
+            await self._session.rollback()
+            if exc.orig is not None and getattr(exc.orig, "pgcode", None) == "23505":
+                raise EmailAlreadyExistsError(data.email) from exc
+            raise
+        return UserResponse.model_validate(created)
 
-    async def update(self, user_id: str, data: UserUpdate) -> UserDocument:
-        user = await self.get_by_id(user_id)
+    async def update(self, user_id: str, data: UserUpdate) -> UserResponse:
+        try:
+            parsed_id = uuid.UUID(user_id)
+        except ValueError as exc:
+            raise UserNotFoundError(user_id) from exc
+
+        user = await self._repo.get_by_id(parsed_id)
         if user is None:
             raise UserNotFoundError(user_id)
 
-        updates: dict[str, object] = {}
+        update_fields: dict[str, object] = {}
         if data.name is not None:
-            updates["name"] = data.name
+            update_fields["name"] = data.name
         if data.email is not None:
-            updates["email"] = data.email.lower()
+            update_fields["email"] = data.email.lower()
         if data.password is not None:
-            updates["password"] = hash_password(data.password)
+            update_fields["password_hash"] = hash_password(data.password)
 
-        if not updates:
-            return user
+        if not update_fields:
+            return UserResponse.model_validate(user)
+
+        for key, value in update_fields.items():
+            setattr(user, key, value)
 
         try:
-            await self._collection.update_one({"_id": user.id}, {"$set": updates})
-        except DuplicateKeyError as exc:
-            raise EmailAlreadyExistsError(data.email or user.email) from exc
+            await self._repo.update(user)
+        except IntegrityError as exc:
+            await self._session.rollback()
+            if exc.orig is not None and getattr(exc.orig, "pgcode", None) == "23505":
+                raise EmailAlreadyExistsError(data.email or user.email) from exc
+            raise
 
-        return user.model_copy(update=updates)
+        return UserResponse.model_validate(user)
 
     async def delete(self, user_id: str) -> None:
-        if not ObjectId.is_valid(user_id):
+        try:
+            parsed_id = uuid.UUID(user_id)
+        except ValueError as exc:
+            raise UserNotFoundError(user_id) from exc
+
+        user = await self._repo.get_by_id(parsed_id)
+        if user is None:
             raise UserNotFoundError(user_id)
-        result = await self._collection.delete_one({"_id": ObjectId(user_id)})
-        if result.deleted_count == 0:
-            raise UserNotFoundError(user_id)
+        await self._repo.delete(user)

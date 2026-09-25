@@ -1,90 +1,100 @@
-from collections.abc import AsyncIterator
-from typing import Any
+import os
+from collections.abc import AsyncIterator, Iterator
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-from mongomock_motor import AsyncMongoMockClient
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from testcontainers.community.postgres import PostgresContainer
 
-from gameapi.api.deps import get_db, get_gameplay_service, get_user_service
-from gameapi.core.database import get_gameplays_collection, get_users_collection
-from gameapi.main import app
-from gameapi.services import GameplayService, UserService
+
+def _to_asyncpg_uri(uri: str) -> str:
+    """Convert a sync SQLAlchemy URI (psycopg2) to an asyncpg URI."""
+    return uri.replace("postgresql+psycopg2://", "postgresql+asyncpg://").replace(
+        "postgresql://", "postgresql+asyncpg://"
+    )
+
+
+@pytest.fixture(scope="session")
+def postgres_uri() -> Iterator[str]:
+    """
+    Yield the PostgreSQL URI to use.
+
+    - If TEST_POSTGRES_URI is set (CI), use it directly.
+    - Otherwise, spin up a testcontainers PostgreSQL (local).
+    """
+    env_uri = os.environ.get("TEST_POSTGRES_URI")
+    if env_uri:
+        yield _to_asyncpg_uri(env_uri)
+        return
+
+    with PostgresContainer("postgres:16-alpine") as container:
+        yield _to_asyncpg_uri(container.get_connection_url())
+
+
+@pytest.fixture(scope="session")
+async def _run_migrations(postgres_uri: str) -> None:
+    import os
+    import subprocess
+
+    env = os.environ.copy()
+    env["POSTGRES_URI"] = postgres_uri
+    subprocess.run(["uv", "run", "alembic", "upgrade", "head"], check=True, env=env)
 
 
 @pytest.fixture
-def mock_db() -> Any:
-    return AsyncMongoMockClient()["GameDB"]
+async def db_engine(postgres_uri: str, _run_migrations: None) -> AsyncIterator:
+    engine = create_async_engine(postgres_uri, echo=False)
+    try:
+        yield engine
+    finally:
+        await engine.dispose()
 
 
 @pytest.fixture
-async def mock_users_collection(mock_db: Any) -> Any:
-    collection = mock_db["Users"]
-    await collection.create_index("email", unique=True)
-    return collection
-
-
-@pytest.fixture
-def mock_gameplays_collection(mock_db: Any) -> Any:
-    return mock_db["Gameplays"]
+async def db_session(db_engine) -> AsyncIterator[AsyncSession]:
+    factory = async_sessionmaker(db_engine, expire_on_commit=False)
+    async with factory() as session:
+        yield session
+        await session.rollback()
 
 
 @pytest.fixture(autouse=True)
-def _override_dependencies(
-    mock_db: Any,
-    mock_users_collection: Any,
-    mock_gameplays_collection: Any,
-) -> AsyncIterator[None]:
-    def _db() -> Any:
-        return mock_db
+async def _clean_tables(db_session: AsyncSession) -> AsyncIterator[None]:
+    try:
+        yield
+    finally:
+        await db_session.rollback()
+        await db_session.execute(
+            text("TRUNCATE TABLE logs, gameplays, users RESTART IDENTITY CASCADE")
+        )
+        await db_session.commit()
 
-    def _users_collection() -> Any:
-        return mock_users_collection
 
-    def _gameplays_collection() -> Any:
-        return mock_gameplays_collection
+@pytest.fixture(autouse=True)
+def _override_dependencies(db_session: AsyncSession) -> Iterator[None]:
+    from gameapi.api.deps import get_session
+    from gameapi.main import app
 
-    def _user_service() -> UserService:
-        return UserService(mock_users_collection)
+    async def _session() -> AsyncIterator[AsyncSession]:
+        yield db_session
 
-    def _gameplay_service() -> GameplayService:
-        return GameplayService(mock_gameplays_collection)
-
-    app.dependency_overrides[get_db] = _db
-    app.dependency_overrides[get_users_collection] = _users_collection
-    app.dependency_overrides[get_gameplays_collection] = _gameplays_collection
-    app.dependency_overrides[get_user_service] = _user_service
-    app.dependency_overrides[get_gameplay_service] = _gameplay_service
-
+    app.dependency_overrides[get_session] = _session
     yield
-
     app.dependency_overrides.clear()
 
 
 @pytest.fixture
 async def client(_override_dependencies: None) -> AsyncIterator[AsyncClient]:
+    from gameapi.main import app
+
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
 
 
 @pytest.fixture
-async def user_service(
-    mock_users_collection: Any,
-    _override_dependencies: None,
-) -> UserService:
-    return UserService(mock_users_collection)
-
-
-@pytest.fixture
-async def gameplay_service(
-    mock_gameplays_collection: Any,
-    _override_dependencies: None,
-) -> GameplayService:
-    return GameplayService(mock_gameplays_collection)
-
-
-@pytest.fixture
-async def registered_user(client: AsyncClient) -> dict[str, Any]:
+async def registered_user(client: AsyncClient) -> dict[str, object]:
     payload = {
         "name": "Test User",
         "email": "test@example.com",
@@ -96,7 +106,7 @@ async def registered_user(client: AsyncClient) -> dict[str, Any]:
 
 
 @pytest.fixture
-async def auth_token(client: AsyncClient, registered_user: dict[str, Any]) -> str:
+async def auth_token(client: AsyncClient, registered_user: dict[str, object]) -> str:
     response = await client.post(
         "/api/users/login",
         json={

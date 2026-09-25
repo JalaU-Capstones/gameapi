@@ -1,42 +1,28 @@
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import Annotated
 
-from fastapi import Depends, FastAPI, HTTPException, Request, status
+from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from motor.motor_asyncio import AsyncIOMotorDatabase
+from sqlalchemy import text
 
-from gameapi.api.deps import get_db
+from gameapi.api.deps import SessionDep
 from gameapi.api.v1.router import api_router
 from gameapi.core.config import settings
-from gameapi.core.database import (
-    MongoDatabase,
-    MongoDocument,
-    get_users_collection,
-)
 from gameapi.db import PostgresDatabase
-from gameapi.services import UserService
 
 logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
-    await MongoDatabase.connect()
+    await PostgresDatabase.connect()
     try:
-        await PostgresDatabase.connect()
-    except Exception:
-        logger.warning("PostgreSQL is unavailable; continuing with MongoDB only", exc_info=True)
-    try:
-        user_service = UserService(get_users_collection())
-        await user_service.ensure_indexes()
         yield
     finally:
         await PostgresDatabase.disconnect()
-        await MongoDatabase.disconnect()
 
 
 app = FastAPI(
@@ -88,17 +74,15 @@ async def http_exception_handler(
 @app.get(
     "/health",
     tags=["Health"],
-    summary="Health check for the API and MongoDB connection",
+    summary="Health check for the API and PostgreSQL connection",
 )
-async def health(
-    db: Annotated[AsyncIOMotorDatabase[MongoDocument], Depends(get_db)],
-) -> dict[str, str]:
+async def health(session: SessionDep) -> dict[str, str]:
     try:
-        await db.command("ping")
+        await session.execute(text("SELECT 1"))
     except Exception:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="MongoDB unavailable",
+            detail="PostgreSQL unavailable",
         ) from None
     return {"status": "ok"}
 

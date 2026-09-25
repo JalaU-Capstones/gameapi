@@ -78,7 +78,7 @@ async def test_create_gameplay_with_nonexistent_guest_returns_400(
         json={
             "currentPositions": VALID_BOARD,
             "hostPlayer": registered_user["id"],
-            "guestPlayer": "000000000000000000000000",
+            "guestPlayer": "00000000-0000-0000-0000-000000000000",
             "playerTurn": registered_user["id"],
         },
         headers=auth_headers,
@@ -153,7 +153,7 @@ async def test_get_gameplay_by_id(
 
 
 async def test_get_gameplay_not_found(client: AsyncClient) -> None:
-    response = await client.get("/api/gameplays/000000000000000000000000")
+    response = await client.get("/api/gameplays/00000000-0000-0000-0000-000000000000")
     assert response.status_code == 404
 
 

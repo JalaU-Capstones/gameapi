@@ -17,8 +17,10 @@ variables:
   UV_LINK_MODE: "copy"
   UV_PYTHON_DOWNLOADS: "automatic"
   PIP_DISABLE_PIP_VERSION_CHECK: "1"
-  MONGO_CONNECTION_STRING: "mongodb://localhost:27017"
-  MONGO_DATABASE_NAME: "GameDB"
+  POSTGRES_USER: "gameapi"
+  POSTGRES_PASSWORD: "gameapi"
+  POSTGRES_DB: "gameapi"
+  TEST_POSTGRES_URI: "postgresql+asyncpg://gameapi:gameapi@postgres:5432/gameapi"
   JWT_SECRET_KEY: "Una_Clave_Secreta_Super_Segura_con_Minimo_32_Caracteres_123456789"
   JWT_ALGORITHM: "HS256"
   JWT_ISSUER: "GameAPI"
@@ -53,13 +55,23 @@ test:python:
   image: python:${PYTHON_VERSION}-slim
   parallel:
     matrix:
-      - PYTHON_VERSION: ["3.12", "3.13"]
+      - PYTHON_VERSION: ["3.14"]
+  services:
+    - name: postgres:16-alpine
+      alias: postgres
+  variables:
+    POSTGRES_USER: "gameapi"
+    POSTGRES_PASSWORD: "gameapi"
+    POSTGRES_DB: "gameapi"
+    TEST_POSTGRES_URI: "postgresql+asyncpg://gameapi:gameapi@postgres:5432/gameapi"
   before_script:
     - pip install --no-cache-dir uv
     - uv python install ${PYTHON_VERSION}
     - uv sync --frozen --all-extras --dev --python ${PYTHON_VERSION}
   script:
-    - uv run pytest --cov=gameapi --cov-report=term-missing --cov-report=xml:coverage.xml
+    - uv run coverage run -m pytest -o addopts=""
+    - uv run coverage report --fail-under=85
+    - uv run coverage xml -o coverage.xml
   artifacts:
     when: always
     paths:

@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help install dev run test test-cov lint format typecheck clean docker-up docker-down docker-logs docker-reset migrate migrate-create pre-commit pre-commit-install
+.PHONY: help install dev run test test-cov lint format typecheck clean docker-up docker-down docker-logs docker-reset test-clean migrate migrate-create pre-commit pre-commit-install
 
 help:
 	@echo "Comandos disponibles:"
@@ -7,11 +7,12 @@ help:
 	@echo "  make dev         Ejecuta el servidor con recarga en caliente"
 	@echo "  make run         Ejecuta el servidor en modo producción"
 	@echo "  make test        Ejecuta los tests con pytest"
+	@echo "  make test-cov    Ejecuta los tests con cobertura"
 	@echo "  make lint        Analiza el código con ruff"
 	@echo "  make format      Formatea el código con ruff"
 	@echo "  make typecheck   Verifica tipos con mypy"
 	@echo "  make clean       Limpia cachés y artefactos"
-	@echo "  make docker-up   Levanta MongoDB y la API con docker-compose"
+	@echo "  make docker-up   Levanta PostgreSQL y la API con docker-compose"
 	@echo "  make docker-down Detiene los contenedores"
 	@echo "  make migrate     Aplica las migraciones de Alembic"
 	@echo "  make migrate-create Crea una migración de Alembic"
@@ -20,10 +21,10 @@ install:
 	uv sync
 
 dev:
-	uv run uvicorn gameapi.main:app --reload --host $${APP_HOST:-0.0.0.0} --port $${APP_PORT:-8080}
+	uv run python -m gameapi
 
 run:
-	uv run uvicorn gameapi.main:app --host $${APP_HOST:-0.0.0.0} --port $${APP_PORT:-8080}
+	uv run python -m gameapi
 
 lint:
 	uv run ruff check .
@@ -53,8 +54,13 @@ docker-reset:
 test:
 	uv run pytest -v
 
+test-clean:
+	docker ps -aq --filter "label=testcontainers" | xargs -r docker rm -f
+
 test-cov:
-	uv run pytest --cov=gameapi --cov-report=term-missing --cov-report=html
+	uv run coverage run -m pytest
+	uv run coverage report --fail-under=85
+	uv run coverage html
 	@echo "HTML report: htmlcov/index.html"
 
 pre-commit:
