@@ -24,3 +24,6 @@ dist/
 .DS_Store
 
 *.log
+
+# Alembic
+*.db

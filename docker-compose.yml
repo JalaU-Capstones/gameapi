@@ -17,6 +17,25 @@ services:
       retries: 5
       start_period: 15s
 
+  postgres:
+    image: postgres:16-alpine
+    container_name: game-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: gameapi
+      POSTGRES_PASSWORD: gameapi
+      POSTGRES_DB: gameapi
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gameapi"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
   api:
     build:
       context: .
@@ -28,6 +47,7 @@ services:
     environment:
       MONGO_CONNECTION_STRING: mongodb://mongodb:27017
       MONGO_DATABASE_NAME: GameDB
+      POSTGRES_URI: postgresql+asyncpg://gameapi:gameapi@postgres:5432/gameapi
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-Una_Clave_Secreta_Super_Segura_con_Minimo_32_Caracteres_123456789}
       JWT_ALGORITHM: HS256
       JWT_ISSUER: GameAPI
@@ -39,6 +59,8 @@ services:
       CORS_ORIGINS: "*"
     depends_on:
       mongodb:
+        condition: service_healthy
+      postgres:
         condition: service_healthy
     healthcheck:
       test:
@@ -54,3 +76,4 @@ services:
 volumes:
   mongodb_data:
   mongodb_config:
+  postgres_data:

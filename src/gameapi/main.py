@@ -1,3 +1,4 @@
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Annotated
@@ -16,17 +17,25 @@ from gameapi.core.database import (
     MongoDocument,
     get_users_collection,
 )
+from gameapi.db import PostgresDatabase
 from gameapi.services import UserService
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     await MongoDatabase.connect()
     try:
+        await PostgresDatabase.connect()
+    except Exception:
+        logger.warning("PostgreSQL is unavailable; continuing with MongoDB only", exc_info=True)
+    try:
         user_service = UserService(get_users_collection())
         await user_service.ensure_indexes()
         yield
     finally:
+        await PostgresDatabase.disconnect()
         await MongoDatabase.disconnect()
 
 

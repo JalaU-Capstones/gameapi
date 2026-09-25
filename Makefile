@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help install dev run test lint format typecheck clean docker-up docker-down
+.PHONY: help install dev run test test-cov lint format typecheck clean docker-up docker-down docker-logs docker-reset migrate migrate-create pre-commit pre-commit-install
 
 help:
 	@echo "Comandos disponibles:"
@@ -13,6 +13,8 @@ help:
 	@echo "  make clean       Limpia cachés y artefactos"
 	@echo "  make docker-up   Levanta MongoDB y la API con docker-compose"
 	@echo "  make docker-down Detiene los contenedores"
+	@echo "  make migrate     Aplica las migraciones de Alembic"
+	@echo "  make migrate-create Crea una migración de Alembic"
 
 install:
 	uv sync
@@ -36,8 +38,6 @@ clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 	rm -rf .pytest_cache .mypy_cache .ruff_cache .coverage htmlcov build dist *.egg-info
 
-.PHONY: help install dev run test lint format typecheck clean docker-up docker-down docker-logs docker-reset
-
 docker-up:
 	docker compose up --build -d
 
@@ -49,8 +49,6 @@ docker-logs:
 
 docker-reset:
 	docker compose down -v
-
-.PHONY: help install dev run test test-cov lint format typecheck pre-commit clean docker-up docker-down docker-logs docker-reset
 
 test:
 	uv run pytest -v
@@ -64,3 +62,10 @@ pre-commit:
 
 pre-commit-install:
 	uv run pre-commit install
+
+migrate:
+	uv run alembic upgrade head
+
+migrate-create:
+	@read -p "Migration name: " name; \
+	uv run alembic revision --autogenerate -m "$$name"

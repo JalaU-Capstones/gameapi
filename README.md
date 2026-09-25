@@ -53,9 +53,10 @@ Antes de instalar, asegúrate de tener:
 | **uv** | 0.4+ | `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
 | **Git** | 2.30+ | <https://git-scm.com/downloads> |
 | **MongoDB** | 7.0 (opcional si usas Docker) | <https://www.mongodb.com/try/download/community> |
+| **PostgreSQL** | 16 (opcional si usas Docker) | <https://www.postgresql.org/download/> |
 | **Docker** + **Compose** | 24+ / v2 (opcional) | <https://docs.docker.com/get-docker/> |
 
-> **Recomendado:** usa Docker para levantar MongoDB y la API sin instalar nada más. Si prefieres desarrollo local, instala MongoDB community o usa [MongoDB Atlas](https://www.mongodb.com/atlas) (cloud gratuito).
+> **Recomendado:** usa Docker para levantar MongoDB, PostgreSQL y la API sin instalar nada más. Si prefieres desarrollo local, instala MongoDB Community y PostgreSQL, o usa [MongoDB Atlas](https://www.mongodb.com/atlas) (cloud gratuito).
 
 ---
 
@@ -94,6 +95,7 @@ Todas las variables se leen desde `.env` (ver `.env.example`):
 |---|---|---|
 | `MONGO_CONNECTION_STRING` | URI de MongoDB | `mongodb://localhost:27017` |
 | `MONGO_DATABASE_NAME` | Nombre de la base de datos | `GameDB` |
+| `POSTGRES_URI` | URI de PostgreSQL para SQLAlchemy async | `postgresql+asyncpg://gameapi:gameapi@localhost:5432/gameapi` |
 | `JWT_SECRET_KEY` | Clave secreta para firmar JWT (mín. 32 caracteres) | *(requerido)* |
 | `JWT_ALGORITHM` | Algoritmo de firma | `HS256` |
 | `JWT_ISSUER` | Emisor del token | `GameAPI` |
@@ -104,25 +106,56 @@ Todas las variables se leen desde `.env` (ver `.env.example`):
 | `APP_PORT` | Puerto de escucha | `8080` |
 | `CORS_ORIGINS` | Orígenes permitidos (coma-separados o `*`) | `*` |
 
+> **Migración en curso:** MongoDB y PostgreSQL coexisten temporalmente. MongoDB sigue siendo la base de datos principal de la API mientras se completa la migración.
+
 ---
 
 ## Ejecución
 
-### Opción 1: Local (con MongoDB corriendo aparte)
+### Opción 1: Local (con MongoDB y PostgreSQL corriendo aparte)
 
 ```bash
 # Levantar solo MongoDB con Docker
 docker run -d --name game-mongodb -p 27017:27017 mongo:7.0
 
+# Levantar PostgreSQL con Docker
+docker run -d --name game-postgres -p 5432:5432 \
+  -e POSTGRES_USER=gameapi \
+  -e POSTGRES_PASSWORD=gameapi \
+  -e POSTGRES_DB=gameapi \
+  postgres:16-alpine
+
 # Arrancar la API en modo desarrollo (con hot-reload)
 make dev
 ```
 
-### Opción 2: Docker Compose (API + MongoDB)
+### Opción 2: Docker Compose (API + MongoDB + PostgreSQL)
 
 ```bash
 make docker-up
 ```
+
+### Migraciones con Alembic
+
+Con PostgreSQL disponible, aplica el esquema inicial con:
+
+```bash
+uv run alembic upgrade head
+```
+
+Para revertir una revisión:
+
+```bash
+uv run alembic downgrade -1
+```
+
+Para crear una migración a partir de cambios en los modelos:
+
+```bash
+uv run alembic revision --autogenerate -m "description"
+```
+
+Las migraciones versionadas se almacenan en `migrations/versions/`.
 
 ### URLs
 
@@ -292,7 +325,7 @@ Detalles:
 - Imagen de la API: multi-stage build (`ghcr.io/astral-sh/uv` + `python:3.12-slim-bookworm`).
 - Usuario no-root en el contenedor.
 - Healthchecks reales para MongoDB y la API.
-- La API espera a que Mongo esté `healthy` antes de arrancar.
+- Healthcheck de PostgreSQL y espera a que MongoDB y PostgreSQL estén `healthy` antes de arrancar.
 
 ---
 
@@ -306,6 +339,7 @@ gameapi/
 │   ├── schemas/         # Contratos de API (camelCase, validación)
 │   ├── services/        # Lógica de negocio async, errores de dominio
 │   ├── api/             # Routers FastAPI + dependencias (auth, DI)
+│   ├── db/              # Capa PostgreSQL en configuración junto a MongoDB
 │   └── main.py          # App FastAPI, lifespan, CORS, exception handlers
 ├── tests/               # pytest + httpx + mongomock
 ├── Dockerfile

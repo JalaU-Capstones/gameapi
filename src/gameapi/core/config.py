@@ -12,6 +12,15 @@ class MongoSettings(BaseSettings):
     database_name: str = Field(default="GameDB", min_length=1)
 
 
+class PostgresSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="POSTGRES_", env_file=".env", extra="ignore")
+
+    uri: str = Field(
+        default="postgresql+asyncpg://gameapi:gameapi@localhost:5432/gameapi",
+        min_length=1,
+    )
+
+
 class JWTSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="JWT_", env_file=".env", extra="ignore")
 
@@ -45,6 +54,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     mongo: MongoSettings = Field(default_factory=MongoSettings)
+    postgres: PostgresSettings = Field(default_factory=PostgresSettings)
     jwt: JWTSettings = Field(default_factory=JWTSettings)
     app: AppSettings = Field(default_factory=AppSettings)
 
