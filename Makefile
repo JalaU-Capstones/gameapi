@@ -58,7 +58,7 @@ test-clean:
 	docker ps -aq --filter "label=testcontainers" | xargs -r docker rm -f
 
 test-cov:
-	uv run coverage run -m pytest
+	COVERAGE_CORE=ctrace uv run coverage run -m pytest
 	uv run coverage report --fail-under=85
 	uv run coverage html
 	@echo "HTML report: htmlcov/index.html"

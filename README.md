@@ -326,6 +326,11 @@ Hooks configurados: `ruff`, `ruff-format`, `mypy`, `trailing-whitespace`, `end-o
 La cobertura se mide con `coverage run` (no con `pytest-cov`) para evitar
 conflictos entre tracers. El plugin `pytest-cov` fue removido del proyecto.
 
+La cobertura se ejecuta con `COVERAGE_CORE=ctrace` para forzar el tracer clásico
+de Coverage.py. El tracer basado en `sys.monitoring` (por defecto en Python
+3.12+) tiene problemas conocidos al medir código asíncrono y producía
+resultados inconsistentes entre versiones de Python.
+
 **GitLab CI** (`.gitlab-ci.yml`) — mismo flujo, con PostgreSQL 16 provisto como
 `services:` nativo y cacheando solo `$UV_CACHE_DIR`.
 
