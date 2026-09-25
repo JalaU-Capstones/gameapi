@@ -15,6 +15,9 @@ dependencies = [
     "bcrypt>=4.2.0",
     "python-multipart>=0.0.12",
     "email-validator>=2.2.0",
+    "sqlalchemy[asyncio]>=2.0.36",
+    "asyncpg>=0.30.0",
+    "alembic>=1.14.0",
 ]
 
 [dependency-groups]
@@ -28,6 +31,8 @@ dev = [
     "types-python-jose>=3.3.4",
     "mongomock-motor>=0.0.36",
     "pre-commit>=4.0.0",
+    "pytest-postgresql>=7.0.0",
+    "psycopg[binary]>=3.2.0",
 ]
 
 [build-system]
@@ -65,6 +70,7 @@ branch = true
 omit = [
     "*/tests/*",
     "*/__init__.py",
+    "*/db/*",
 ]
 
 [tool.coverage.report]
