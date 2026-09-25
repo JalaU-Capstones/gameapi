@@ -11,8 +11,6 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  MONGO_CONNECTION_STRING: mongodb://localhost:27017
-  MONGO_DATABASE_NAME: GameDB
   JWT_SECRET_KEY: Una_Clave_Secreta_Super_Segura_con_Minimo_32_Caracteres_123456789
   JWT_ALGORITHM: HS256
   JWT_ISSUER: GameAPI
@@ -55,6 +53,25 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.12", "3.13"]
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: gameapi
+          POSTGRES_PASSWORD: gameapi
+          POSTGRES_DB: gameapi
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U gameapi"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      TEST_POSTGRES_URI: postgresql+asyncpg://gameapi:gameapi@localhost:5432/gameapi
+
     steps:
       - uses: actions/checkout@v4
 
@@ -103,10 +120,30 @@ jobs:
 
       - name: Smoke test image
         run: |
-          docker run -d --name api-smoke -p 8080:8080 \
-            -e MONGO_CONNECTION_STRING=mongodb://localhost:27017 \
+          docker network create gameapi-smoke || true
+
+          docker run -d --name pg-smoke --network gameapi-smoke \
+            -e POSTGRES_USER=gameapi \
+            -e POSTGRES_PASSWORD=gameapi \
+            -e POSTGRES_DB=gameapi \
+            postgres:16-alpine
+
+          echo "Waiting for PostgreSQL to be ready..."
+          for i in $(seq 1 30); do
+            if docker exec pg-smoke pg_isready -U gameapi > /dev/null 2>&1; then
+              echo "PostgreSQL is ready"
+              break
+            fi
+            sleep 1
+          done
+
+          docker run -d --name api-smoke --network gameapi-smoke -p 8080:8080 \
+            -e POSTGRES_URI=postgresql+asyncpg://gameapi:gameapi@pg-smoke:5432/gameapi \
             -e JWT_SECRET_KEY=Una_Clave_Secreta_Super_Segura_con_Minimo_32_Caracteres_123456789 \
             gameapi:ci
-          sleep 3
+
+          sleep 5
           docker logs api-smoke
-          docker rm -f api-smoke || true
+
+          docker rm -f api-smoke pg-smoke || true
+          docker network rm gameapi-smoke || true
