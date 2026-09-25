@@ -1,4 +1,5 @@
-from collections.abc import AsyncIterator
+import os
+from collections.abc import AsyncIterator, Iterator
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -10,16 +11,28 @@ from gameapi.api.deps import get_session
 from gameapi.main import app
 
 
+def _to_asyncpg_uri(uri: str) -> str:
+    """Convert a sync SQLAlchemy URI (psycopg2) to an asyncpg URI."""
+    return uri.replace("postgresql+psycopg2://", "postgresql+asyncpg://").replace(
+        "postgresql://", "postgresql+asyncpg://"
+    )
+
+
 @pytest.fixture(scope="session")
-def postgres_container() -> PostgresContainer:
+def postgres_uri() -> Iterator[str]:
+    """
+    Yield the PostgreSQL URI to use.
+
+    - If TEST_POSTGRES_URI is set (CI), use it directly.
+    - Otherwise, spin up a testcontainers PostgreSQL (local).
+    """
+    env_uri = os.environ.get("TEST_POSTGRES_URI")
+    if env_uri:
+        yield _to_asyncpg_uri(env_uri)
+        return
+
     with PostgresContainer("postgres:16-alpine") as container:
-        yield container
-
-
-@pytest.fixture(scope="session")
-def postgres_uri(postgres_container: PostgresContainer) -> str:
-    sync_uri = postgres_container.get_connection_url()
-    return sync_uri.replace("postgresql+psycopg2://", "postgresql+asyncpg://")
+        yield _to_asyncpg_uri(container.get_connection_url())
 
 
 @pytest.fixture(scope="session")
