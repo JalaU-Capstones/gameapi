@@ -1,26 +1,14 @@
 from fastapi import APIRouter, HTTPException, Response, status
 
 from gameapi.api.deps import CurrentUser, GameplayServiceDep, UserServiceDep
-from gameapi.models.gameplay import GameplayDocument
 from gameapi.schemas.gameplay import GameplayCreate, GameplayResponse, GameplayUpdate
 from gameapi.services import GameplayNotFoundError
 
 router = APIRouter(prefix="/gameplays", tags=["Gameplays"])
 
 
-def _to_response(gameplay: GameplayDocument) -> GameplayResponse:
-    if gameplay.id is None:
-        raise RuntimeError("Gameplay document has no _id; was it persisted?")
-    return GameplayResponse(
-        id=str(gameplay.id),
-        current_positions=gameplay.current_positions,
-        host_player=gameplay.host_player,
-        guest_player=gameplay.guest_player,
-        player_turn=gameplay.player_turn,
-        match_result=gameplay.match_result,
-        created_date=gameplay.created_date,
-        updated_date=gameplay.updated_date,
-    )
+def _to_response(gameplay: GameplayResponse) -> GameplayResponse:
+    return gameplay
 
 
 @router.get(

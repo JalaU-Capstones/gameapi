@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Response, status
 
 from gameapi.api.deps import CurrentUser, UserServiceDep
 from gameapi.core.security import create_access_token, verify_password
-from gameapi.models.user import UserDocument
+from gameapi.db.models.user import User
 from gameapi.schemas.token import LoginRequest, LoginResponse
 from gameapi.schemas.user import UserCreate, UserResponse, UserUpdate
 from gameapi.services import EmailAlreadyExistsError, UserNotFoundError
@@ -10,18 +10,13 @@ from gameapi.services import EmailAlreadyExistsError, UserNotFoundError
 router = APIRouter(prefix="/users", tags=["Users"])
 
 
-def _to_response(user: UserDocument) -> UserResponse:
-    if user.id is None:
-        raise RuntimeError("User document has no _id; was it persisted?")
-    return UserResponse(
-        id=str(user.id),
-        name=user.name,
-        email=user.email,
-        register_date=user.register_date,
-    )
+def _to_response(user: User | UserResponse) -> UserResponse:
+    if isinstance(user, UserResponse):
+        return user
+    return UserResponse.model_validate(user)
 
 
-def _require_self(current_user: UserDocument, user_id: str) -> None:
+def _require_self(current_user: UserResponse, user_id: str) -> None:
     if current_user.id is None:
         raise RuntimeError("Authenticated user has no _id")
     if str(current_user.id) != user_id:

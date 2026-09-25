@@ -1,36 +1,32 @@
+from collections.abc import AsyncIterator
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from motor.motor_asyncio import AsyncIOMotorCollection, AsyncIOMotorDatabase
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from gameapi.core.database import (
-    MongoDatabase,
-    MongoDocument,
-    get_gameplays_collection,
-    get_users_collection,
-)
 from gameapi.core.security import TokenDecodeError, decode_access_token
-from gameapi.models.user import UserDocument
+from gameapi.db.session import session_scope
+from gameapi.schemas.user import UserResponse
 from gameapi.services import GameplayService, UserService
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
 
-def get_db() -> AsyncIOMotorDatabase[MongoDocument]:
-    return MongoDatabase.get_db()
+async def get_session() -> AsyncIterator[AsyncSession]:
+    async with session_scope() as session:
+        yield session
 
 
-def get_user_service(
-    collection: Annotated[AsyncIOMotorCollection[MongoDocument], Depends(get_users_collection)],
-) -> UserService:
-    return UserService(collection)
+SessionDep = Annotated[AsyncSession, Depends(get_session)]
 
 
-def get_gameplay_service(
-    collection: Annotated[AsyncIOMotorCollection[MongoDocument], Depends(get_gameplays_collection)],
-) -> GameplayService:
-    return GameplayService(collection)
+def get_user_service(session: SessionDep) -> UserService:
+    return UserService(session)
+
+
+def get_gameplay_service(session: SessionDep) -> GameplayService:
+    return GameplayService(session)
 
 
 UserServiceDep = Annotated[UserService, Depends(get_user_service)]
@@ -40,7 +36,7 @@ GameplayServiceDep = Annotated[GameplayService, Depends(get_gameplay_service)]
 async def get_current_user(
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)],
     user_service: UserServiceDep,
-) -> UserDocument:
+) -> UserResponse:
     if credentials is None or credentials.scheme.lower() != "bearer":
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -66,4 +62,4 @@ async def get_current_user(
     return user
 
 
-CurrentUser = Annotated[UserDocument, Depends(get_current_user)]
+CurrentUser = Annotated[UserResponse, Depends(get_current_user)]

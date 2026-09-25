@@ -1,15 +1,8 @@
 from functools import lru_cache
 from typing import Annotated, Literal
 
-from pydantic import Field, field_validator
+from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
-
-
-class MongoSettings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="MONGO_", env_file=".env", extra="ignore")
-
-    connection_string: str = Field(default="mongodb://localhost:27017", min_length=1)
-    database_name: str = Field(default="GameDB", min_length=1)
 
 
 class PostgresSettings(BaseSettings):
@@ -35,12 +28,24 @@ class JWTSettings(BaseSettings):
 
 
 class AppSettings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_prefix="APP_", env_file=".env", extra="ignore")
 
-    env: Literal["development", "staging", "production"] = "development"
-    host: str = "0.0.0.0"
-    port: int = 8080
-    cors_origins: Annotated[list[str], NoDecode] = Field(default_factory=lambda: ["*"])
+    env: Literal["development", "staging", "production"] = Field(
+        default="development",
+        validation_alias=AliasChoices("APP_ENV", "env"),
+    )
+    host: str = Field(
+        default="0.0.0.0",
+        validation_alias=AliasChoices("APP_HOST", "host"),
+    )
+    port: int = Field(
+        default=8080,
+        validation_alias=AliasChoices("APP_PORT", "port"),
+    )
+    cors_origins: Annotated[list[str], NoDecode] = Field(
+        default_factory=lambda: ["*"],
+        validation_alias=AliasChoices("CORS_ORIGINS", "APP_CORS_ORIGINS", "cors_origins"),
+    )
 
     @field_validator("cors_origins", mode="before")
     @classmethod
@@ -53,7 +58,6 @@ class AppSettings(BaseSettings):
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    mongo: MongoSettings = Field(default_factory=MongoSettings)
     postgres: PostgresSettings = Field(default_factory=PostgresSettings)
     jwt: JWTSettings = Field(default_factory=JWTSettings)
     app: AppSettings = Field(default_factory=AppSettings)
