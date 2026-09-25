@@ -125,6 +125,24 @@ async def test_update_user_with_token(
     assert fetched.json()["name"] == "Updated Name"
 
 
+async def test_update_user_with_email_only_updates_email(
+    client: AsyncClient,
+    registered_user: dict,
+    auth_headers: dict[str, str],
+) -> None:
+    user_id = registered_user["id"]
+    response = await client.put(
+        f"/api/users/{user_id}",
+        json={"email": "new@example.com"},
+        headers=auth_headers,
+    )
+    assert response.status_code == 204, response.text
+
+    fetched = await client.get(f"/api/users/{user_id}")
+    assert fetched.status_code == 200, fetched.text
+    assert fetched.json()["email"] == "new@example.com"
+
+
 async def test_update_another_user_returns_403(
     client: AsyncClient,
     registered_user: dict,
