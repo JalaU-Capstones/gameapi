@@ -17,7 +17,6 @@ variables:
   UV_LINK_MODE: "copy"
   UV_PYTHON_DOWNLOADS: "automatic"
   PIP_DISABLE_PIP_VERSION_CHECK: "1"
-  COVERAGE_CORE: "ctrace"
   POSTGRES_USER: "gameapi"
   POSTGRES_PASSWORD: "gameapi"
   POSTGRES_DB: "gameapi"
@@ -56,7 +55,7 @@ test:python:
   image: python:${PYTHON_VERSION}-slim
   parallel:
     matrix:
-      - PYTHON_VERSION: ["3.12", "3.13"]
+      - PYTHON_VERSION: ["3.14"]
   services:
     - name: postgres:16-alpine
       alias: postgres

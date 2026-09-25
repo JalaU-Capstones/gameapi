@@ -52,7 +52,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.12", "3.13"]
+        python-version: ["3.14"]
 
     services:
       postgres:
@@ -88,8 +88,6 @@ jobs:
         run: uv sync --frozen --all-extras --dev
 
       - name: Run tests with coverage
-        env:
-          COVERAGE_CORE: ctrace
         run: |
           uv run coverage run -m pytest -o addopts=""
           uv run coverage report --fail-under=85
