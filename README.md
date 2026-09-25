@@ -38,7 +38,7 @@ REST API para gestión de usuarios y partidas de Tic-Tac-Toe.
 - Endpoints protegidos por token y validación de propiedad.
 - Validación de datos con Pydantic v2.
 - Documentación interactiva con Swagger UI y ReDoc.
-- Tests automatizados con pytest + httpx + testcontainers[postgresql] (requieren Docker activo).
+- Tests automatizados con pytest + httpx sobre PostgreSQL, con modo local en Docker via `testcontainers` y modo CI con servicio nativo.
 - ORM async con SQLAlchemy 2.0 y PostgreSQL como base de datos principal.
 - Dockerizado con healthchecks y multi-stage build.
 
@@ -252,7 +252,14 @@ Salida esperada:
 Required test coverage of 85.0% reached. Total coverage: 87.96%
 ```
 
-Los tests usan `testcontainers[postgresql]` para levantar un PostgreSQL efímero en Docker. **Requieren Docker corriendo.** La primera ejecución descarga la imagen `postgres:16-alpine` (~100 MB).
+Los tests usan **PostgreSQL** de dos formas según el entorno:
+
+- **Local:** levantan un contenedor efímero con `testcontainers[postgresql]`.
+  Requieren Docker corriendo. La primera ejecución descarga la imagen
+  `postgres:16-alpine` (~100 MB).
+- **CI:** usan un servicio PostgreSQL nativo del runner, configurado vía la
+  variable de entorno `TEST_POSTGRES_URI`. Esto evita la sobrecarga de
+  Docker-in-Docker y hace los pipelines más rápidos y fiables.
 
 ### Cobertura
 
@@ -303,10 +310,11 @@ Hooks configurados: `ruff`, `ruff-format`, `mypy`, `trailing-whitespace`, `end-o
 **GitHub Actions** (`.github/workflows/ci.yml`) — 3 jobs:
 
 - `quality`: ruff + mypy.
-- `test`: matriz Python 3.12 / 3.13 con cobertura.
-- `docker`: build de la imagen + smoke test.
+- `test`: matriz Python 3.12 / 3.13 con cobertura, contra un servicio PostgreSQL 16.
+- `docker`: build de la imagen + smoke test con PostgreSQL en red dedicada.
 
-**GitLab CI** (`.gitlab-ci.yml`) — mismo flujo, cacheando solo `$UV_CACHE_DIR`.
+**GitLab CI** (`.gitlab-ci.yml`) — mismo flujo, con PostgreSQL 16 provisto como
+`services:` nativo y cacheando solo `$UV_CACHE_DIR`.
 
 **Dependabot** (`.github/dependabot.yml`) — PR semanal para actualizar `uv.lock` y GitHub Actions.
 
@@ -343,7 +351,7 @@ gameapi/
 │   ├── api/             # Routers FastAPI + dependencias (auth, DI)
 │   └── main.py          # App FastAPI, lifespan, CORS, exception handlers
 ├── migrations/          # Migraciones Alembic
-├── tests/               # pytest + httpx + testcontainers
+├── tests/               # pytest + httpx + PostgreSQL (local/CI dual-mode)
 ├── Dockerfile
 ├── docker-compose.yml
 ├── Makefile
