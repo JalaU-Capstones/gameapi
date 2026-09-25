@@ -323,8 +323,14 @@ Hooks configurados: `ruff`, `ruff-format`, `mypy`, `trailing-whitespace`, `end-o
   contra un servicio PostgreSQL 16.
 - `docker`: build de la imagen + smoke test con PostgreSQL en red dedicada.
 
+La cobertura se mide con `coverage run` (no con `pytest-cov`) para evitar
+conflictos entre tracers. El plugin `pytest-cov` fue removido del proyecto.
+
 **GitLab CI** (`.gitlab-ci.yml`) — mismo flujo, con PostgreSQL 16 provisto como
 `services:` nativo y cacheando solo `$UV_CACHE_DIR`.
+
+La cobertura se mide con `coverage run` (no con `pytest-cov`) para evitar
+conflictos entre tracers. El plugin `pytest-cov` fue removido del proyecto.
 
 **Dependabot** (`.github/dependabot.yml`) — PR semanal para actualizar `uv.lock` y GitHub Actions.
 

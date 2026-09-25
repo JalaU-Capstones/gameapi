@@ -69,7 +69,7 @@ test:python:
     - uv python install ${PYTHON_VERSION}
     - uv sync --frozen --all-extras --dev --python ${PYTHON_VERSION}
   script:
-    - uv run coverage run -m pytest
+    - uv run coverage run -m pytest -o addopts=""
     - uv run coverage report --fail-under=85
     - uv run coverage xml -o coverage.xml
   artifacts:
