@@ -1,14 +1,13 @@
 [project]
 name = "gameapi"
 version = "0.1.0"
-description = "REST API for users and tic-tac-toe gameplays (FastAPI + MongoDB)"
+description = "REST API for users and tic-tac-toe gameplays (FastAPI + PostgreSQL)"
 readme = "README.md"
 requires-python = ">=3.12"
 authors = [{ name = "Diego Botina", email = "alejandro.botina012@jala.university" }]
 dependencies = [
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.32.0",
-    "motor>=3.6.0",
     "pydantic>=2.9.0",
     "pydantic-settings>=2.5.0",
     "python-jose[cryptography]>=3.3.0",
@@ -29,9 +28,8 @@ dev = [
     "ruff>=0.7.0",
     "mypy>=1.11.0",
     "types-python-jose>=3.3.4",
-    "mongomock-motor>=0.0.36",
+    "testcontainers[postgresql]>=4.8.0",
     "pre-commit>=4.0.0",
-    "pytest-postgresql>=7.0.0",
     "psycopg[binary]>=3.2.0",
 ]
 

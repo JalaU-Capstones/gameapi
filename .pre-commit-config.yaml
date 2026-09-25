@@ -29,10 +29,12 @@ repos:
         additional_dependencies:
           - bcrypt>=4.2.0
           - fastapi>=0.115.0
-          - motor>=3.6.0
+          - uvicorn[standard]>=0.32.0
           - pydantic>=2.9.0
           - pydantic-settings>=2.5.0
           - sqlalchemy[asyncio]>=2.0.36
+          - asyncpg>=0.30.0
+          - alembic>=1.14.0
           - python-jose>=3.3.0
           - types-python-jose>=3.3.4
         args: [--config-file=pyproject.toml, src]
