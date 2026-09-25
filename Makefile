@@ -7,6 +7,7 @@ help:
 	@echo "  make dev         Ejecuta el servidor con recarga en caliente"
 	@echo "  make run         Ejecuta el servidor en modo producción"
 	@echo "  make test        Ejecuta los tests con pytest"
+	@echo "  make test-cov    Ejecuta los tests con cobertura"
 	@echo "  make lint        Analiza el código con ruff"
 	@echo "  make format      Formatea el código con ruff"
 	@echo "  make typecheck   Verifica tipos con mypy"
@@ -57,7 +58,9 @@ test-clean:
 	docker ps -aq --filter "label=testcontainers" | xargs -r docker rm -f
 
 test-cov:
-	uv run pytest --cov=gameapi --cov-report=term-missing --cov-report=html
+	uv run coverage run -m pytest
+	uv run coverage report --fail-under=85
+	uv run coverage html
 	@echo "HTML report: htmlcov/index.html"
 
 pre-commit:

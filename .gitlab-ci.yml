@@ -69,7 +69,9 @@ test:python:
     - uv python install ${PYTHON_VERSION}
     - uv sync --frozen --all-extras --dev --python ${PYTHON_VERSION}
   script:
-    - uv run pytest --cov=gameapi --cov-report=term-missing --cov-report=xml:coverage.xml
+    - uv run coverage run -m pytest
+    - uv run coverage report --fail-under=85
+    - uv run coverage xml -o coverage.xml
   artifacts:
     when: always
     paths:
