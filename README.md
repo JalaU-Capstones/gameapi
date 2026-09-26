@@ -6,7 +6,7 @@ REST API para gestión de usuarios y partidas de Tic-Tac-Toe.
 [![codecov](https://codecov.io/gh/JalaU-Capstones/gameapi/branch/main/graph/badge.svg)](https://codecov.io/gh/JalaU-Capstones/gameapi)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg)](https://fastapi.tiangolo.com/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![Tests](https://img.shields.io/badge/tests-50%20passed-success.svg)](#pruebas)
+[![Tests](https://img.shields.io/badge/tests-68%20passed-success.svg)](#pruebas)
 
 **Stack:** Python 3.11+ · FastAPI · PostgreSQL 16 · SQLAlchemy 2.0 async · Pydantic v2 · JWT · uv · Docker
 
@@ -248,8 +248,8 @@ make test
 Salida esperada:
 
 ```
-50 passed in ~22s
-Required test coverage of 85.0% reached. Total coverage: 87.41%
+68 passed in ~30s
+Required test coverage of 85.0% reached. Total coverage: 93.00%
 ```
 
 Los tests usan **PostgreSQL** de dos formas según el entorno:
@@ -271,15 +271,16 @@ make test-cov
 
 **Umbral mínimo:** 85% (configurado en `pyproject.toml` → `[tool.coverage.report] fail_under`).
 
-**Cobertura actual:** 87.41% (579 statements, 104 branches).
+**Cobertura actual:** 93% (577 statements, 100 branches).
 
-| Archivo                    | Tests | Qué cubre                                                                                             |
-|----------------------------|-------|-------------------------------------------------------------------------------------------------------|
-| `tests/test_security.py`   | 4     | Hashing bcrypt, JWT create/decode, token manipulado.                                                  |
-| `tests/test_health.py`     | 1     | Endpoint `/health` con PostgreSQL disponible.                                                         |
-| `tests/test_users.py`      | 15    | Registro, duplicado, validación, login, CRUD con permisos.                                            |
-| `tests/test_gameplays.py`  | 13    | CRUD, validación JSON, permisos host/guest.                                                           |
-| `tests/test_edge_cases.py` | 16    | Edge cases: UUID validation, session lifecycle, auth malformado, guest inexistente, jugadores ajenos. |
+| Archivo                     | Tests | Qué cubre                                                                                  |
+|-----------------------------|-------|--------------------------------------------------------------------------------------------|
+| `tests/test_security.py`    | 4     | Hashing bcrypt, JWT create/decode, token manipulado.                                       |
+| `tests/test_health.py`      | 1     | Endpoint `/health` con PostgreSQL disponible.                                              |
+| `tests/test_users.py`       | 20    | Registro, duplicado, validación, login, CRUD con permisos, updates parciales.             |
+| `tests/test_gameplays.py`   | 21    | CRUD, validación JSON, permisos host/guest, updates por campo.                            |
+| `tests/test_edge_cases.py`  | 16    | Edge cases: UUID validation, session lifecycle, auth malformado, guest inexistente.       |
+| `tests/test_services_unit.py` | 6    | Unit tests directos a servicios: `_legacy_json_string`, deletes y updates con UUID inválido, `ensure_indexes`. |
 
 **Reporte HTML** (local, tras `make test-cov`):
 
@@ -291,11 +292,10 @@ open htmlcov/index.html
 
 **Módulos con menor cobertura**:
 
-- `services/gameplay_service.py` (79%): branches secundarios del update y
-  validación de estados.
+- `api/deps.py` (89%): branches defensivos de auth.
+- `api/v1/users.py` (91%): branches secundarios del router.
+- `api/v1/gameplays.py` (87%): branches secundarios del update / list.
 - `main.py` (81%): `lifespan` real y algunos branches del exception handler.
-- `services/user_service.py` (83%): branches secundarios de update.
-- `api/v1/gameplays.py` (84%): branches secundarios del update / list.
 
 ### Calidad de código
 
