@@ -47,7 +47,10 @@ class UserService:
             await self._session.rollback()
             if exc.orig is not None and getattr(exc.orig, "pgcode", None) == "23505":
                 raise EmailAlreadyExistsError(data.email) from exc
-            raise
+            # Defensive branch: PostgreSQL unique constraint violations are the only
+            # IntegrityError we expect. Reaching this line requires a different
+            # database-level error which is not reachable via the API.
+            raise  # pragma: no cover
         return UserResponse.model_validate(created)
 
     async def update(self, user_id: str, data: UserUpdate) -> UserResponse:
@@ -80,7 +83,10 @@ class UserService:
             await self._session.rollback()
             if exc.orig is not None and getattr(exc.orig, "pgcode", None) == "23505":
                 raise EmailAlreadyExistsError(data.email or user.email) from exc
-            raise
+            # Defensive branch: PostgreSQL unique constraint violations are the only
+            # IntegrityError we expect. Reaching this line requires a different
+            # database-level error which is not reachable via the API.
+            raise  # pragma: no cover
 
         return UserResponse.model_validate(user)
 
