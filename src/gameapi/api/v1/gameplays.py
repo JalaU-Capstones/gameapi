@@ -1,3 +1,5 @@
+"""v1 API — Frozen. Mirrors the C# legacy migration 1:1. Do not modify."""
+
 from fastapi import APIRouter, HTTPException, Response, status
 
 from gameapi.api.deps import CurrentUser, GameplayServiceDep, UserServiceDep
@@ -104,7 +106,7 @@ async def create_gameplay(
             )
 
     gameplay = await service.create(payload)
-    response.headers["Location"] = f"/api/gameplays/{gameplay.id}"
+    response.headers["Location"] = f"/api/v1/gameplays/{gameplay.id}"
     return _to_response(gameplay)
 
 

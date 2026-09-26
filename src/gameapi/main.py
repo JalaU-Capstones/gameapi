@@ -9,7 +9,8 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 from gameapi.api.deps import SessionDep
-from gameapi.api.v1.router import api_router
+from gameapi.api.v1.router import api_router as v1_router
+from gameapi.api.v2.router import api_router as v2_router
 from gameapi.core.config import settings
 from gameapi.db import PostgresDatabase
 
@@ -87,4 +88,5 @@ async def health(session: SessionDep) -> dict[str, str]:
     return {"status": "ok"}
 
 
-app.include_router(api_router)
+app.include_router(v1_router)
+app.include_router(v2_router)
