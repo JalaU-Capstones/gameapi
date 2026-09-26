@@ -3,7 +3,7 @@ name = "gameapi"
 version = "0.1.0"
 description = "REST API for users and tic-tac-toe gameplays (FastAPI + PostgreSQL)"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.11"
 authors = [{ name = "Diego Botina", email = "alejandro.botina012@jala.university" }]
 dependencies = [
     "fastapi>=0.115.0",
@@ -42,13 +42,13 @@ packages = ["src/gameapi"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py312"
+target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "UP", "B", "C4", "SIM", "RUF"]
 
 [tool.mypy]
-python_version = "3.12"
+python_version = "3.11"
 strict = true
 plugins = ["pydantic.mypy"]
 
@@ -59,6 +59,7 @@ testpaths = ["tests"]
 [tool.coverage.run]
 source = ["src/gameapi"]
 branch = true
+concurrency = ["thread", "greenlet"]
 omit = [
     "*/tests/*",
     "*/__init__.py",
