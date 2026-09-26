@@ -119,6 +119,14 @@ def _clear_ws_managers() -> Iterator[None]:
     presence_manager._connections.clear()
 
 
+@pytest.fixture(autouse=True)
+async def _reset_event_bus() -> AsyncIterator[None]:
+    from gameapi.services.event_bus import event_bus
+
+    yield
+    await event_bus.shutdown()
+
+
 @pytest.fixture
 async def registered_user(client: AsyncClient) -> dict[str, object]:
     payload = {
