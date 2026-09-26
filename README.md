@@ -173,28 +173,83 @@ Las migraciones versionadas se almacenan en `migrations/versions/`.
 
 ## Endpoints
 
-### Users
+### Versionado de la API
 
-| Método   | Ruta               | Auth | Descripción                     |
-|----------|--------------------|------|---------------------------------|
-| `POST`   | `/api/users`       | ❌   | Registrar usuario               |
-| `GET`    | `/api/users`       | ❌   | Listar usuarios                 |
-| `GET`    | `/api/users/{id}`  | ❌   | Obtener un usuario              |
-| `PUT`    | `/api/users/{id}`  | ✅   | Actualizar **tu propia** cuenta |
-| `DELETE` | `/api/users/{id}`  | ✅   | Eliminar **tu propia** cuenta   |
-| `POST`   | `/api/users/login` | ❌   | Login (devuelve JWT)            |
+El proyecto mantiene dos contratos activos:
 
-### Gameplays
+- `/api/v1`: versión congelada, compatible con el contrato legado original.
+- `/api/v2`: versión activa para nuevas integraciones y WebSockets.
 
-| Método   | Ruta                          | Auth | Descripción                      |
-|----------|-------------------------------|------|----------------------------------|
-| `GET`    | `/api/gameplays`              | ❌   | Listar todas las partidas        |
-| `GET`    | `/api/gameplays/my-gameplays` | ✅   | Partidas del usuario autenticado |
-| `GET`    | `/api/gameplays/player/{id}`  | ❌   | Partidas de un jugador           |
-| `GET`    | `/api/gameplays/{id}`         | ❌   | Obtener una partida              |
-| `POST`   | `/api/gameplays`              | ✅   | Crear partida (host = tú)        |
-| `PUT`    | `/api/gameplays/{id}`         | ✅   | Actualizar (solo participantes)  |
-| `DELETE` | `/api/gameplays/{id}`         | ✅   | Eliminar (solo host)             |
+> La versión v1 queda fija para compatibilidad. La v2 puede evolucionar sin romper la v1.
+
+### Usuarios v1 y v2
+
+| Método   | Ruta                    | Auth | Descripción                     |
+|----------|-------------------------|------|---------------------------------|
+| `POST`   | `/api/v1/users`         | ❌   | Registrar usuario               |
+| `GET`    | `/api/v1/users`         | ❌   | Listar usuarios                 |
+| `GET`    | `/api/v1/users/{id}`    | ❌   | Obtener un usuario              |
+| `PUT`    | `/api/v1/users/{id}`    | ✅   | Actualizar **tu propia** cuenta |
+| `DELETE` | `/api/v1/users/{id}`    | ✅   | Eliminar **tu propia** cuenta   |
+| `POST`   | `/api/v1/users/login`   | ❌   | Login (devuelve JWT)            |
+| `POST`   | `/api/v2/users`         | ❌   | Mismo contrato v2              |
+| `GET`    | `/api/v2/users`         | ❌   | Mismo contrato v2              |
+| `GET`    | `/api/v2/users/{id}`    | ❌   | Mismo contrato v2              |
+| `PUT`    | `/api/v2/users/{id}`    | ✅   | Mismo contrato v2              |
+| `DELETE` | `/api/v2/users/{id}`    | ✅   | Mismo contrato v2              |
+| `POST`   | `/api/v2/users/login`   | ❌   | Mismo contrato v2              |
+
+### Gameplays v1 y v2
+
+| Método   | Ruta                             | Auth | Descripción                      |
+|----------|----------------------------------|------|----------------------------------|
+| `GET`    | `/api/v1/gameplays`              | ❌   | Listar todas las partidas        |
+| `GET`    | `/api/v1/gameplays/my-gameplays` | ✅   | Partidas del usuario autenticado |
+| `GET`    | `/api/v1/gameplays/player/{id}`  | ❌   | Partidas de un jugador           |
+| `GET`    | `/api/v1/gameplays/{id}`         | ❌   | Obtener una partida              |
+| `POST`   | `/api/v1/gameplays`              | ✅   | Crear partida (host = tú)        |
+| `PUT`    | `/api/v1/gameplays/{id}`         | ✅   | Actualizar (solo participantes)  |
+| `DELETE` | `/api/v1/gameplays/{id}`         | ✅   | Eliminar (solo host)             |
+| `GET`    | `/api/v2/gameplays`              | ❌   | Mismo contrato v2                |
+| `GET`    | `/api/v2/gameplays/my-gameplays` | ✅   | Mismo contrato v2                |
+| `GET`    | `/api/v2/gameplays/player/{id}`  | ❌   | Mismo contrato v2                |
+| `GET`    | `/api/v2/gameplays/{id}`         | ❌   | Mismo contrato v2                |
+| `POST`   | `/api/v2/gameplays`              | ✅   | Mismo contrato v2                |
+| `PUT`    | `/api/v2/gameplays/{id}`         | ✅   | Mismo contrato v2                |
+| `DELETE` | `/api/v2/gameplays/{id}`         | ✅   | Mismo contrato v2                |
+
+### WebSockets v2
+
+Los endpoints WebSocket operan bajo `/api/v2/ws` y requieren autenticación JWT mediante el primer mensaje JSON.
+
+| Ruta                           | Descripción |
+|--------------------------------|-------------|
+| `/api/v2/ws/gameplays`         | Canal de eventos de partidas. Requiere el evento `auth` con `{ "token": "..." }`. |
+| `/api/v2/ws/presence`         | Canal de presencia en línea. Requiere el evento `auth` con `{ "token": "..." }`. |
+
+#### Protocolo de autenticación WS
+
+```json
+{"event": "auth", "payload": {"token": "<jwt>"}}
+```
+
+Respuesta exitosa:
+
+```json
+{"event": "auth_ok", "payload": {"user_id": "<uuid>"}}
+```
+
+Errores:
+
+```json
+{"event": "auth_error", "payload": {"reason": "invalid_token"}}
+```
+
+Eventos soportados:
+
+- `ping` → responde `pong`
+- `list_online_users` (presencia) → devuelve usuarios conectados
+- Cualquier otro evento sin implementar devuelve `error`
 
 ### Ejemplos
 

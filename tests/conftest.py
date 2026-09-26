@@ -1,5 +1,5 @@
 import os
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator, Callable, Iterator
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -94,13 +94,39 @@ async def client(_override_dependencies: None) -> AsyncIterator[AsyncClient]:
 
 
 @pytest.fixture
+async def ws_client_factory(
+    _override_dependencies: None,
+) -> AsyncIterator[Callable[[], AsyncClient]]:
+    from httpx_ws.transport import ASGIWebSocketTransport
+
+    from gameapi.main import app
+
+    def factory() -> AsyncClient:
+        return AsyncClient(
+            transport=ASGIWebSocketTransport(app=app),
+            base_url="http://test",
+        )
+
+    yield factory
+
+
+@pytest.fixture(autouse=True)
+def _clear_ws_managers() -> Iterator[None]:
+    from gameapi.api.v2.ws.manager import gameplays_manager, presence_manager
+
+    yield
+    gameplays_manager._connections.clear()
+    presence_manager._connections.clear()
+
+
+@pytest.fixture
 async def registered_user(client: AsyncClient) -> dict[str, object]:
     payload = {
         "name": "Test User",
         "email": "test@example.com",
         "password": "password123",
     }
-    response = await client.post("/api/users", json=payload)
+    response = await client.post("/api/v1/users", json=payload)
     assert response.status_code == 201, response.text
     return response.json()
 
@@ -108,7 +134,7 @@ async def registered_user(client: AsyncClient) -> dict[str, object]:
 @pytest.fixture
 async def auth_token(client: AsyncClient, registered_user: dict[str, object]) -> str:
     response = await client.post(
-        "/api/users/login",
+        "/api/v1/users/login",
         json={
             "email": registered_user["email"],
             "password": "password123",

@@ -1,3 +1,5 @@
+"""v1 API — Frozen. Mirrors the C# legacy migration 1:1. Do not modify."""
+
 from fastapi import APIRouter, HTTPException, Response, status
 
 from gameapi.api.deps import CurrentUser, UserServiceDep
@@ -45,7 +47,7 @@ async def create_user(
             detail="Email is currently registered",
         ) from exc
 
-    response.headers["Location"] = f"/api/users/{user.id}"
+    response.headers["Location"] = f"/api/v1/users/{user.id}"
     return _to_response(user)
 
 
