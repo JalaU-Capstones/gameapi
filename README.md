@@ -2,13 +2,13 @@
 
 REST API para gestión de usuarios y partidas de Tic-Tac-Toe.
 
-[![Python](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
+[![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![codecov](https://codecov.io/gh/JalaU-Capstones/gameapi/branch/main/graph/badge.svg)](https://codecov.io/gh/JalaU-Capstones/gameapi)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg)](https://fastapi.tiangolo.com/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![Tests](https://img.shields.io/badge/tests-49%20passed-success.svg)](#pruebas)
+[![Tests](https://img.shields.io/badge/tests-50%20passed-success.svg)](#pruebas)
 
-**Stack:** Python 3.12+ · FastAPI · PostgreSQL 16 · SQLAlchemy 2.0 async · Pydantic v2 · JWT · uv · Docker
+**Stack:** Python 3.11+ · FastAPI · PostgreSQL 16 · SQLAlchemy 2.0 async · Pydantic v2 · JWT · uv · Docker
 
 ---
 
@@ -50,7 +50,7 @@ Antes de instalar, asegúrate de tener:
 
 | Herramienta              | Versión mínima      | Instalación                                        |
 |--------------------------|---------------------|----------------------------------------------------|
-| **Python**               | 3.12+               | <https://www.python.org/downloads/>                |
+| **Python**               | 3.11+               | <https://www.python.org/downloads/>                |
 | **uv**                   | 0.4+                | `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
 | **Git**                  | 2.30+               | <https://git-scm.com/downloads>                    |
 | **PostgreSQL**           | 16                  | <https://www.postgresql.org/download/>             |
@@ -248,7 +248,7 @@ make test
 Salida esperada:
 
 ```
-49 passed in ~22s
+50 passed in ~22s
 Required test coverage of 85.0% reached. Total coverage: 87.41%
 ```
 
@@ -318,26 +318,26 @@ Hooks configurados: `ruff`, `ruff-format`, `mypy`, `trailing-whitespace`, `end-o
 
 **GitHub Actions** (`.github/workflows/ci.yml`) — 3 jobs:
 
-- `quality`: ruff + mypy.
-- `test`: matriz Python 3.12 / 3.13 con cobertura (`coverage run -m pytest`),
-  contra un servicio PostgreSQL 16.
+- `quality`: ruff + mypy (Python 3.12).
+- `test`: matriz de compatibilidad **Python 3.11 / 3.12 / 3.13 / 3.14**, cada
+  versión ejecuta los tests con cobertura (`coverage run` + `--fail-under=85`)
+  contra un servicio PostgreSQL 16. El reporte se sube a Codecov una sola vez
+  desde Python 3.14.
 - `docker`: build de la imagen + smoke test con PostgreSQL en red dedicada.
 
-La cobertura se mide con `coverage run` (no con `pytest-cov`) para evitar
-conflictos entre tracers. El plugin `pytest-cov` fue removido del proyecto.
+**GitLab CI** (`.gitlab-ci.yml`) — mismo esquema: `test:python` corre la matriz
+3.11–3.14 con cobertura y umbral aplicado en cada versión.
 
-La cobertura se mide sobre Python 3.14 con el tracer por defecto de Coverage.py.
-Las versiones anteriores de Python presentan limitaciones conocidas al medir
-código asíncrono con FastAPI. El proyecto mantiene compatibilidad con Python
-3.12+ para runtime, pero la medición de cobertura se realiza en 3.14.
+**Dependabot** (`.github/dependabot.yml`) — PR semanal para `uv.lock` y
+GitHub Actions.
 
-**GitLab CI** (`.gitlab-ci.yml`) — mismo flujo, con PostgreSQL 16 provisto como
-`services:` nativo y cacheando solo `$UV_CACHE_DIR`.
-
-La cobertura se mide con `coverage run` (no con `pytest-cov`) para evitar
-conflictos entre tracers. El plugin `pytest-cov` fue removido del proyecto.
-
-**Dependabot** (`.github/dependabot.yml`) — PR semanal para actualizar `uv.lock` y GitHub Actions.
+**Nota sobre la medición de cobertura**
+El proyecto declara `concurrency = ["thread", "greenlet"]` en la configuración
+de Coverage.py. SQLAlchemy async usa greenlets internamente para gestionar el
+contexto de las coroutines, y Coverage.py requiere esta declaración explícita
+para rastrear los frames correctamente en Python 3.11–3.14. Sin esta
+configuración, la cobertura se reportaba erróneamente en versiones anteriores
+a 3.14.
 
 ---
 
@@ -352,7 +352,7 @@ make docker-reset  # detener y borrar datos
 
 Detalles:
 
-- Imagen de la API: multi-stage build (`ghcr.io/astral-sh/uv` + `python:3.12-slim-bookworm`).
+- Imagen de la API: multi-stage build (`ghcr.io/astral-sh/uv` + `python:3.13-slim-bookworm`).
 - Usuario no-root en el contenedor.
 - Healthchecks reales para PostgreSQL y la API.
 - La API espera a que PostgreSQL esté `healthy` antes de arrancar.
