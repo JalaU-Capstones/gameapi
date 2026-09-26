@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Game API",
-    "description": "REST API for users and gameplays. The collection automatically logs in and stores the JWT in {{token}}.",
+    "description": "REST API for users and gameplays with WebSocket support for real-time play. The collection automatically logs in and stores the JWT in {{token}}. All REST endpoints are versioned under /api/v1. WebSocket endpoints are under /api/v2/ws/* and require auth as the first message.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -24,7 +24,7 @@
           "if (requiresAuth) {",
           "    pm.request.headers.remove('X-Requires-Auth');",
           "    const loginRequest = {",
-          "        url: pm.collectionVariables.get('baseUrl') + '/api/users/login',",
+          "        url: pm.collectionVariables.get('baseUrl') + '/api/v1/users/login',",
           "        method: 'POST',",
           "        header: { 'Content-Type': 'application/json' },",
           "        body: {",
@@ -114,9 +114,9 @@
               "raw": "{\n  \"name\": \"Sandra Dee\",\n  \"email\": \"sandra@mail.com\",\n  \"password\": \"password123\"\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/api/users",
+              "raw": "{{baseUrl}}/api/v1/users",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "users"]
+              "path": ["api", "v1", "users"]
             }
           }
         },
@@ -149,9 +149,9 @@
               "raw": "{\n  \"email\": \"sandra@mail.com\",\n  \"password\": \"password123\"\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/api/users/login",
+              "raw": "{{baseUrl}}/api/v1/users/login",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "users", "login"]
+              "path": ["api", "v1", "users", "login"]
             }
           }
         },
@@ -161,9 +161,9 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/users",
+              "raw": "{{baseUrl}}/api/v1/users",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "users"]
+              "path": ["api", "v1", "users"]
             }
           }
         },
@@ -173,9 +173,9 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/users/{{userId}}",
+              "raw": "{{baseUrl}}/api/v1/users/{{userId}}",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "users", "{{userId}}"]
+              "path": ["api", "v1", "users", "{{userId}}"]
             }
           }
         },
@@ -195,9 +195,9 @@
               "raw": "{\n  \"name\": \"Sandra Dee Updated\"\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/api/users/{{userId}}",
+              "raw": "{{baseUrl}}/api/v1/users/{{userId}}",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "users", "{{userId}}"]
+              "path": ["api", "v1", "users", "{{userId}}"]
             }
           }
         },
@@ -211,9 +211,9 @@
             "method": "DELETE",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/users/{{userId}}",
+              "raw": "{{baseUrl}}/api/v1/users/{{userId}}",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "users", "{{userId}}"]
+              "path": ["api", "v1", "users", "{{userId}}"]
             }
           }
         }
@@ -253,9 +253,9 @@
               "raw": "{\n  \"currentPositions\": \"{\\\"board\\\": [[0,0,0],[0,0,0],[0,0,0]], \\\"lastMove\\\": null}\",\n  \"hostPlayer\": \"{{userId}}\",\n  \"playerTurn\": \"{{userId}}\",\n  \"matchResult\": null\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/api/gameplays",
+              "raw": "{{baseUrl}}/api/v1/gameplays",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "gameplays"]
+              "path": ["api", "v1", "gameplays"]
             }
           }
         },
@@ -265,9 +265,9 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/gameplays",
+              "raw": "{{baseUrl}}/api/v1/gameplays",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "gameplays"]
+              "path": ["api", "v1", "gameplays"]
             }
           }
         },
@@ -281,9 +281,9 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/gameplays/my-gameplays",
+              "raw": "{{baseUrl}}/api/v1/gameplays/my-gameplays",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "gameplays", "my-gameplays"]
+              "path": ["api", "v1", "gameplays", "my-gameplays"]
             }
           }
         },
@@ -293,9 +293,9 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/gameplays/player/{{userId}}",
+              "raw": "{{baseUrl}}/api/v1/gameplays/player/{{userId}}",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "gameplays", "player", "{{userId}}"]
+              "path": ["api", "v1", "gameplays", "player", "{{userId}}"]
             }
           }
         },
@@ -305,9 +305,9 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/gameplays/{{gameplayId}}",
+              "raw": "{{baseUrl}}/api/v1/gameplays/{{gameplayId}}",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "gameplays", "{{gameplayId}}"]
+              "path": ["api", "v1", "gameplays", "{{gameplayId}}"]
             }
           }
         },
@@ -327,9 +327,9 @@
               "raw": "{\n  \"currentPositions\": \"{\\\"board\\\": [[1,0,0],[0,2,0],[0,0,0]], \\\"lastMove\\\": {\\\"x\\\":0,\\\"y\\\":0}}\"\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/api/gameplays/{{gameplayId}}",
+              "raw": "{{baseUrl}}/api/v1/gameplays/{{gameplayId}}",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "gameplays", "{{gameplayId}}"]
+              "path": ["api", "v1", "gameplays", "{{gameplayId}}"]
             }
           }
         },
@@ -343,9 +343,48 @@
             "method": "DELETE",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/gameplays/{{gameplayId}}",
+              "raw": "{{baseUrl}}/api/v1/gameplays/{{gameplayId}}",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "gameplays", "{{gameplayId}}"]
+              "path": ["api", "v1", "gameplays", "{{gameplayId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "WebSocket (v2)",
+      "item": [
+        {
+          "name": "Gameplays WS",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "WebSocket endpoint for gameplay events.\n\nMessages to send (in order):\n\n1. Auth (send first, within 10s):\n   {\"event\": \"auth\", \"payload\": {\"token\": \"{{token}}\"}}\n\n2. Ping:\n   {\"event\": \"ping\"}\n\n3. Subscribe to a game:\n   {\"event\": \"subscribe_game\", \"payload\": {\"game_id\": \"<gameplayId>\"}}\n\n4. Broadcast a message to the game (B2 synthetic):\n   {\"event\": \"broadcast_to_game\", \"payload\": {\"game_id\": \"<gameplayId>\", \"message\": \"hello\"}}\n\n5. Unsubscribe:\n   {\"event\": \"unsubscribe_game\", \"payload\": {\"game_id\": \"<gameplayId>\"}}",
+            "protocolProfileBehavior": {
+              "useWebSocket": true
+            },
+            "url": {
+              "raw": "ws://{{baseUrl}}/api/v2/ws/gameplays",
+              "protocol": "ws",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v2", "ws", "gameplays"]
+            }
+          }
+        },
+        {
+          "name": "Presence WS",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "WebSocket endpoint for user presence.\n\nMessages:\n\n1. Auth:\n   {\"event\": \"auth\", \"payload\": {\"token\": \"{{token}}\"}}\n\n2. List online users:\n   {\"event\": \"list_online_users\"}\n\n3. Ping:\n   {\"event\": \"ping\"}",
+            "protocolProfileBehavior": {
+              "useWebSocket": true
+            },
+            "url": {
+              "raw": "ws://{{baseUrl}}/api/v2/ws/presence",
+              "protocol": "ws",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v2", "ws", "presence"]
             }
           }
         }

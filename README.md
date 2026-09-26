@@ -227,6 +227,15 @@ Los endpoints WebSocket operan bajo `/api/v2/ws` y requieren autenticación JWT 
 | `/api/v2/ws/gameplays`         | Canal de eventos de partidas. Requiere el evento `auth` con `{ "token": "..." }`. |
 | `/api/v2/ws/presence`         | Canal de presencia en línea. Requiere el evento `auth` con `{ "token": "..." }`. |
 
+**Eventos soportados actualmente (B2):**
+
+- `auth` — primer mensaje obligatorio con el JWT.
+- `ping` / `pong` — keepalive.
+- `subscribe_game` — unirse al canal de una partida.
+- `unsubscribe_game` — salir del canal.
+- `broadcast_to_game` — **temporal** (será reemplazado por eventos reales del juego en B3).
+- `list_online_users` — solo en el endpoint `presence`.
+
 #### Protocolo de autenticación WS
 
 ```json
@@ -321,6 +330,16 @@ Para correr los tests con cobertura:
 ```bash
 make test-cov
 ```
+
+### Bus de eventos
+
+El proyecto usa un **EventBus in-process** (`services/event_bus.py`) para desacoplar los handlers de WebSocket de la lógica de dominio. Cada partida tiene su propio canal, y los clientes se suscriben al canal al entrar a una partida.
+
+- **Arquitectura:** un `asyncio.Queue` + un worker task por canal.
+- **API:** `subscribe(channel, subscriber_id, callback)`, `unsubscribe(channel, subscriber_id)`, `publish(channel, event)`.
+- **Limpieza automática:** al quedarse sin suscriptores, el canal se destruye y su worker se cancela.
+- **Sin estado persistente:** todo vive en memoria del proceso. Un reinicio limpia las suscripciones.
+- **Upgrade path:** si se necesita escalar horizontalmente, se puede reemplazar por Redis Pub/Sub sin cambiar la API del bus.
 
 ### Cobertura
 
@@ -424,6 +443,9 @@ gameapi/
 │   ├── repositories/    # Data access layer (queries SQLAlchemy)
 │   ├── schemas/         # Contratos de API (camelCase, validación)
 │   ├── services/        # Lógica de negocio async, errores de dominio
+│   │   ├── ...
+│   │   ├── event_bus.py         # Pub/sub in-process por canal (gameplay)
+│   │   └── ...
 │   ├── api/             # Routers FastAPI + dependencias (auth, DI)
 │   └── main.py          # App FastAPI, lifespan, CORS, exception handlers
 ├── migrations/          # Migraciones Alembic
