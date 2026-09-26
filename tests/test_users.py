@@ -143,6 +143,60 @@ async def test_update_user_with_email_only_updates_email(
     assert fetched.json()["email"] == "new@example.com"
 
 
+async def test_update_user_with_password(
+    client: AsyncClient,
+    registered_user: dict,
+    auth_headers: dict[str, str],
+) -> None:
+    user_id = registered_user["id"]
+    response = await client.put(
+        f"/api/users/{user_id}",
+        json={"password": "newPassword123"},
+        headers=auth_headers,
+    )
+    assert response.status_code == 204, response.text
+
+    login = await client.post(
+        "/api/users/login",
+        json={"email": registered_user["email"], "password": "newPassword123"},
+    )
+    assert login.status_code == 200
+
+
+async def test_update_user_with_empty_body_is_noop(
+    client: AsyncClient,
+    registered_user: dict,
+    auth_headers: dict[str, str],
+) -> None:
+    user_id = registered_user["id"]
+    response = await client.put(f"/api/users/{user_id}", json={}, headers=auth_headers)
+    assert response.status_code == 204, response.text
+
+    fetched = await client.get(f"/api/users/{user_id}")
+    assert fetched.status_code == 200, fetched.text
+    assert fetched.json()["name"] == registered_user["name"]
+
+
+async def test_update_user_with_invalid_uuid_returns_404(
+    client: AsyncClient,
+    auth_headers: dict[str, str],
+) -> None:
+    response = await client.put(
+        "/api/users/not-a-uuid",
+        json={"name": "Updated"},
+        headers=auth_headers,
+    )
+    assert response.status_code in {403, 404}
+
+
+async def test_delete_user_with_invalid_uuid_returns_404(
+    client: AsyncClient,
+    auth_headers: dict[str, str],
+) -> None:
+    response = await client.delete("/api/users/not-a-uuid", headers=auth_headers)
+    assert response.status_code in {403, 404}
+
+
 async def test_update_another_user_returns_403(
     client: AsyncClient,
     registered_user: dict,

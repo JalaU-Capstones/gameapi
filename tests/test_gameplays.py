@@ -128,6 +128,19 @@ async def test_list_my_gameplays_without_token_returns_401(client: AsyncClient) 
     assert response.status_code == 401
 
 
+async def test_list_gameplays(
+    client: AsyncClient,
+    registered_user: dict,
+    auth_headers: dict[str, str],
+) -> None:
+    await _create_gameplay(client, auth_headers, registered_user["id"])
+    await _create_gameplay(client, auth_headers, registered_user["id"])
+
+    response = await client.get("/api/gameplays")
+    assert response.status_code == 200
+    assert len(response.json()) == 2
+
+
 async def test_list_gameplays_by_player(
     client: AsyncClient,
     registered_user: dict,
@@ -138,6 +151,14 @@ async def test_list_gameplays_by_player(
     response = await client.get(f"/api/gameplays/player/{registered_user['id']}")
     assert response.status_code == 200
     assert len(response.json()) == 1
+
+
+async def test_list_gameplays_by_player_with_invalid_uuid_returns_empty(
+    client: AsyncClient,
+) -> None:
+    response = await client.get("/api/gameplays/player/not-a-uuid")
+    assert response.status_code == 200
+    assert response.json() == []
 
 
 async def test_get_gameplay_by_id(
@@ -174,6 +195,121 @@ async def test_update_gameplay(
 
     fetched = await client.get(f"/api/gameplays/{gameplay['id']}")
     assert fetched.json()["currentPositions"] == updated_board
+
+
+async def test_update_gameplay_with_match_result(
+    client: AsyncClient,
+    registered_user: dict,
+    auth_headers: dict[str, str],
+) -> None:
+    gameplay = await _create_gameplay(client, auth_headers, registered_user["id"])
+
+    response = await client.put(
+        f"/api/gameplays/{gameplay['id']}",
+        json={"matchResult": '{"winner":"X"}'},
+        headers=auth_headers,
+    )
+    assert response.status_code == 204
+
+    fetched = await client.get(f"/api/gameplays/{gameplay['id']}")
+    assert fetched.json()["matchResult"] == '{"winner": "X"}'
+
+
+async def test_update_gameplay_with_new_guest_player(
+    client: AsyncClient,
+    registered_user: dict,
+    auth_headers: dict[str, str],
+) -> None:
+    gameplay = await _create_gameplay(client, auth_headers, registered_user["id"])
+    guest = await client.post(
+        "/api/users",
+        json={"name": "Guest", "email": "guest@example.com", "password": "password123"},
+    )
+    assert guest.status_code == 201
+
+    response = await client.put(
+        f"/api/gameplays/{gameplay['id']}",
+        json={"guestPlayer": guest.json()["id"]},
+        headers=auth_headers,
+    )
+    assert response.status_code == 204
+
+    fetched = await client.get(f"/api/gameplays/{gameplay['id']}")
+    assert fetched.json()["guestPlayer"] == guest.json()["id"]
+
+
+async def test_update_gameplay_with_new_host_player(
+    client: AsyncClient,
+    registered_user: dict,
+    auth_headers: dict[str, str],
+    db_session,
+) -> None:
+    gameplay = await _create_gameplay(client, auth_headers, registered_user["id"])
+    other = await client.post(
+        "/api/users",
+        json={"name": "Other", "email": "other@example.com", "password": "password123"},
+    )
+    assert other.status_code == 201
+
+    class StubPayload:
+        def __init__(self) -> None:
+            self.model_fields_set = {"host_player"}
+            self.host_player = other.json()["id"]
+
+    service = __import__("gameapi.services", fromlist=["GameplayService"]).GameplayService(
+        db_session
+    )
+
+    await service.update(gameplay["id"], StubPayload())
+
+    updated = await service.get_by_id(gameplay["id"])
+    assert updated is not None
+    assert updated.host_player == other.json()["id"]
+
+
+async def test_update_gameplay_with_new_player_turn(
+    client: AsyncClient,
+    registered_user: dict,
+    auth_headers: dict[str, str],
+) -> None:
+    gameplay = await _create_gameplay(client, auth_headers, registered_user["id"])
+    other = await client.post(
+        "/api/users",
+        json={"name": "Turn User", "email": "turn@example.com", "password": "password123"},
+    )
+    assert other.status_code == 201
+
+    response = await client.put(
+        f"/api/gameplays/{gameplay['id']}",
+        json={"playerTurn": other.json()["id"]},
+        headers=auth_headers,
+    )
+    assert response.status_code == 204
+
+    fetched = await client.get(f"/api/gameplays/{gameplay['id']}")
+    assert fetched.json()["playerTurn"] == other.json()["id"]
+
+
+async def test_update_gameplay_with_invalid_uuid_returns_404(
+    client: AsyncClient,
+    registered_user: dict,
+    auth_headers: dict[str, str],
+) -> None:
+    response = await client.put(
+        "/api/gameplays/not-a-uuid",
+        json={"matchResult": '{"winner":"X"}'},
+        headers=auth_headers,
+    )
+    assert response.status_code == 404
+
+
+async def test_delete_gameplay_with_invalid_uuid_returns_404(
+    client: AsyncClient,
+    registered_user: dict,
+    auth_headers: dict[str, str],
+) -> None:
+    response = await client.delete("/api/gameplays/not-a-uuid", headers=auth_headers)
+    assert response.status_code == 404
 
 
 async def test_update_gameplay_by_stranger_returns_403(
