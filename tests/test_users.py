@@ -3,7 +3,7 @@ from httpx import AsyncClient
 
 async def test_register_user_returns_created(client: AsyncClient) -> None:
     response = await client.post(
-        "/api/users",
+        "/api/v1/users",
         json={
             "name": "Alice",
             "email": "alice@example.com",
@@ -21,7 +21,7 @@ async def test_register_user_returns_created(client: AsyncClient) -> None:
 
 async def test_register_user_normalizes_email_to_lowercase(client: AsyncClient) -> None:
     response = await client.post(
-        "/api/users",
+        "/api/v1/users",
         json={
             "name": "Bob",
             "email": "BOB@Example.COM",
@@ -34,7 +34,7 @@ async def test_register_user_normalizes_email_to_lowercase(client: AsyncClient) 
 
 async def test_register_user_with_invalid_email_returns_400(client: AsyncClient) -> None:
     response = await client.post(
-        "/api/users",
+        "/api/v1/users",
         json={"name": "X", "email": "not-an-email", "password": "password123"},
     )
     assert response.status_code == 400
@@ -43,7 +43,7 @@ async def test_register_user_with_invalid_email_returns_400(client: AsyncClient)
 
 async def test_register_user_with_short_password_returns_400(client: AsyncClient) -> None:
     response = await client.post(
-        "/api/users",
+        "/api/v1/users",
         json={"name": "X", "email": "x@example.com", "password": "123"},
     )
     assert response.status_code == 400
@@ -56,20 +56,20 @@ async def test_register_duplicate_email_returns_409(client: AsyncClient) -> None
         "email": "alice@example.com",
         "password": "password123",
     }
-    first = await client.post("/api/users", json=payload)
+    first = await client.post("/api/v1/users", json=payload)
     assert first.status_code == 201
 
-    second = await client.post("/api/users", json=payload)
+    second = await client.post("/api/v1/users", json=payload)
     assert second.status_code == 409
     assert second.json()["message"] == "Email is currently registered"
 
 
 async def test_list_users_returns_registered_users(client: AsyncClient) -> None:
     await client.post(
-        "/api/users",
+        "/api/v1/users",
         json={"name": "Alice", "email": "alice@example.com", "password": "password123"},
     )
-    response = await client.get("/api/users")
+    response = await client.get("/api/v1/users")
     assert response.status_code == 200
     users = response.json()
     assert len(users) == 1
@@ -78,31 +78,31 @@ async def test_list_users_returns_registered_users(client: AsyncClient) -> None:
 
 async def test_get_user_by_id(client: AsyncClient) -> None:
     created = await client.post(
-        "/api/users",
+        "/api/v1/users",
         json={"name": "Alice", "email": "alice@example.com", "password": "password123"},
     )
     user_id = created.json()["id"]
 
-    response = await client.get(f"/api/users/{user_id}")
+    response = await client.get(f"/api/v1/users/{user_id}")
     assert response.status_code == 200
     assert response.json()["id"] == user_id
 
 
 async def test_get_user_by_id_not_found(client: AsyncClient) -> None:
-    response = await client.get("/api/users/00000000-0000-0000-0000-000000000000")
+    response = await client.get("/api/v1/users/00000000-0000-0000-0000-000000000000")
     assert response.status_code == 404
     assert response.json()["message"] == "User not found"
 
 
 async def test_update_user_without_token_returns_401(client: AsyncClient) -> None:
     created = await client.post(
-        "/api/users",
+        "/api/v1/users",
         json={"name": "Alice", "email": "alice@example.com", "password": "password123"},
     )
     user_id = created.json()["id"]
 
     response = await client.put(
-        f"/api/users/{user_id}",
+        f"/api/v1/users/{user_id}",
         json={"name": "Updated"},
     )
     assert response.status_code == 401
@@ -115,13 +115,13 @@ async def test_update_user_with_token(
 ) -> None:
     user_id = registered_user["id"]
     response = await client.put(
-        f"/api/users/{user_id}",
+        f"/api/v1/users/{user_id}",
         json={"name": "Updated Name"},
         headers=auth_headers,
     )
     assert response.status_code == 204
 
-    fetched = await client.get(f"/api/users/{user_id}")
+    fetched = await client.get(f"/api/v1/users/{user_id}")
     assert fetched.json()["name"] == "Updated Name"
 
 
@@ -132,13 +132,13 @@ async def test_update_user_with_email_only_updates_email(
 ) -> None:
     user_id = registered_user["id"]
     response = await client.put(
-        f"/api/users/{user_id}",
+        f"/api/v1/users/{user_id}",
         json={"email": "new@example.com"},
         headers=auth_headers,
     )
     assert response.status_code == 204, response.text
 
-    fetched = await client.get(f"/api/users/{user_id}")
+    fetched = await client.get(f"/api/v1/users/{user_id}")
     assert fetched.status_code == 200, fetched.text
     assert fetched.json()["email"] == "new@example.com"
 
@@ -150,14 +150,14 @@ async def test_update_user_with_password(
 ) -> None:
     user_id = registered_user["id"]
     response = await client.put(
-        f"/api/users/{user_id}",
+        f"/api/v1/users/{user_id}",
         json={"password": "newPassword123"},
         headers=auth_headers,
     )
     assert response.status_code == 204, response.text
 
     login = await client.post(
-        "/api/users/login",
+        "/api/v1/users/login",
         json={"email": registered_user["email"], "password": "newPassword123"},
     )
     assert login.status_code == 200
@@ -169,10 +169,10 @@ async def test_update_user_with_empty_body_is_noop(
     auth_headers: dict[str, str],
 ) -> None:
     user_id = registered_user["id"]
-    response = await client.put(f"/api/users/{user_id}", json={}, headers=auth_headers)
+    response = await client.put(f"/api/v1/users/{user_id}", json={}, headers=auth_headers)
     assert response.status_code == 204, response.text
 
-    fetched = await client.get(f"/api/users/{user_id}")
+    fetched = await client.get(f"/api/v1/users/{user_id}")
     assert fetched.status_code == 200, fetched.text
     assert fetched.json()["name"] == registered_user["name"]
 
@@ -182,7 +182,7 @@ async def test_update_user_with_invalid_uuid_returns_404(
     auth_headers: dict[str, str],
 ) -> None:
     response = await client.put(
-        "/api/users/not-a-uuid",
+        "/api/v1/users/not-a-uuid",
         json={"name": "Updated"},
         headers=auth_headers,
     )
@@ -193,7 +193,7 @@ async def test_delete_user_with_invalid_uuid_returns_404(
     client: AsyncClient,
     auth_headers: dict[str, str],
 ) -> None:
-    response = await client.delete("/api/users/not-a-uuid", headers=auth_headers)
+    response = await client.delete("/api/v1/users/not-a-uuid", headers=auth_headers)
     assert response.status_code in {403, 404}
 
 
@@ -203,13 +203,13 @@ async def test_update_another_user_returns_403(
     auth_headers: dict[str, str],
 ) -> None:
     other = await client.post(
-        "/api/users",
+        "/api/v1/users",
         json={"name": "Other", "email": "other@example.com", "password": "password123"},
     )
     other_id = other.json()["id"]
 
     response = await client.put(
-        f"/api/users/{other_id}",
+        f"/api/v1/users/{other_id}",
         json={"name": "Hacked"},
         headers=auth_headers,
     )
@@ -222,10 +222,10 @@ async def test_delete_user_with_token(
     auth_headers: dict[str, str],
 ) -> None:
     user_id = registered_user["id"]
-    response = await client.delete(f"/api/users/{user_id}", headers=auth_headers)
+    response = await client.delete(f"/api/v1/users/{user_id}", headers=auth_headers)
     assert response.status_code == 204
 
-    fetched = await client.get(f"/api/users/{user_id}")
+    fetched = await client.get(f"/api/v1/users/{user_id}")
     assert fetched.status_code == 404
 
 
@@ -233,13 +233,13 @@ async def test_delete_user_without_token_returns_401(
     client: AsyncClient,
     registered_user: dict,
 ) -> None:
-    response = await client.delete(f"/api/users/{registered_user['id']}")
+    response = await client.delete(f"/api/v1/users/{registered_user['id']}")
     assert response.status_code == 401
 
 
 async def test_login_with_valid_credentials(client: AsyncClient, registered_user: dict) -> None:
     response = await client.post(
-        "/api/users/login",
+        "/api/v1/users/login",
         json={"email": registered_user["email"], "password": "password123"},
     )
     assert response.status_code == 200
@@ -250,7 +250,7 @@ async def test_login_with_valid_credentials(client: AsyncClient, registered_user
 
 async def test_login_with_invalid_credentials(client: AsyncClient, registered_user: dict) -> None:
     response = await client.post(
-        "/api/users/login",
+        "/api/v1/users/login",
         json={"email": registered_user["email"], "password": "wrong"},
     )
     assert response.status_code == 401

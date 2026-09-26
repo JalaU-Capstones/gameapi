@@ -31,7 +31,7 @@ def test_exception_messages_include_identifier() -> None:
 
 
 async def test_get_user_with_invalid_object_id_returns_404(client: AsyncClient) -> None:
-    response = await client.get("/api/users/not-an-object-id")
+    response = await client.get("/api/v1/users/not-an-object-id")
     assert response.status_code == 404
     assert response.json()["message"] == "User not found"
 
@@ -42,11 +42,11 @@ async def test_update_user_with_duplicate_email_returns_409(
     auth_headers: dict[str, str],
 ) -> None:
     await client.post(
-        "/api/users",
+        "/api/v1/users",
         json={"name": "Other", "email": "other@example.com", "password": "password123"},
     )
     response = await client.put(
-        f"/api/users/{registered_user['id']}",
+        f"/api/v1/users/{registered_user['id']}",
         json={"email": "other@example.com"},
         headers=auth_headers,
     )
@@ -60,7 +60,7 @@ async def test_update_user_with_invalid_email_returns_400(
     auth_headers: dict[str, str],
 ) -> None:
     response = await client.put(
-        f"/api/users/{registered_user['id']}",
+        f"/api/v1/users/{registered_user['id']}",
         json={"email": "not-an-email"},
         headers=auth_headers,
     )
@@ -69,7 +69,7 @@ async def test_update_user_with_invalid_email_returns_400(
 
 async def test_login_with_nonexistent_email_returns_401(client: AsyncClient) -> None:
     response = await client.post(
-        "/api/users/login",
+        "/api/v1/users/login",
         json={"email": "ghost@example.com", "password": "password123"},
     )
     assert response.status_code == 401
@@ -78,14 +78,14 @@ async def test_login_with_nonexistent_email_returns_401(client: AsyncClient) -> 
 
 async def test_login_with_missing_password_returns_400(client: AsyncClient) -> None:
     response = await client.post(
-        "/api/users/login",
+        "/api/v1/users/login",
         json={"email": "someone@example.com", "password": ""},
     )
     assert response.status_code == 400
 
 
 async def test_register_user_missing_fields_returns_400(client: AsyncClient) -> None:
-    response = await client.post("/api/users", json={"email": "x@y.com"})
+    response = await client.post("/api/v1/users", json={"email": "x@y.com"})
     assert response.status_code == 400
     assert "message" in response.json()
 
@@ -94,7 +94,7 @@ async def test_register_user_missing_fields_returns_400(client: AsyncClient) -> 
 
 
 async def test_get_gameplay_with_invalid_object_id_returns_404(client: AsyncClient) -> None:
-    response = await client.get("/api/gameplays/not-an-object-id")
+    response = await client.get("/api/v1/gameplays/not-an-object-id")
     assert response.status_code == 404
     assert response.json()["message"] == "Gameplay not found"
 
@@ -104,7 +104,7 @@ async def test_update_gameplay_not_found_returns_404(
     auth_headers: dict[str, str],
 ) -> None:
     response = await client.put(
-        "/api/gameplays/00000000-0000-0000-0000-000000000000",
+        "/api/v1/gameplays/00000000-0000-0000-0000-000000000000",
         json={"currentPositions": VALID_BOARD},
         headers=auth_headers,
     )
@@ -116,7 +116,7 @@ async def test_delete_gameplay_not_found_returns_404(
     auth_headers: dict[str, str],
 ) -> None:
     response = await client.delete(
-        "/api/gameplays/00000000-0000-0000-0000-000000000000",
+        "/api/v1/gameplays/00000000-0000-0000-0000-000000000000",
         headers=auth_headers,
     )
     assert response.status_code == 404
@@ -128,18 +128,18 @@ async def test_delete_gameplay_by_non_host_returns_403(
     auth_headers: dict[str, str],
 ) -> None:
     other = await client.post(
-        "/api/users",
+        "/api/v1/users",
         json={"name": "Other", "email": "other@example.com", "password": "password123"},
     )
     other_id = other.json()["id"]
     other_login = await client.post(
-        "/api/users/login",
+        "/api/v1/users/login",
         json={"email": "other@example.com", "password": "password123"},
     )
     other_headers = {"Authorization": f"Bearer {other_login.json()['token']}"}
 
     gameplay = await client.post(
-        "/api/gameplays",
+        "/api/v1/gameplays",
         json={
             "currentPositions": VALID_BOARD,
             "hostPlayer": registered_user["id"],
@@ -150,7 +150,7 @@ async def test_delete_gameplay_by_non_host_returns_403(
     )
     gameplay_id = gameplay.json()["id"]
 
-    response = await client.delete(f"/api/gameplays/{gameplay_id}", headers=other_headers)
+    response = await client.delete(f"/api/v1/gameplays/{gameplay_id}", headers=other_headers)
     assert response.status_code == 403
 
 
@@ -160,7 +160,7 @@ async def test_update_gameplay_with_nonexistent_guest_returns_400(
     auth_headers: dict[str, str],
 ) -> None:
     gameplay = await client.post(
-        "/api/gameplays",
+        "/api/v1/gameplays",
         json={
             "currentPositions": VALID_BOARD,
             "hostPlayer": registered_user["id"],
@@ -171,7 +171,7 @@ async def test_update_gameplay_with_nonexistent_guest_returns_400(
     gameplay_id = gameplay.json()["id"]
 
     response = await client.put(
-        f"/api/gameplays/{gameplay_id}",
+        f"/api/v1/gameplays/{gameplay_id}",
         json={"guestPlayer": "00000000-0000-0000-0000-000000000000"},
         headers=auth_headers,
     )
@@ -185,7 +185,7 @@ async def test_create_gameplay_with_empty_current_positions_is_allowed(
     auth_headers: dict[str, str],
 ) -> None:
     response = await client.post(
-        "/api/gameplays",
+        "/api/v1/gameplays",
         json={
             "currentPositions": "",
             "hostPlayer": registered_user["id"],
@@ -202,7 +202,7 @@ async def test_create_gameplay_with_empty_current_positions_is_allowed(
 
 async def test_request_with_malformed_bearer_returns_401(client: AsyncClient) -> None:
     response = await client.get(
-        "/api/gameplays/my-gameplays",
+        "/api/v1/gameplays/my-gameplays",
         headers={"Authorization": "Bearer not-a-valid-jwt"},
     )
     assert response.status_code == 401
@@ -211,7 +211,7 @@ async def test_request_with_malformed_bearer_returns_401(client: AsyncClient) ->
 
 async def test_request_with_wrong_scheme_returns_401(client: AsyncClient) -> None:
     response = await client.get(
-        "/api/gameplays/my-gameplays",
+        "/api/v1/gameplays/my-gameplays",
         headers={"Authorization": "Basic dXNlcjpwYXNz"},
     )
     assert response.status_code == 401
