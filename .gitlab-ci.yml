@@ -55,7 +55,7 @@ test:python:
   image: python:${PYTHON_VERSION}-slim
   parallel:
     matrix:
-      - PYTHON_VERSION: ["3.14"]
+      - PYTHON_VERSION: ["3.11", "3.12", "3.13", "3.14"]
   services:
     - name: postgres:16-alpine
       alias: postgres
