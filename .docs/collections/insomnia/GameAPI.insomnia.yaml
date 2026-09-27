@@ -1,0 +1,1481 @@
+_type: export
+__export_format: 4
+__export_date: 2026-09-26T23:30:00.000Z
+__export_source: insomnia.desktop.app:v2024.5.0
+resources:
+  # ==================================================================
+  # WORKSPACE
+  # ==================================================================
+  - _id: wrk_gameapi
+    parentId: null
+    modified: 1790462000000
+    created: 1790462000000
+    name: Game API
+    description: |-
+      # Game API
+
+      REST API for managing users and Tic-Tac-Toe gameplays, with WebSocket support for real-time updates.
+
+      ## Base URL
+
+      All requests use the `baseUrl` environment variable, which defaults to `localhost:8080`.
+
+      - **REST**: `http://{{ _.baseUrl }}/api/v1/*`
+      - **WebSocket**: `ws://{{ _.baseUrl }}/api/v2/ws/*`
+
+      ## Authentication
+
+      The API uses **JWT Bearer tokens** for authenticated endpoints.
+
+      1. Run **Users → Register user** to create an account.
+      2. Run **Users → Login** to obtain a JWT. The response is stored automatically in the `token` environment variable.
+      3. Authenticated requests inject the token via the `Authorization: Bearer <token>` header.
+
+      WebSocket connections authenticate via a **JSON message** sent immediately after the socket opens:
+
+      ```json
+      {"event":"auth","payload":{"token":"{{ _.token }}"}}
+      ```
+
+      ## Recommended first-time flow
+
+      1. **Users → Register user** — creates the account and stores `userId`.
+      2. **Users → Login** — stores `token` and `userId`.
+      3. **Gameplays → Create gameplay** — stores `gameplayId`.
+      4. **WebSocket (v2) → Presence WS** — connect and send the auth message.
+      5. **WebSocket (v2) → Gameplays WS** — connect and send the auth message.
+
+      ## Environment variables
+
+      | Variable | Description | Set by |
+      |----------|-------------|--------|
+      | `baseUrl` | Host and port (no scheme) | User |
+      | `token` | JWT for authenticated requests | Login script |
+      | `userId` | Current user UUID | Register / Login script |
+      | `gameplayId` | Last created gameplay UUID | Create gameplay script |
+      | `testEmail` | Email used for login | User |
+      | `testPassword` | Password used for login | User |
+
+      ## Response format
+
+      All errors return a JSON body with a `message` field:
+
+      ```json
+      {"message": "Email is currently registered"}
+      ```
+
+      ## Versioning
+
+      - `/api/v1/*` — frozen contract, backward compatible.
+      - `/api/v2/*` — active version, used for WebSocket endpoints.
+    scope: collection
+    _type: workspace
+
+  # ==================================================================
+  # ENVIRONMENTS
+  # ==================================================================
+  - _id: env_base
+    parentId: wrk_gameapi
+    modified: 1790462000000
+    created: 1790462000000
+    name: Base Environment
+    data: {}
+    dataPropertyOrder: null
+    color: null
+    isPrivate: false
+    metaSortKey: 1790462000000
+    _type: environment
+
+  - _id: env_local
+    parentId: wrk_gameapi
+    modified: 1790462000000
+    created: 1790462000000
+    name: Local
+    data:
+      baseUrl: "localhost:8080"
+      token: ""
+      userId: ""
+      gameplayId: ""
+      testEmail: "sandra@mail.com"
+      testPassword: "password123"
+    dataPropertyOrder:
+      "&":
+        - baseUrl
+        - token
+        - userId
+        - gameplayId
+        - testEmail
+        - testPassword
+    color: null
+    isPrivate: false
+    metaSortKey: 1790462000001
+    _type: environment
+
+  # ==================================================================
+  # REQUEST GROUPS
+  # ==================================================================
+  - _id: fld_users
+    parentId: wrk_gameapi
+    modified: 1790462000000
+    created: 1790462000000
+    name: Users
+    description: |-
+      # Users
+
+      User account management: registration, login, and CRUD operations.
+
+      ## Endpoints
+
+      | Method | Path | Auth | Description |
+      |--------|------|------|-------------|
+      | `POST` | `/api/v1/users` | No | Register a new user |
+      | `GET` | `/api/v1/users` | No | List all users |
+      | `GET` | `/api/v1/users/{id}` | No | Get one user by UUID |
+      | `PUT` | `/api/v1/users/{id}` | Yes | Update your own account |
+      | `DELETE` | `/api/v1/users/{id}` | Yes | Delete your own account |
+      | `POST` | `/api/v1/users/login` | No | Login and obtain a JWT |
+
+      ## Field naming
+
+      Python internals use `snake_case`, but the JSON API uses `camelCase`:
+
+      - `register_date` → `registerDate`
+
+      ## Authentication
+
+      `PUT` and `DELETE` require a JWT and enforce **ownership**: you can only modify or delete your own account. Attempting to modify another user returns `403 Forbidden`.
+
+      ## Typical error responses
+
+      | Status | Reason |
+      |--------|--------|
+      | `400` | Invalid email format, password too short, missing fields |
+      | `401` | Missing or invalid token |
+      | `403` | Trying to modify another user |
+      | `404` | User not found (also returned for malformed UUIDs) |
+      | `409` | Email already registered |
+    environment: {}
+    environmentPropertyOrder: null
+    metaSortKey: -1790462000000
+    _type: request_group
+
+  - _id: fld_gameplays
+    parentId: wrk_gameapi
+    modified: 1790462000000
+    created: 1790462000000
+    name: Gameplays
+    description: |-
+      # Gameplays
+
+      Tic-Tac-Toe match management. A gameplay stores the board state as a JSON string and tracks two players (host and optional guest) plus the current turn.
+
+      ## Endpoints
+
+      | Method | Path | Auth | Description |
+      |--------|------|------|-------------|
+      | `GET` | `/api/v1/gameplays` | No | List all gameplays |
+      | `GET` | `/api/v1/gameplays/my-gameplays` | Yes | List your gameplays (as host or guest) |
+      | `GET` | `/api/v1/gameplays/player/{id}` | No | List gameplays for a specific player |
+      | `GET` | `/api/v1/gameplays/{id}` | No | Get one gameplay by UUID |
+      | `POST` | `/api/v1/gameplays` | Yes | Create a gameplay (you become the host) |
+      | `PUT` | `/api/v1/gameplays/{id}` | Yes | Update (only participants) |
+      | `DELETE` | `/api/v1/gameplays/{id}` | Yes | Delete (only the host) |
+
+      ## Board state format
+
+      `currentPositions` and `matchResult` are **JSON-encoded strings**, not nested objects. Example value:
+
+      ```json
+      "{\"board\": [[0,0,0],[0,0,0],[0,0,0]], \"lastMove\": null}"
+      ```
+
+      | Cell value | Meaning |
+      |------------|---------|
+      | `0` | Empty |
+      | `1` | Player X |
+      | `2` | Player O |
+
+      ## Authentication and permissions
+
+      - **Create**: only the authenticated user can be the host. Trying to assign another user as host returns `403`.
+      - **Update**: only the host or guest can update. Non-participants get `403`.
+      - **Delete**: only the host can delete. Non-hosts (including guests) get `403`.
+
+      ## Typical error responses
+
+      | Status | Reason |
+      |--------|--------|
+      | `400` | Invalid JSON in `currentPositions` or `matchResult`, or guest does not exist |
+      | `401` | Missing or invalid token |
+      | `403` | Not the owner / not a participant |
+      | `404` | Gameplay not found (also returned for malformed UUIDs) |
+    environment: {}
+    environmentPropertyOrder: null
+    metaSortKey: -1790462000000
+    _type: request_group
+
+  - _id: fld_ws
+    parentId: wrk_gameapi
+    modified: 1790462000000
+    created: 1790462000000
+    name: WebSocket (v2)
+    description: |-
+      # WebSocket endpoints (v2)
+
+      Real-time channels for gameplay events and user presence.
+
+      ## Endpoints
+
+      | Path | Purpose |
+      |------|---------|
+      | `/api/v2/ws/presence` | User presence and online list |
+      | `/api/v2/ws/gameplays` | Gameplay events and game-scoped broadcasts |
+
+      ## Authentication flow
+
+      The JWT **must be sent as the first message** within a short timeout window (the server closes the connection with `auth_timeout` if you take too long).
+
+      1. Click **Connect** on the WebSocket request.
+      2. In the message editor, send:
+
+         ```json
+         {"event":"auth","payload":{"token":"{{ _.token }}"}}
+         ```
+
+      3. On success, the server replies:
+
+         ```json
+         {"event":"auth_ok","payload":{"user_id":"..."}}
+         ```
+
+      4. If the token is invalid, the server replies with `auth_error` and closes the socket.
+
+      ## Common events
+
+      | Event | Payload | Purpose |
+      |-------|---------|---------|
+      | `auth` | `{"token": "<jwt>"}` | Authenticate the socket (must be first) |
+      | `ping` | — | Keep-alive probe |
+      | `list_online_users` | — | Presence only; list online user IDs |
+      | `subscribe_game` | `{"game_id": "<uuid>"}` | Gameplays only; subscribe to a game |
+      | `broadcast_to_game` | `{"game_id": "<uuid>", "message": "<text>"}` | Gameplays only; broadcast to subscribers |
+      | `unsubscribe_game` | `{"game_id": "<uuid>"}` | Gameplays only; leave the subscription |
+
+      ## Message format
+
+      All client and server messages follow the same envelope:
+
+      ```json
+      {"event": "<event_name>", "payload": { ... }}
+      ```
+
+      Events without a payload omit the `payload` key.
+
+      ## Tips
+
+      - Run **Users → Login** before connecting so `{{ _.token }}` is populated.
+      - You can open two Insomnia windows (or two WebSocket requests) with **different users** to test cross-user broadcasts.
+    environment: {}
+    environmentPropertyOrder: null
+    metaSortKey: -1790462000000
+    _type: request_group
+
+  # ==================================================================
+  # USERS REQUESTS
+  # ==================================================================
+  - _id: req_register_user
+    parentId: fld_users
+    modified: 1790462000000
+    created: 1790462000000
+    name: Register user
+    url: "http://{{ _.baseUrl }}/api/v1/users"
+    method: POST
+    body:
+      mimeType: application/json
+      text: |-
+        {
+          "name": "Sandra Dee",
+          "email": "{{ _.testEmail }}",
+          "password": "{{ _.testPassword }}"
+        }
+    parameters: []
+    headers:
+      - name: Content-Type
+      - value: application/json
+        id: pair_ct_reg
+    description: |-
+      # Register user
+
+      Creates a new user account.
+
+      - **Method**: `POST`
+      - **Path**: `/api/v1/users`
+      - **Auth**: Not required
+
+      ## Request body
+
+      | Field | Type | Required | Constraints |
+      |-------|------|----------|-------------|
+      | `name` | string | Yes | Non-empty |
+      | `email` | string | Yes | Valid email; stored in lowercase |
+      | `password` | string | Yes | Minimum 8 characters |
+
+      ### Example
+
+      ```json
+      {
+        "name": "Sandra Dee",
+        "email": "sandra@mail.com",
+        "password": "password123"
+      }
+      ```
+
+      ## Response — `201 Created`
+
+      ```json
+      {
+        "id": "8df1c70b-e4e4-4dc6-80fb-2ce6404ee28f",
+        "name": "Sandra Dee",
+        "email": "sandra@mail.com",
+        "registerDate": "2026-09-26T21:12:51.971090Z"
+      }
+      ```
+
+      The `Location` header points to the new resource: `/api/v1/users/{id}`.
+
+      ## Errors
+
+      | Status | Cause | Body |
+      |--------|-------|------|
+      | `400` | Invalid email, short password, missing fields | `{"message": "..."}` |
+      | `409` | Email already registered | `{"message": "Email is currently registered"}` |
+
+      ## Side effects
+
+      The **After-response script** stores `userId` and `testEmail` in the environment so subsequent requests can use them.
+    authentication: {}
+    metaSortKey: -1790462000006
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    afterResponseScript: |-
+      const res = insomnia.response;
+      if (res.code === 201) {
+        const body = res.json();
+        insomnia.environment.set("userId", body.id);
+        insomnia.environment.set("testEmail", body.email);
+        console.log("Saved userId:", body.id);
+      } else {
+        console.error("Register failed:", res.code, res.text());
+      }
+    _type: request
+
+  - _id: req_login
+    parentId: fld_users
+    modified: 1790462000000
+    created: 1790462000000
+    name: Login
+    url: "http://{{ _.baseUrl }}/api/v1/users/login"
+    method: POST
+    body:
+      mimeType: application/json
+      text: |-
+        {
+          "email": "{{ _.testEmail }}",
+          "password": "{{ _.testPassword }}"
+        }
+    parameters: []
+    headers:
+      - name: Content-Type
+        value: application/json
+        id: pair_ct_login
+    description: |-
+      # Login
+
+      Authenticates a user and returns a JWT access token.
+
+      - **Method**: `POST`
+      - **Path**: `/api/v1/users/login`
+      - **Auth**: Not required
+
+      ## Request body
+
+      ```json
+      {
+        "email": "sandra@mail.com",
+        "password": "password123"
+      }
+      ```
+
+      ## Response — `200 OK`
+
+      ```json
+      {
+        "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+        "user": {
+          "id": "8df1c70b-e4e4-4dc6-80fb-2ce6404ee28f",
+          "name": "Sandra Dee",
+          "email": "sandra@mail.com",
+          "registerDate": "2026-09-26T21:12:51.971090Z"
+        }
+      }
+      ```
+
+      ## JWT claims
+
+      | Claim | Value |
+      |-------|-------|
+      | `sub` | User UUID |
+      | `email` | User email |
+      | `name` | User display name |
+      | `jti` | Unique token identifier |
+      | `iat` | Issued-at (Unix timestamp) |
+      | `exp` | Expiration (default: +60 minutes) |
+      | `iss` | `GameAPI` |
+      | `aud` | `GameAPI` |
+
+      ## Errors
+
+      | Status | Cause |
+      |--------|-------|
+      | `400` | Missing or empty password |
+      | `401` | Email not registered, or wrong password (`{"message": "Invalid credentials"}`) |
+
+      ## Side effects
+
+      The **After-response script** stores `token` and `userId` in the environment. Every subsequent authenticated request and WebSocket auth message reads these values automatically.
+    authentication: {}
+    metaSortKey: -1790462000005
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    afterResponseScript: |-
+      const res = insomnia.response;
+      if (res.code === 200) {
+        const body = res.json();
+        insomnia.environment.set("token", body.token);
+        insomnia.environment.set("userId", body.user.id);
+        console.log("Token and userId stored");
+      } else {
+        console.error("Login failed:", res.code, res.text());
+      }
+    _type: request
+
+  - _id: req_get_all_users
+    parentId: fld_users
+    modified: 1790462000000
+    created: 1790462000000
+    name: Get all users
+    url: "http://{{ _.baseUrl }}/api/v1/users"
+    method: GET
+    body:
+      mimeType: null
+      text: ""
+    parameters: []
+    headers: []
+    description: |-
+      # Get all users
+
+      Returns every registered user.
+
+      - **Method**: `GET`
+      - **Path**: `/api/v1/users`
+      - **Auth**: Not required
+
+      ## Response — `200 OK`
+
+      ```json
+      [
+        {
+          "id": "8df1c70b-e4e4-4dc6-80fb-2ce6404ee28f",
+          "name": "Sandra Dee",
+          "email": "sandra@mail.com",
+          "registerDate": "2026-09-26T21:12:51.971090Z"
+        }
+      ]
+      ```
+
+      Returns `[]` if there are no users. Password hashes are never returned.
+
+      ## Errors
+
+      None for well-formed requests.
+    authentication: {}
+    metaSortKey: -1790462000004
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+
+  - _id: req_get_user_by_id
+    parentId: fld_users
+    modified: 1790462000000
+    created: 1790462000000
+    name: Get user by ID
+    url: "http://{{ _.baseUrl }}/api/v1/users/{{ _.userId }}"
+    method: GET
+    body:
+      mimeType: null
+      text: ""
+    parameters: []
+    headers: []
+    description: |-
+      # Get user by ID
+
+      Retrieves a single user by UUID.
+
+      - **Method**: `GET`
+      - **Path**: `/api/v1/users/{id}`
+      - **Auth**: Not required
+
+      ## Path parameters
+
+      | Parameter | Type | Description |
+      |-----------|------|-------------|
+      | `id` | UUID | User identifier (`{{ _.userId }}` by default) |
+
+      ## Response — `200 OK`
+
+      ```json
+      {
+        "id": "8df1c70b-e4e4-4dc6-80fb-2ce6404ee28f",
+        "name": "Sandra Dee",
+        "email": "sandra@mail.com",
+        "registerDate": "2026-09-26T21:12:51.971090Z"
+      }
+      ```
+
+      ## Errors
+
+      | Status | Cause |
+      |--------|-------|
+      | `404` | UUID not found, **or** malformed UUID (e.g. `not-an-object-id`) |
+
+      ### Example 404
+
+      ```json
+      {"message": "User not found"}
+      ```
+
+      ## Notes
+
+      Malformed UUIDs intentionally return `404` instead of `422` to avoid leaking which IDs are syntactically valid.
+    authentication: {}
+    metaSortKey: -1790462000003
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+
+  - _id: req_update_user
+    parentId: fld_users
+    modified: 1790462000000
+    created: 1790462000000
+    name: Update my user
+    url: "http://{{ _.baseUrl }}/api/v1/users/{{ _.userId }}"
+    method: PUT
+    body:
+      mimeType: application/json
+      text: |-
+        {
+          "name": "Sandra Dee Updated"
+        }
+    parameters: []
+    headers:
+      - name: Content-Type
+        value: application/json
+        id: pair_ct_upduser
+    description: |-
+      # Update my user
+
+      Partially updates the authenticated user's own account.
+
+      - **Method**: `PUT`
+      - **Path**: `/api/v1/users/{id}`
+      - **Auth**: Required (Bearer JWT)
+
+      ## Ownership rule
+
+      The JWT `sub` claim **must match** the `id` in the path. Updating another user's account returns `403 Forbidden`.
+
+      ## Request body
+
+      All fields are optional. Only the fields you send are updated.
+
+      | Field | Type | Notes |
+      |-------|------|-------|
+      | `name` | string | New display name |
+      | `email` | string | Must be unique; stored lowercase |
+      | `password` | string | Minimum 8 characters; re-hashed server-side |
+
+      ### Example — update name only
+
+      ```json
+      {"name": "Sandra Dee Updated"}
+      ```
+
+      ### Example — update password
+
+      ```json
+      {"password": "newpassword456"}
+      ```
+
+      ### Example — empty body (no-op)
+
+      ```json
+      {}
+      ```
+
+      Sending an empty object returns `204` without modifying the record.
+
+      ## Response — `204 No Content`
+
+      Empty body. Fetch the user with **Get user by ID** to verify the changes.
+
+      ## Errors
+
+      | Status | Cause |
+      |--------|-------|
+      | `400` | Invalid email format, short password |
+      | `401` | Missing/invalid token |
+      | `403` | `id` does not match `sub` |
+      | `404` | User not found, or malformed UUID |
+      | `409` | Email already used by another account |
+
+      ## Notes
+
+      - If you change your email, **future logins must use the new email**.
+      - If you change your password, previously issued JWTs remain valid until they expire.
+    authentication:
+      type: bearer
+      token: "{{ _.token }}"
+      prefix: ""
+    metaSortKey: -1790462000002
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+
+  - _id: req_delete_user
+    parentId: fld_users
+    modified: 1790462000000
+    created: 1790462000000
+    name: Delete my user
+    url: "http://{{ _.baseUrl }}/api/v1/users/{{ _.userId }}"
+    method: DELETE
+    body:
+      mimeType: null
+      text: ""
+    parameters: []
+    headers: []
+    description: |-
+      # Delete my user
+
+      Permanently deletes the authenticated user's own account.
+
+      - **Method**: `DELETE`
+      - **Path**: `/api/v1/users/{id}`
+      - **Auth**: Required (Bearer JWT)
+
+      ## Ownership rule
+
+      The JWT `sub` claim must match the `id` in the path. Deleting another user's account returns `403 Forbidden`.
+
+      ## Response — `204 No Content`
+
+      Empty body.
+
+      ## Errors
+
+      | Status | Cause |
+      |--------|-------|
+      | `401` | Missing/invalid token |
+      | `403` | `id` does not match `sub` |
+      | `404` | User not found, or malformed UUID |
+
+      ## Side effects
+
+      - The user row is deleted from the database.
+      - Gameplays hosted by this user are removed (cascade).
+      - **Previously issued JWTs are NOT invalidated** — they remain valid until `exp`. If your server rotates keys or checks user existence on each request, they will fail on the next call.
+      - After deletion, `{{ _.userId }}` and `{{ _.token }}` in the environment still hold old values; re-register and re-login before continuing.
+
+      ## Notes
+
+      This action cannot be undone. Re-run **Register user** to create a fresh account.
+    authentication:
+      type: bearer
+      token: "{{ _.token }}"
+      prefix: ""
+    metaSortKey: -1790462000001
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+
+  # ==================================================================
+  # GAMEPLAYS REQUESTS
+  # ==================================================================
+  - _id: req_create_gameplay
+    parentId: fld_gameplays
+    modified: 1790462000000
+    created: 1790462000000
+    name: Create gameplay
+    url: "http://{{ _.baseUrl }}/api/v1/gameplays"
+    method: POST
+    body:
+      mimeType: application/json
+      text: |-
+        {
+          "currentPositions": "{\"board\": [[0,0,0],[0,0,0],[0,0,0]], \"lastMove\": null}",
+          "hostPlayer": "{{ _.userId }}",
+          "playerTurn": "{{ _.userId }}",
+          "matchResult": null
+        }
+    parameters: []
+    headers:
+      - name: Content-Type
+        value: application/json
+        id: pair_ct_creategp
+    description: |-
+      # Create gameplay
+
+      Starts a new Tic-Tac-Toe match. The authenticated user becomes the host.
+
+      - **Method**: `POST`
+      - **Path**: `/api/v1/gameplays`
+      - **Auth**: Required (Bearer JWT)
+
+      ## Request body
+
+      | Field | Type | Required | Notes |
+      |-------|------|----------|-------|
+      | `currentPositions` | string (JSON-encoded) | Yes | Board state; empty string is allowed |
+      | `hostPlayer` | UUID string | Yes | Must equal the JWT `sub` |
+      | `guestPlayer` | UUID string \| null | No | Must reference an existing user |
+      | `playerTurn` | UUID string | Yes | User whose turn it is |
+      | `matchResult` | string (JSON-encoded) \| null | No | Final result, if any |
+
+      ### Example — open match
+
+      ```json
+      {
+        "currentPositions": "{\"board\": [[0,0,0],[0,0,0],[0,0,0]], \"lastMove\": null}",
+        "hostPlayer": "8df1c70b-e4e4-4dc6-80fb-2ce6404ee28f",
+        "playerTurn": "8df1c70b-e4e4-4dc6-80fb-2ce6404ee28f",
+        "matchResult": null
+      }
+      ```
+
+      ### Example — match with guest
+
+      ```json
+      {
+        "currentPositions": "{\"board\": [[0,0,0],[0,0,0],[0,0,0]], \"lastMove\": null}",
+        "hostPlayer": "8df1c70b-e4e4-4dc6-80fb-2ce6404ee28f",
+        "guestPlayer": "9a02d81c-f5f5-4ed7-91fc-3df7515ff39e",
+        "playerTurn": "9a02d81c-f5f5-4ed7-91fc-3df7515ff39e",
+        "matchResult": null
+      }
+      ```
+
+      ## Response — `201 Created`
+
+      ```json
+      {
+        "id": "cd820ba6-b121-4d64-827e-3b2b4fb7b42b",
+        "currentPositions": "{\"board\": [[0,0,0],[0,0,0],[0,0,0]], \"lastMove\": null}",
+        "hostPlayer": "8df1c70b-e4e4-4dc6-80fb-2ce6404ee28f",
+        "guestPlayer": null,
+        "playerTurn": "8df1c70b-e4e4-4dc6-80fb-2ce6404ee28f",
+        "matchResult": null,
+        "createdDate": "2026-09-26T22:34:27.964128Z",
+        "updatedDate": "2026-09-26T22:34:27.964128Z"
+      }
+      ```
+
+      The `Location` header points to the new resource: `/api/v1/gameplays/{id}`.
+
+      ## Errors
+
+      | Status | Cause |
+      |--------|-------|
+      | `400` | Invalid JSON in `currentPositions` or `matchResult`, or `guestPlayer` does not exist |
+      | `401` | Missing/invalid token |
+      | `403` | `hostPlayer` does not match the authenticated user |
+
+      ## Side effects
+
+      The **After-response script** stores `gameplayId` in the environment for the subsequent WebSocket and update/delete requests.
+    authentication:
+      type: bearer
+      token: "{{ _.token }}"
+      prefix: ""
+    metaSortKey: -1790462000007
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    afterResponseScript: |-
+      const res = insomnia.response;
+      if (res.code === 201) {
+        const body = res.json();
+        insomnia.environment.set("gameplayId", body.id);
+        console.log("Saved gameplayId:", body.id);
+      } else {
+        console.error("Create gameplay failed:", res.code, res.text());
+      }
+    _type: request
+
+  - _id: req_get_all_gameplays
+    parentId: fld_gameplays
+    modified: 1790462000000
+    created: 1790462000000
+    name: Get all gameplays
+    url: "http://{{ _.baseUrl }}/api/v1/gameplays"
+    method: GET
+    body:
+      mimeType: null
+      text: ""
+    parameters: []
+    headers: []
+    description: |-
+      # Get all gameplays
+
+      Returns every gameplay in the system.
+
+      - **Method**: `GET`
+      - **Path**: `/api/v1/gameplays`
+      - **Auth**: Not required
+
+      ## Response — `200 OK`
+
+      ```json
+      [
+        {
+          "id": "cd820ba6-b121-4d64-827e-3b2b4fb7b42b",
+          "currentPositions": "{\"board\": [[0,0,0],[0,0,0],[0,0,0]], \"lastMove\": null}",
+          "hostPlayer": "8df1c70b-e4e4-4dc6-80fb-2ce6404ee28f",
+          "guestPlayer": null,
+          "playerTurn": "8df1c70b-e4e4-4dc6-80fb-2ce6404ee28f",
+          "matchResult": null,
+          "createdDate": "2026-09-26T22:34:27.964128Z",
+          "updatedDate": "2026-09-26T22:34:27.964128Z"
+        }
+      ]
+      ```
+
+      Returns `[]` if there are no gameplays.
+
+      ## Notes
+
+      This endpoint is primarily for debugging. In production you would typically list a user's gameplays with **Get my gameplays** or **Get gameplays by player**.
+    authentication: {}
+    metaSortKey: -1790462000006
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+
+  - _id: req_get_my_gameplays
+    parentId: fld_gameplays
+    modified: 1790462000000
+    created: 1790462000000
+    name: Get my gameplays
+    url: "http://{{ _.baseUrl }}/api/v1/gameplays/my-gameplays"
+    method: GET
+    body:
+      mimeType: null
+      text: ""
+    parameters: []
+    headers: []
+    description: |-
+      # Get my gameplays
+
+      Returns gameplays where the authenticated user is either the host or the guest.
+
+      - **Method**: `GET`
+      - **Path**: `/api/v1/gameplays/my-gameplays`
+      - **Auth**: Required (Bearer JWT)
+
+      ## Response — `200 OK`
+
+      ```json
+      [
+        {
+          "id": "cd820ba6-b121-4d64-827e-3b2b4fb7b42b",
+          "currentPositions": "{\"board\": [[0,0,0],[0,0,0],[0,0,0]], \"lastMove\": null}",
+          "hostPlayer": "8df1c70b-e4e4-4dc6-80fb-2ce6404ee28f",
+          "guestPlayer": null,
+          "playerTurn": "8df1c70b-e4e4-4dc6-80fb-2ce6404ee28f",
+          "matchResult": null,
+          "createdDate": "2026-09-26T22:34:27.964128Z",
+          "updatedDate": "2026-09-26T22:34:27.964128Z"
+        }
+      ]
+      ```
+
+      Returns `[]` if the user has no gameplays.
+
+      ## Errors
+
+      | Status | Cause |
+      |--------|-------|
+      | `401` | Missing or invalid token |
+
+      ## Notes
+
+      - Sorting: results are ordered by `createdDate` descending (newest first).
+      - This is the query behind the "My games" view in a client.
+    authentication:
+      type: bearer
+      token: "{{ _.token }}"
+      prefix: ""
+    metaSortKey: -1790462000005
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+
+  - _id: req_get_gameplays_by_player
+    parentId: fld_gameplays
+    modified: 1790462000000
+    created: 1790462000000
+    name: Get gameplays by player
+    url: "http://{{ _.baseUrl }}/api/v1/gameplays/player/{{ _.userId }}"
+    method: GET
+    body:
+      mimeType: null
+      text: ""
+    parameters: []
+    headers: []
+    description: |-
+      # Get gameplays by player
+
+      Returns all gameplays where the given user is the host or the guest.
+
+      - **Method**: `GET`
+      - **Path**: `/api/v1/gameplays/player/{id}`
+      - **Auth**: Not required
+
+      ## Path parameters
+
+      | Parameter | Type | Description |
+      |-----------|------|-------------|
+      | `id` | UUID | Player identifier (`{{ _.userId }}` by default) |
+
+      ## Response — `200 OK`
+
+      Same shape as **Get my gameplays**.
+
+      ## Behavior with malformed UUIDs
+
+      If `id` is not a valid UUID (e.g. `not-a-uuid`), the API returns **`200 OK` with an empty list** instead of `404`. This is intentional: listing endpoints never fail on invalid input, they just have no results.
+
+      ## Notes
+
+      - Useful for viewing another player's match history.
+      - Compare with **Get my gameplays**, which uses the JWT `sub` and therefore cannot be called without authentication.
+    authentication: {}
+    metaSortKey: -1790462000004
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+
+  - _id: req_get_gameplay_by_id
+    parentId: fld_gameplays
+    modified: 1790462000000
+    created: 1790462000000
+    name: Get gameplay by ID
+    url: "http://{{ _.baseUrl }}/api/v1/gameplays/{{ _.gameplayId }}"
+    method: GET
+    body:
+      mimeType: null
+      text: ""
+    parameters: []
+    headers: []
+    description: |-
+      # Get gameplay by ID
+
+      Retrieves a single gameplay by UUID.
+
+      - **Method**: `GET`
+      - **Path**: `/api/v1/gameplays/{id}`
+      - **Auth**: Not required
+
+      ## Response — `200 OK`
+
+      ```json
+      {
+        "id": "cd820ba6-b121-4d64-827e-3b2b4fb7b42b",
+        "currentPositions": "{\"board\": [[0,0,0],[0,0,0],[0,0,0]], \"lastMove\": null}",
+        "hostPlayer": "8df1c70b-e4e4-4dc6-80fb-2ce6404ee28f",
+        "guestPlayer": null,
+        "playerTurn": "8df1c70b-e4e4-4dc6-80fb-2ce6404ee28f",
+        "matchResult": null,
+        "createdDate": "2026-09-26T22:34:27.964128Z",
+        "updatedDate": "2026-09-26T22:34:27.964128Z"
+      }
+      ```
+
+      ## Errors
+
+      | Status | Cause |
+      |--------|-------|
+      | `404` | UUID not found, or malformed UUID |
+
+      ### Example 404
+
+      ```json
+      {"message": "Gameplay not found"}
+      ```
+
+      ## Notes
+
+      `currentPositions` and `matchResult` come back as **strings**, not nested objects. Parse them client-side.
+    authentication: {}
+    metaSortKey: -1790462000003
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+
+  - _id: req_update_gameplay
+    parentId: fld_gameplays
+    modified: 1790462000000
+    created: 1790462000000
+    name: Update gameplay
+    url: "http://{{ _.baseUrl }}/api/v1/gameplays/{{ _.gameplayId }}"
+    method: PUT
+    body:
+      mimeType: application/json
+      text: |-
+        {
+          "currentPositions": "{\"board\": [[1,0,0],[0,2,0],[0,0,0]], \"lastMove\": {\"x\":0,\"y\":0}}"
+        }
+    parameters: []
+    headers:
+      - name: Content-Type
+        value: application/json
+        id: pair_ct_updgp
+    description: |-
+      # Update gameplay
+
+      Updates one or more fields of an existing gameplay. Only participants (host or guest) may update.
+
+      - **Method**: `PUT`
+      - **Path**: `/api/v1/gameplays/{id}`
+      - **Auth**: Required (Bearer JWT)
+
+      ## Authorization
+
+      The JWT `sub` must equal either `hostPlayer` or `guestPlayer`. Otherwise the server returns `403 Forbidden`.
+
+      ## Request body
+
+      All fields are optional. Only the fields present in the body are updated.
+
+      | Field | Type | Notes |
+      |-------|------|-------|
+      | `currentPositions` | string (JSON-encoded) | New board state |
+      | `guestPlayer` | UUID string \| null | Assign or clear the guest |
+      | `hostPlayer` | UUID string | Reassign the host |
+      | `playerTurn` | UUID string | Whose turn it is |
+      | `matchResult` | string (JSON-encoded) \| null | Final result |
+
+      ### Example — play a move
+
+      ```json
+      {
+        "currentPositions": "{\"board\": [[1,0,0],[0,2,0],[0,0,0]], \"lastMove\": {\"x\":0,\"y\":0}}",
+        "playerTurn": "9a02d81c-f5f5-4ed7-91fc-3df7515ff39e"
+      }
+      ```
+
+      ### Example — assign a guest
+
+      ```json
+      {"guestPlayer": "9a02d81c-f5f5-4ed7-91fc-3df7515ff39e"}
+      ```
+
+      ### Example — declare a result
+
+      ```json
+      {"matchResult": "{\"winner\": \"X\"}"}
+      ```
+
+      ## Response — `204 No Content`
+
+      Empty body. Fetch the gameplay with **Get gameplay by ID** to verify.
+
+      ## Errors
+
+      | Status | Cause |
+      |--------|-------|
+      | `400` | Invalid JSON, or `guestPlayer` does not exist |
+      | `401` | Missing/invalid token |
+      | `403` | Caller is not the host or guest |
+      | `404` | Gameplay not found, or malformed UUID |
+
+      ## Notes
+
+      - `guestPlayer` with a value of `null` removes the guest from the match.
+      - Concurrent updates are not serialized; last write wins.
+    authentication:
+      type: bearer
+      token: "{{ _.token }}"
+      prefix: ""
+    metaSortKey: -1790462000002
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+
+  - _id: req_delete_gameplay
+    parentId: fld_gameplays
+    modified: 1790462000000
+    created: 1790462000000
+    name: Delete gameplay
+    url: "http://{{ _.baseUrl }}/api/v1/gameplays/{{ _.gameplayId }}"
+    method: DELETE
+    body:
+      mimeType: null
+      text: ""
+    parameters: []
+    headers: []
+    description: |-
+      # Delete gameplay
+
+      Permanently deletes a gameplay. Only the host may delete.
+
+      - **Method**: `DELETE`
+      - **Path**: `/api/v1/gameplays/{id}`
+      - **Auth**: Required (Bearer JWT)
+
+      ## Authorization
+
+      The JWT `sub` must equal `hostPlayer`. Guests and strangers get `403 Forbidden`.
+
+      ## Response — `204 No Content`
+
+      Empty body.
+
+      ## Errors
+
+      | Status | Cause |
+      |--------|-------|
+      | `401` | Missing/invalid token |
+      | `403` | Caller is not the host |
+      | `404` | Gameplay not found, or malformed UUID |
+
+      ## Side effects
+
+      - The gameplay row is deleted.
+      - WebSocket subscribers receive no further events for this game ID.
+      - **This action cannot be undone.** Guests cannot recover the match.
+    authentication:
+      type: bearer
+      token: "{{ _.token }}"
+      prefix: ""
+    metaSortKey: -1790462000001
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+
+  # ==================================================================
+  # WEBSOCKET REQUESTS
+  # ==================================================================
+  - _id: req_ws_gameplays
+    parentId: fld_ws
+    modified: 1790462000000
+    created: 1790462000000
+    name: Gameplays WS
+    url: "ws://{{ _.baseUrl }}/api/v2/ws/gameplays"
+    headers: []
+    authentication: {}
+    description: |-
+      # Gameplays WebSocket
+
+      Real-time channel for gameplay events. Subscribe to a specific game and receive or broadcast messages to other participants.
+
+      - **URL**: `ws://{{ _.baseUrl }}/api/v2/ws/gameplays`
+      - **Auth**: JWT sent as the first message
+
+      ## Message envelope
+
+      Every message — client to server and server to client — follows:
+
+      ```json
+      {"event": "<name>", "payload": { ... }}
+      ```
+
+      ## Step-by-step flow
+
+      ### 1. Connect
+
+      Click **Connect** in the toolbar. The status indicator turns green (`CONNECTED`).
+
+      ### 2. Authenticate
+
+      Send immediately (the server enforces a short auth timeout):
+
+      ```json
+      {"event":"auth","payload":{"token":"{{ _.token }}"}}
+      ```
+
+      Success response:
+
+      ```json
+      {"event":"auth_ok","payload":{"user_id":"8df1c70b-e4e4-4dc6-80fb-2ce6404ee28f"}}
+      ```
+
+      Failure response:
+
+      ```json
+      {"event":"auth_error","payload":{"reason":"invalid_token"}}
+      ```
+
+      If you take too long to send `auth`, the server closes the socket with reason `auth_timeout`. Reconnect and send it again.
+
+      ### 3. Keep the connection alive
+
+      ```json
+      {"event":"ping"}
+      ```
+
+      Response:
+
+      ```json
+      {"event":"pong"}
+      ```
+
+      ### 4. Subscribe to a game
+
+      Requires a valid `gameplayId` (run **Create gameplay** first):
+
+      ```json
+      {"event":"subscribe_game","payload":{"game_id":"{{ _.gameplayId }}"}}
+      ```
+
+      You must be the host or guest of that gameplay. Subscribing to a game you are not part of returns an error event.
+
+      ### 5. Broadcast a message
+
+      ```json
+      {"event":"broadcast_to_game","payload":{"game_id":"{{ _.gameplayId }}","message":"hello"}}
+      ```
+
+      Every other subscriber of that game (across all connected sockets) receives:
+
+      ```json
+      {"event":"game_message","payload":{"game_id":"{{ _.gameplayId }}","from_user":"8df1c70b-...","message":"hello"}}
+      ```
+
+      ### 6. Unsubscribe
+
+      ```json
+      {"event":"unsubscribe_game","payload":{"game_id":"{{ _.gameplayId }}"}}
+      ```
+
+      ### 7. Disconnect
+
+      Click **Disconnect** in the toolbar, or send `Ctrl+C` if using a CLI client.
+
+      ## Testing multi-user behavior
+
+      To see the broadcast in action, open two WebSocket connections with **different users**:
+
+      1. In Insomnia, duplicate this request (`Ctrl+D`) and rename it "Gameplays WS (user B)".
+      2. Change the environment: temporarily set `testEmail` / `testPassword` to user B's credentials, run **Login**, then connect.
+      3. In user A's socket, send `broadcast_to_game`; user B's socket should receive the `game_message` event.
+
+      ## Error events
+
+      | Event | Reason | Cause |
+      |-------|--------|-------|
+      | `auth_error` | `invalid_token` | Token malformed, expired, or wrong signature |
+      | `auth_timeout` (close) | — | `auth` not sent within the timeout window |
+      | `error` | `game_not_found` | `game_id` does not exist |
+      | `error` | `not_a_participant` | Caller is neither host nor guest |
+      | `error` | `unknown_event` | Event name not recognized |
+    metaSortKey: -1790462000002
+    isPrivate: false
+    _type: websocket_request
+
+  - _id: req_ws_presence
+    parentId: fld_ws
+    modified: 1790462000000
+    created: 1790462000000
+    name: Presence WS
+    url: "ws://{{ _.baseUrl }}/api/v2/ws/presence"
+    headers: []
+    authentication: {}
+    description: |-
+      # Presence WebSocket
+
+      Tracks which users are currently online and broadcasts presence changes.
+
+      - **URL**: `ws://{{ _.baseUrl }}/api/v2/ws/presence`
+      - **Auth**: JWT sent as the first message
+
+      ## Step-by-step flow
+
+      ### 1. Connect
+
+      Click **Connect**. Status turns green.
+
+      ### 2. Authenticate
+
+      Send immediately:
+
+      ```json
+      {"event":"auth","payload":{"token":"{{ _.token }}"}}
+      ```
+
+      Success:
+
+      ```json
+      {"event":"auth_ok","payload":{"user_id":"8df1c70b-e4e4-4dc6-80fb-2ce6404ee28f"}}
+      ```
+
+      ### 3. Keep the connection alive
+
+      ```json
+      {"event":"ping"}
+      ```
+
+      Response:
+
+      ```json
+      {"event":"pong"}
+      ```
+
+      ### 4. List online users
+
+      ```json
+      {"event":"list_online_users"}
+      ```
+
+      Response (shape may vary by server version):
+
+      ```json
+      {
+        "event": "online_users",
+        "payload": {
+          "users": [
+            {"user_id": "8df1c70b-e4e4-4dc6-80fb-2ce6404ee28f"},
+            {"user_id": "9a02d81c-f5f5-4ed7-91fc-3df7515ff39e"}
+          ]
+        }
+      }
+      ```
+
+      ### 5. Disconnect
+
+      Click **Disconnect**, or close the socket. The server broadcasts your departure to remaining clients.
+
+      ## Presence events
+
+      When other users connect or disconnect, the server pushes events to all authenticated sockets:
+
+      | Event | Payload | Meaning |
+      |-------|---------|---------|
+      | `user_online` | `{"user_id": "..."}` | A user just authenticated |
+      | `user_offline` | `{"user_id": "..."}` | A user disconnected |
+
+      ## Testing multi-user presence
+
+      Open two Presence WS connections with different users:
+
+      1. Connect with user A, authenticate.
+      2. Duplicate the request (`Ctrl+D`), log in as user B, connect, authenticate.
+      3. In user A's socket, send `list_online_users`. Both users should appear.
+      4. In user B's socket, send `Ctrl+C` to disconnect.
+      5. In user A's socket, watch for the `user_offline` event with user B's ID.
+
+      ## Error events
+
+      | Event | Reason | Cause |
+      |-------|--------|-------|
+      | `auth_error` | `invalid_token` | Token malformed, expired, or wrong signature |
+      | `auth_timeout` (close) | — | `auth` not sent within the timeout window |
+      | `error` | `unknown_event` | Event name not recognized |
+    metaSortKey: -1790462000001
+    isPrivate: false
+    _type: websocket_request
+
+  # ==================================================================
+  # API SPEC
+  # ==================================================================
+  - _id: spc_gameapi
+    parentId: wrk_gameapi
+    modified: 1790462000000
+    created: 1790462000000
+    fileName: GameAPI
+    contents: ""
+    contentType: yaml
+    _type: api_spec
+
+  # ==================================================================
+  # COOKIE JAR
+  # ==================================================================
+  - _id: jar_gameapi
+    parentId: wrk_gameapi
+    modified: 1790462000000
+    created: 1790462000000
+    name: Default Jar
+    cookies: []
+    _type: cookie_jar

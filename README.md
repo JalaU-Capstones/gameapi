@@ -21,6 +21,7 @@ REST API para gestión de usuarios y partidas de Tic-Tac-Toe.
 - [Configuración](#configuración)
 - [Ejecución](#ejecución)
 - [Endpoints](#endpoints)
+- [Colecciones de cliente](#colecciones-de-cliente)
 - [Pruebas](#pruebas)
 - [Docker](#docker)
 - [Arquitectura](#arquitectura)
@@ -299,7 +300,28 @@ curl -X POST http://localhost:8080/api/gameplays \
   }'
 ```
 
-**Colección Postman:** importa `GameAPI.postman_collection.json` (incluye login automático que guarda el token).
+**Colecciones de cliente:** ver [`.docs/collections/`](./.docs/collections/README.md) para instrucciones detalladas.
+
+---
+
+## Colecciones de cliente
+
+El repositorio incluye dos colecciones para probar la API manualmente desde un cliente HTTP/WebSocket:
+
+| Herramienta  | Cubre             | Archivo                                                              |
+|--------------|-------------------|----------------------------------------------------------------------|
+| **Postman**  | Solo REST         | [`GameAPI.postman_collection.json`](./.docs/collections/postman/GameAPI.postman_collection.json) |
+| **Insomnia** | REST + WebSocket  | [`GameAPI.insomnia.yaml`](./.docs/collections/insomnia/GameAPI.insomnia.yaml) |
+
+> **Nota**: la colección de Postman **no incluye los endpoints WebSocket**. Postman no maneja bien colecciones mixtas REST + WS (convierte los requests WS a HTTP y falla con `Invalid protocol: ws:`), por lo que Insomnia es la herramienta recomendada para el flujo completo. Ver [la explicación completa](./.docs/collections/README.md#por-qué-dos-colecciones).
+
+Ambas colecciones incluyen:
+
+- **Login automático** que guarda el token en una variable (`{{token}}` en Postman, `{{ _.token }}` en Insomnia).
+- **Documentación por request** visible en el panel **Documentation** (Postman) o **Docs** (Insomnia).
+- **Scripts de respuesta** que capturan `userId` y `gameplayId` tras las operaciones de creación.
+
+Para el detalle de por qué hay dos colecciones, el flujo recomendado y la solución de problemas (auth timeout, curl sin soporte `--ws`, etc.), consulta [`.docs/collections/README.md`](./.docs/collections/README.md).
 
 ---
 
@@ -312,8 +334,8 @@ make test
 Salida esperada:
 
 ```
-68 passed in ~30s
-Required test coverage of 85.0% reached. Total coverage: 93.00%
+93 passed in ~50s
+Required test coverage of 85.0% reached. Total coverage: 90%
 ```
 
 Los tests usan **PostgreSQL** de dos formas según el entorno:
