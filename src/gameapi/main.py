@@ -13,6 +13,7 @@ from gameapi.api.v1.router import api_router as v1_router
 from gameapi.api.v2.router import api_router as v2_router
 from gameapi.core.config import settings
 from gameapi.db import PostgresDatabase
+from gameapi.services.event_bus import event_bus
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +24,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     try:
         yield
     finally:
+        await event_bus.shutdown()
         await PostgresDatabase.disconnect()
 
 

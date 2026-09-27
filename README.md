@@ -21,6 +21,7 @@ REST API para gestión de usuarios y partidas de Tic-Tac-Toe.
 - [Configuración](#configuración)
 - [Ejecución](#ejecución)
 - [Endpoints](#endpoints)
+- [Colecciones de cliente](#colecciones-de-cliente)
 - [Pruebas](#pruebas)
 - [Docker](#docker)
 - [Arquitectura](#arquitectura)
@@ -227,6 +228,15 @@ Los endpoints WebSocket operan bajo `/api/v2/ws` y requieren autenticación JWT 
 | `/api/v2/ws/gameplays`         | Canal de eventos de partidas. Requiere el evento `auth` con `{ "token": "..." }`. |
 | `/api/v2/ws/presence`         | Canal de presencia en línea. Requiere el evento `auth` con `{ "token": "..." }`. |
 
+**Eventos soportados actualmente (B2):**
+
+- `auth` — primer mensaje obligatorio con el JWT.
+- `ping` / `pong` — keepalive.
+- `subscribe_game` — unirse al canal de una partida.
+- `unsubscribe_game` — salir del canal.
+- `broadcast_to_game` — **temporal** (será reemplazado por eventos reales del juego en B3).
+- `list_online_users` — solo en el endpoint `presence`.
+
 #### Protocolo de autenticación WS
 
 ```json
@@ -290,7 +300,28 @@ curl -X POST http://localhost:8080/api/gameplays \
   }'
 ```
 
-**Colección Postman:** importa `GameAPI.postman_collection.json` (incluye login automático que guarda el token).
+**Colecciones de cliente:** ver [`.docs/collections/`](./.docs/collections/README.md) para instrucciones detalladas.
+
+---
+
+## Colecciones de cliente
+
+El repositorio incluye dos colecciones para probar la API manualmente desde un cliente HTTP/WebSocket:
+
+| Herramienta  | Cubre             | Archivo                                                              |
+|--------------|-------------------|----------------------------------------------------------------------|
+| **Postman**  | Solo REST         | [`GameAPI.postman_collection.json`](./.docs/collections/postman/GameAPI.postman_collection.json) |
+| **Insomnia** | REST + WebSocket  | [`GameAPI.insomnia.yaml`](./.docs/collections/insomnia/GameAPI.insomnia.yaml) |
+
+> **Nota**: la colección de Postman **no incluye los endpoints WebSocket**. Postman no maneja bien colecciones mixtas REST + WS (convierte los requests WS a HTTP y falla con `Invalid protocol: ws:`), por lo que Insomnia es la herramienta recomendada para el flujo completo. Ver [la explicación completa](./.docs/collections/README.md#por-qué-dos-colecciones).
+
+Ambas colecciones incluyen:
+
+- **Login automático** que guarda el token en una variable (`{{token}}` en Postman, `{{ _.token }}` en Insomnia).
+- **Documentación por request** visible en el panel **Documentation** (Postman) o **Docs** (Insomnia).
+- **Scripts de respuesta** que capturan `userId` y `gameplayId` tras las operaciones de creación.
+
+Para el detalle de por qué hay dos colecciones, el flujo recomendado y la solución de problemas (auth timeout, curl sin soporte `--ws`, etc.), consulta [`.docs/collections/README.md`](./.docs/collections/README.md).
 
 ---
 
@@ -303,8 +334,8 @@ make test
 Salida esperada:
 
 ```
-68 passed in ~30s
-Required test coverage of 85.0% reached. Total coverage: 93.00%
+93 passed in ~50s
+Required test coverage of 85.0% reached. Total coverage: 90%
 ```
 
 Los tests usan **PostgreSQL** de dos formas según el entorno:
@@ -321,6 +352,16 @@ Para correr los tests con cobertura:
 ```bash
 make test-cov
 ```
+
+### Bus de eventos
+
+El proyecto usa un **EventBus in-process** (`services/event_bus.py`) para desacoplar los handlers de WebSocket de la lógica de dominio. Cada partida tiene su propio canal, y los clientes se suscriben al canal al entrar a una partida.
+
+- **Arquitectura:** un `asyncio.Queue` + un worker task por canal.
+- **API:** `subscribe(channel, subscriber_id, callback)`, `unsubscribe(channel, subscriber_id)`, `publish(channel, event)`.
+- **Limpieza automática:** al quedarse sin suscriptores, el canal se destruye y su worker se cancela.
+- **Sin estado persistente:** todo vive en memoria del proceso. Un reinicio limpia las suscripciones.
+- **Upgrade path:** si se necesita escalar horizontalmente, se puede reemplazar por Redis Pub/Sub sin cambiar la API del bus.
 
 ### Cobertura
 
@@ -424,6 +465,9 @@ gameapi/
 │   ├── repositories/    # Data access layer (queries SQLAlchemy)
 │   ├── schemas/         # Contratos de API (camelCase, validación)
 │   ├── services/        # Lógica de negocio async, errores de dominio
+│   │   ├── ...
+│   │   ├── event_bus.py         # Pub/sub in-process por canal (gameplay)
+│   │   └── ...
 │   ├── api/             # Routers FastAPI + dependencias (auth, DI)
 │   └── main.py          # App FastAPI, lifespan, CORS, exception handlers
 ├── migrations/          # Migraciones Alembic

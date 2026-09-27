@@ -1,0 +1,383 @@
+{
+  "info": {
+    "name": "Game API",
+    "description": "# Game API\n\nREST API for managing users and Tic-Tac-Toe gameplays, with WebSocket support for real-time play.\n\n## Base URL\n\nAll requests use the `baseUrl` collection variable, which defaults to `localhost:8080` (no scheme included).\n\n- **REST endpoints**: `http://{{baseUrl}}/api/v1/*`\n\n## Authentication\n\nThe API uses **JWT Bearer tokens** for authenticated endpoints.\n\n1. Run **Users → Register user** to create an account.\n2. Run **Users → Login** to obtain a JWT. The token is stored automatically in the `{{token}}` variable by the test script.\n3. Authenticated requests inject the token via the `Authorization: Bearer <token>` header.\n\n## Recommended first-time flow\n\n1. **Users → Register user** — creates the account and stores `{{userId}}`.\n2. **Users → Login** — stores `{{token}}` and `{{userId}}`.\n3. **Gameplays → Create gameplay** — stores `{{gameplayId}}`.\n4. Continue with the rest of the endpoints as needed.\n\n## Collection variables\n\n| Variable | Description | Set by |\n|----------|-------------|--------|\n| `baseUrl` | Host and port (no scheme) | User |\n| `token` | JWT for authenticated requests | Login script |\n| `userId` | Current user UUID | Register / Login script |\n| `gameplayId` | Last created gameplay UUID | Create gameplay script |\n| `testEmail` | Email used for login | User / Register script |\n| `testPassword` | Password used for login | User |\n\n## Response format\n\nAll errors return a JSON body with a `message` field:\n\n```json\n{\"message\": \"Email is currently registered\"}\n```\n\n## Versioning\n\n- `/api/v1/*` — frozen contract, backward compatible.\n- `/api/v2/*` — active version (used by WebSocket endpoints, not included in this collection).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const requiresAuth = pm.request.headers.has('X-Requires-Auth');",
+          "if (requiresAuth) {",
+          "    pm.request.headers.remove('X-Requires-Auth');",
+          "    const loginRequest = {",
+          "        url: 'http://' + pm.collectionVariables.get('baseUrl') + '/api/v1/users/login',",
+          "        method: 'POST',",
+          "        header: { 'Content-Type': 'application/json' },",
+          "        body: {",
+          "            mode: 'raw',",
+          "            raw: JSON.stringify({",
+          "                email: pm.collectionVariables.get('testEmail'),",
+          "                password: pm.collectionVariables.get('testPassword')",
+          "            })",
+          "        }",
+          "    };",
+          "    pm.sendRequest(loginRequest, function (err, res) {",
+          "        if (err) { console.error('Login failed', err); return; }",
+          "        if (res.code === 200) {",
+          "            pm.collectionVariables.set('token', res.json().token);",
+          "        } else {",
+          "            console.warn('Login returned', res.code);",
+          "        }",
+          "    });",
+          "}"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "testEmail",
+      "value": "sandra@mail.com",
+      "type": "string"
+    },
+    {
+      "key": "testPassword",
+      "value": "password123",
+      "type": "string"
+    },
+    {
+      "key": "userId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "gameplayId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Users",
+      "description": "# Users\n\nUser account management: registration, login, and CRUD operations.\n\n## Endpoints\n\n| Method | Path | Auth | Description |\n|--------|------|------|-------------|\n| `POST` | `/api/v1/users` | No | Register a new user |\n| `GET` | `/api/v1/users` | No | List all users |\n| `GET` | `/api/v1/users/{id}` | No | Get one user by UUID |\n| `PUT` | `/api/v1/users/{id}` | Yes | Update your own account |\n| `DELETE` | `/api/v1/users/{id}` | Yes | Delete your own account |\n| `POST` | `/api/v1/users/login` | No | Login and obtain a JWT |\n\n## Field naming\n\nPython internals use `snake_case`, but the JSON API uses `camelCase`:\n\n- `register_date` → `registerDate`\n\n## Authentication\n\n`PUT` and `DELETE` require a JWT and enforce **ownership**: you can only modify or delete your own account. Attempting to modify another user returns `403 Forbidden`.\n\n## Typical error responses\n\n| Status | Reason |\n|--------|--------|\n| `400` | Invalid email format, password too short, missing fields |\n| `401` | Missing or invalid token |\n| `403` | Trying to modify another user |\n| `404` | User not found (also returned for malformed UUIDs) |\n| `409` | Email already registered |",
+      "item": [
+        {
+          "name": "Register user",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set('userId', body.id);",
+                  "    pm.collectionVariables.set('testEmail', body.email);",
+                  "    console.log('Saved userId:', body.id);",
+                  "}",
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Response has id', () => pm.response.json().id !== undefined);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Sandra Dee\",\n  \"email\": \"sandra@mail.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "http://{{baseUrl}}/api/v1/users",
+              "protocol": "http",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users"]
+            },
+            "description": "# Register user\n\nCreates a new user account.\n\n- **Method**: `POST`\n- **Path**: `/api/v1/users`\n- **Auth**: Not required\n\n## Request body\n\n| Field | Type | Required | Constraints |\n|-------|------|----------|-------------|\n| `name` | string | Yes | Non-empty |\n| `email` | string | Yes | Valid email; stored in lowercase |\n| `password` | string | Yes | Minimum 8 characters |\n\n### Example\n\n```json\n{\n  \"name\": \"Sandra Dee\",\n  \"email\": \"sandra@mail.com\",\n  \"password\": \"password123\"\n}\n```\n\n## Response — `201 Created`\n\n```json\n{\n  \"id\": \"8df1c70b-e4e4-4dc6-80fb-2ce6404ee28f\",\n  \"name\": \"Sandra Dee\",\n  \"email\": \"sandra@mail.com\",\n  \"registerDate\": \"2026-09-26T21:12:51.971090Z\"\n}\n```\n\nThe `Location` header points to the new resource: `/api/v1/users/{id}`.\n\n## Errors\n\n| Status | Cause | Body |\n|--------|-------|------|\n| `400` | Invalid email, short password, missing fields | `{\"message\": \"...\"}` |\n| `409` | Email already registered | `{\"message\": \"Email is currently registered\"}` |\n\n## Side effects\n\nThe **test script** stores `userId` and `testEmail` in the collection variables so subsequent requests can use them."
+          }
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    pm.collectionVariables.set('token', pm.response.json().token);",
+                  "    pm.collectionVariables.set('userId', pm.response.json().user.id);",
+                  "    console.log('Token stored');",
+                  "}",
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response has token', () => pm.response.json().token !== undefined);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"sandra@mail.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "http://{{baseUrl}}/api/v1/users/login",
+              "protocol": "http",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users", "login"]
+            },
+            "description": "# Login\n\nAuthenticates a user and returns a JWT access token.\n\n- **Method**: `POST`\n- **Path**: `/api/v1/users/login`\n- **Auth**: Not required\n\n## Request body\n\n```json\n{\n  \"email\": \"sandra@mail.com\",\n  \"password\": \"password123\"\n}\n```\n\n## Response — `200 OK`\n\n```json\n{\n  \"token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\",\n  \"user\": {\n    \"id\": \"8df1c70b-e4e4-4dc6-80fb-2ce6404ee28f\",\n    \"name\": \"Sandra Dee\",\n    \"email\": \"sandra@mail.com\",\n    \"registerDate\": \"2026-09-26T21:12:51.971090Z\"\n  }\n}\n```\n\n## JWT claims\n\n| Claim | Value |\n|-------|-------|\n| `sub` | User UUID |\n| `email` | User email |\n| `name` | User display name |\n| `jti` | Unique token identifier |\n| `iat` | Issued-at (Unix timestamp) |\n| `exp` | Expiration (default: +60 minutes) |\n| `iss` | `GameAPI` |\n| `aud` | `GameAPI` |\n\n## Errors\n\n| Status | Cause |\n|--------|-------|\n| `400` | Missing or empty password |\n| `401` | Email not registered, or wrong password (`{\"message\": \"Invalid credentials\"}`) |\n\n## Side effects\n\nThe **test script** stores `token` and `userId` in the collection variables. Every subsequent authenticated request reads these values automatically."
+          }
+        },
+        {
+          "name": "Get all users",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://{{baseUrl}}/api/v1/users",
+              "protocol": "http",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users"]
+            },
+            "description": "# Get all users\n\nReturns every registered user.\n\n- **Method**: `GET`\n- **Path**: `/api/v1/users`\n- **Auth**: Not required\n\n## Response — `200 OK`\n\n```json\n[\n  {\n    \"id\": \"8df1c70b-e4e4-4dc6-80fb-2ce6404ee28f\",\n    \"name\": \"Sandra Dee\",\n    \"email\": \"sandra@mail.com\",\n    \"registerDate\": \"2026-09-26T21:12:51.971090Z\"\n  }\n]\n```\n\nReturns `[]` if there are no users. Password hashes are never returned.\n\n## Errors\n\nNone for well-formed requests."
+          }
+        },
+        {
+          "name": "Get user by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://{{baseUrl}}/api/v1/users/{{userId}}",
+              "protocol": "http",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users", "{{userId}}"]
+            },
+            "description": "# Get user by ID\n\nRetrieves a single user by UUID.\n\n- **Method**: `GET`\n- **Path**: `/api/v1/users/{id}`\n- **Auth**: Not required\n\n## Path parameters\n\n| Parameter | Type | Description |\n|-----------|------|-------------|\n| `id` | UUID | User identifier (`{{userId}}` by default) |\n\n## Response — `200 OK`\n\n```json\n{\n  \"id\": \"8df1c70b-e4e4-4dc6-80fb-2ce6404ee28f\",\n  \"name\": \"Sandra Dee\",\n  \"email\": \"sandra@mail.com\",\n  \"registerDate\": \"2026-09-26T21:12:51.971090Z\"\n}\n```\n\n## Errors\n\n| Status | Cause |\n|--------|-------|\n| `404` | UUID not found, **or** malformed UUID (e.g. `not-an-object-id`) |\n\n### Example 404\n\n```json\n{\"message\": \"User not found\"}\n```\n\n## Notes\n\nMalformed UUIDs intentionally return `404` instead of `422` to avoid leaking which IDs are syntactically valid."
+          }
+        },
+        {
+          "name": "Update my user",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Sandra Dee Updated\"\n}"
+            },
+            "url": {
+              "raw": "http://{{baseUrl}}/api/v1/users/{{userId}}",
+              "protocol": "http",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users", "{{userId}}"]
+            },
+            "description": "# Update my user\n\nPartially updates the authenticated user's own account.\n\n- **Method**: `PUT`\n- **Path**: `/api/v1/users/{id}`\n- **Auth**: Required (Bearer JWT)\n\n## Ownership rule\n\nThe JWT `sub` claim **must match** the `id` in the path. Updating another user's account returns `403 Forbidden`.\n\n## Request body\n\nAll fields are optional. Only the fields you send are updated.\n\n| Field | Type | Notes |\n|-------|------|-------|\n| `name` | string | New display name |\n| `email` | string | Must be unique; stored lowercase |\n| `password` | string | Minimum 8 characters; re-hashed server-side |\n\n### Example — update name only\n\n```json\n{\"name\": \"Sandra Dee Updated\"}\n```\n\n### Example — update password\n\n```json\n{\"password\": \"newpassword456\"}\n```\n\n### Example — empty body (no-op)\n\n```json\n{}\n```\n\nSending an empty object returns `204` without modifying the record.\n\n## Response — `204 No Content`\n\nEmpty body. Fetch the user with **Get user by ID** to verify the changes.\n\n## Errors\n\n| Status | Cause |\n|--------|-------|\n| `400` | Invalid email format, short password |\n| `401` | Missing/invalid token |\n| `403` | `id` does not match `sub` |\n| `404` | User not found, or malformed UUID |\n| `409` | Email already used by another account |\n\n## Notes\n\n- If you change your email, **future logins must use the new email**.\n- If you change your password, previously issued JWTs remain valid until they expire."
+          }
+        },
+        {
+          "name": "Delete my user",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "http://{{baseUrl}}/api/v1/users/{{userId}}",
+              "protocol": "http",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users", "{{userId}}"]
+            },
+            "description": "# Delete my user\n\nPermanently deletes the authenticated user's own account.\n\n- **Method**: `DELETE`\n- **Path**: `/api/v1/users/{id}`\n- **Auth**: Required (Bearer JWT)\n\n## Ownership rule\n\nThe JWT `sub` claim must match the `id` in the path. Deleting another user's account returns `403 Forbidden`.\n\n## Response — `204 No Content`\n\nEmpty body.\n\n## Errors\n\n| Status | Cause |\n|--------|-------|\n| `401` | Missing/invalid token |\n| `403` | `id` does not match `sub` |\n| `404` | User not found, or malformed UUID |\n\n## Side effects\n\n- The user row is deleted from the database.\n- Gameplays hosted by this user are removed (cascade).\n- **Previously issued JWTs are NOT invalidated** — they remain valid until `exp`. If your server rotates keys or checks user existence on each request, they will fail on the next call.\n- After deletion, `{{userId}}` and `{{token}}` in the collection variables still hold old values; re-register and re-login before continuing.\n\n## Notes\n\nThis action cannot be undone. Re-run **Register user** to create a fresh account."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Gameplays",
+      "description": "# Gameplays\n\nTic-Tac-Toe match management. A gameplay stores the board state as a JSON string and tracks two players (host and optional guest) plus the current turn.\n\n## Endpoints\n\n| Method | Path | Auth | Description |\n|--------|------|------|-------------|\n| `GET` | `/api/v1/gameplays` | No | List all gameplays |\n| `GET` | `/api/v1/gameplays/my-gameplays` | Yes | List your gameplays (as host or guest) |\n| `GET` | `/api/v1/gameplays/player/{id}` | No | List gameplays for a specific player |\n| `GET` | `/api/v1/gameplays/{id}` | No | Get one gameplay by UUID |\n| `POST` | `/api/v1/gameplays` | Yes | Create a gameplay (you become the host) |\n| `PUT` | `/api/v1/gameplays/{id}` | Yes | Update (only participants) |\n| `DELETE` | `/api/v1/gameplays/{id}` | Yes | Delete (only the host) |\n\n## Board state format\n\n`currentPositions` and `matchResult` are **JSON-encoded strings**, not nested objects. Example value:\n\n```json\n\"{\\\"board\\\": [[0,0,0],[0,0,0],[0,0,0]], \\\"lastMove\\\": null}\"\n```\n\n| Cell value | Meaning |\n|------------|---------|\n| `0` | Empty |\n| `1` | Player X |\n| `2` | Player O |\n\n## Authentication and permissions\n\n- **Create**: only the authenticated user can be the host. Trying to assign another user as host returns `403`.\n- **Update**: only the host or guest can update. Non-participants get `403`.\n- **Delete**: only the host can delete. Non-hosts (including guests) get `403`.\n\n## Typical error responses\n\n| Status | Reason |\n|--------|--------|\n| `400` | Invalid JSON in `currentPositions` or `matchResult`, or guest does not exist |\n| `401` | Missing or invalid token |\n| `403` | Not the owner / not a participant |\n| `404` | Gameplay not found (also returned for malformed UUIDs) |",
+      "item": [
+        {
+          "name": "Create gameplay",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    pm.collectionVariables.set('gameplayId', pm.response.json().id);",
+                  "    console.log('Saved gameplayId:', pm.response.json().id);",
+                  "}",
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPositions\": \"{\\\"board\\\": [[0,0,0],[0,0,0],[0,0,0]], \\\"lastMove\\\": null}\",\n  \"hostPlayer\": \"{{userId}}\",\n  \"playerTurn\": \"{{userId}}\",\n  \"matchResult\": null\n}"
+            },
+            "url": {
+              "raw": "http://{{baseUrl}}/api/v1/gameplays",
+              "protocol": "http",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "gameplays"]
+            },
+            "description": "# Create gameplay\n\nStarts a new Tic-Tac-Toe match. The authenticated user becomes the host.\n\n- **Method**: `POST`\n- **Path**: `/api/v1/gameplays`\n- **Auth**: Required (Bearer JWT)\n\n## Request body\n\n| Field | Type | Required | Notes |\n|-------|------|----------|-------|\n| `currentPositions` | string (JSON-encoded) | Yes | Board state; empty string is allowed |\n| `hostPlayer` | UUID string | Yes | Must equal the JWT `sub` |\n| `guestPlayer` | UUID string \\| null | No | Must reference an existing user |\n| `playerTurn` | UUID string | Yes | User whose turn it is |\n| `matchResult` | string (JSON-encoded) \\| null | No | Final result, if any |\n\n### Example — open match\n\n```json\n{\n  \"currentPositions\": \"{\\\"board\\\": [[0,0,0],[0,0,0],[0,0,0]], \\\"lastMove\\\": null}\",\n  \"hostPlayer\": \"8df1c70b-e4e4-4dc6-80fb-2ce6404ee28f\",\n  \"playerTurn\": \"8df1c70b-e4e4-4dc6-80fb-2ce6404ee28f\",\n  \"matchResult\": null\n}\n```\n\n### Example — match with guest\n\n```json\n{\n  \"currentPositions\": \"{\\\"board\\\": [[0,0,0],[0,0,0],[0,0,0]], \\\"lastMove\\\": null}\",\n  \"hostPlayer\": \"8df1c70b-e4e4-4dc6-80fb-2ce6404ee28f\",\n  \"guestPlayer\": \"9a02d81c-f5f5-4ed7-91fc-3df7515ff39e\",\n  \"playerTurn\": \"9a02d81c-f5f5-4ed7-91fc-3df7515ff39e\",\n  \"matchResult\": null\n}\n```\n\n## Response — `201 Created`\n\n```json\n{\n  \"id\": \"cd820ba6-b121-4d64-827e-3b2b4fb7b42b\",\n  \"currentPositions\": \"{\\\"board\\\": [[0,0,0],[0,0,0],[0,0,0]], \\\"lastMove\\\": null}\",\n  \"hostPlayer\": \"8df1c70b-e4e4-4dc6-80fb-2ce6404ee28f\",\n  \"guestPlayer\": null,\n  \"playerTurn\": \"8df1c70b-e4e4-4dc6-80fb-2ce6404ee28f\",\n  \"matchResult\": null,\n  \"createdDate\": \"2026-09-26T22:34:27.964128Z\",\n  \"updatedDate\": \"2026-09-26T22:34:27.964128Z\"\n}\n```\n\nThe `Location` header points to the new resource: `/api/v1/gameplays/{id}`.\n\n## Errors\n\n| Status | Cause |\n|--------|-------|\n| `400` | Invalid JSON in `currentPositions` or `matchResult`, or `guestPlayer` does not exist |\n| `401` | Missing/invalid token |\n| `403` | `hostPlayer` does not match the authenticated user |\n\n## Side effects\n\nThe **test script** stores `gameplayId` in the collection variables for subsequent requests."
+          }
+        },
+        {
+          "name": "Get all gameplays",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://{{baseUrl}}/api/v1/gameplays",
+              "protocol": "http",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "gameplays"]
+            },
+            "description": "# Get all gameplays\n\nReturns every gameplay in the system.\n\n- **Method**: `GET`\n- **Path**: `/api/v1/gameplays`\n- **Auth**: Not required\n\n## Response — `200 OK`\n\n```json\n[\n  {\n    \"id\": \"cd820ba6-b121-4d64-827e-3b2b4fb7b42b\",\n    \"currentPositions\": \"{\\\"board\\\": [[0,0,0],[0,0,0],[0,0,0]], \\\"lastMove\\\": null}\",\n    \"hostPlayer\": \"8df1c70b-e4e4-4dc6-80fb-2ce6404ee28f\",\n    \"guestPlayer\": null,\n    \"playerTurn\": \"8df1c70b-e4e4-4dc6-80fb-2ce6404ee28f\",\n    \"matchResult\": null,\n    \"createdDate\": \"2026-09-26T22:34:27.964128Z\",\n    \"updatedDate\": \"2026-09-26T22:34:27.964128Z\"\n  }\n]\n```\n\nReturns `[]` if there are no gameplays.\n\n## Notes\n\nThis endpoint is primarily for debugging. In production you would typically list a user's gameplays with **Get my gameplays** or **Get gameplays by player**."
+          }
+        },
+        {
+          "name": "Get my gameplays",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://{{baseUrl}}/api/v1/gameplays/my-gameplays",
+              "protocol": "http",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "gameplays", "my-gameplays"]
+            },
+            "description": "# Get my gameplays\n\nReturns gameplays where the authenticated user is either the host or the guest.\n\n- **Method**: `GET`\n- **Path**: `/api/v1/gameplays/my-gameplays`\n- **Auth**: Required (Bearer JWT)\n\n## Response — `200 OK`\n\n```json\n[\n  {\n    \"id\": \"cd820ba6-b121-4d64-827e-3b2b4fb7b42b\",\n    \"currentPositions\": \"{\\\"board\\\": [[0,0,0],[0,0,0],[0,0,0]], \\\"lastMove\\\": null}\",\n    \"hostPlayer\": \"8df1c70b-e4e4-4dc6-80fb-2ce6404ee28f\",\n    \"guestPlayer\": null,\n    \"playerTurn\": \"8df1c70b-e4e4-4dc6-80fb-2ce6404ee28f\",\n    \"matchResult\": null,\n    \"createdDate\": \"2026-09-26T22:34:27.964128Z\",\n    \"updatedDate\": \"2026-09-26T22:34:27.964128Z\"\n  }\n]\n```\n\nReturns `[]` if the user has no gameplays.\n\n## Errors\n\n| Status | Cause |\n|--------|-------|\n| `401` | Missing or invalid token |\n\n## Notes\n\n- Sorting: results are ordered by `createdDate` descending (newest first).\n- This is the query behind the \"My games\" view in a client."
+          }
+        },
+        {
+          "name": "Get gameplays by player",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://{{baseUrl}}/api/v1/gameplays/player/{{userId}}",
+              "protocol": "http",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "gameplays", "player", "{{userId}}"]
+            },
+            "description": "# Get gameplays by player\n\nReturns all gameplays where the given user is the host or the guest.\n\n- **Method**: `GET`\n- **Path**: `/api/v1/gameplays/player/{id}`\n- **Auth**: Not required\n\n## Path parameters\n\n| Parameter | Type | Description |\n|-----------|------|-------------|\n| `id` | UUID | Player identifier (`{{userId}}` by default) |\n\n## Response — `200 OK`\n\nSame shape as **Get my gameplays**.\n\n## Behavior with malformed UUIDs\n\nIf `id` is not a valid UUID (e.g. `not-a-uuid`), the API returns **`200 OK` with an empty list** instead of `404`. This is intentional: listing endpoints never fail on invalid input, they just have no results.\n\n## Notes\n\n- Useful for viewing another player's match history.\n- Compare with **Get my gameplays**, which uses the JWT `sub` and therefore cannot be called without authentication."
+          }
+        },
+        {
+          "name": "Get gameplay by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://{{baseUrl}}/api/v1/gameplays/{{gameplayId}}",
+              "protocol": "http",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "gameplays", "{{gameplayId}}"]
+            },
+            "description": "# Get gameplay by ID\n\nRetrieves a single gameplay by UUID.\n\n- **Method**: `GET`\n- **Path**: `/api/v1/gameplays/{id}`\n- **Auth**: Not required\n\n## Response — `200 OK`\n\n```json\n{\n  \"id\": \"cd820ba6-b121-4d64-827e-3b2b4fb7b42b\",\n  \"currentPositions\": \"{\\\"board\\\": [[0,0,0],[0,0,0],[0,0,0]], \\\"lastMove\\\": null}\",\n  \"hostPlayer\": \"8df1c70b-e4e4-4dc6-80fb-2ce6404ee28f\",\n  \"guestPlayer\": null,\n  \"playerTurn\": \"8df1c70b-e4e4-4dc6-80fb-2ce6404ee28f\",\n  \"matchResult\": null,\n  \"createdDate\": \"2026-09-26T22:34:27.964128Z\",\n  \"updatedDate\": \"2026-09-26T22:34:27.964128Z\"\n}\n```\n\n## Errors\n\n| Status | Cause |\n|--------|-------|\n| `404` | UUID not found, or malformed UUID |\n\n### Example 404\n\n```json\n{\"message\": \"Gameplay not found\"}\n```\n\n## Notes\n\n`currentPositions` and `matchResult` come back as **strings**, not nested objects. Parse them client-side."
+          }
+        },
+        {
+          "name": "Update gameplay",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPositions\": \"{\\\"board\\\": [[1,0,0],[0,2,0],[0,0,0]], \\\"lastMove\\\": {\\\"x\\\":0,\\\"y\\\":0}}\"\n}"
+            },
+            "url": {
+              "raw": "http://{{baseUrl}}/api/v1/gameplays/{{gameplayId}}",
+              "protocol": "http",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "gameplays", "{{gameplayId}}"]
+            },
+            "description": "# Update gameplay\n\nUpdates one or more fields of an existing gameplay. Only participants (host or guest) may update.\n\n- **Method**: `PUT`\n- **Path**: `/api/v1/gameplays/{id}`\n- **Auth**: Required (Bearer JWT)\n\n## Authorization\n\nThe JWT `sub` must equal either `hostPlayer` or `guestPlayer`. Otherwise the server returns `403 Forbidden`.\n\n## Request body\n\nAll fields are optional. Only the fields present in the body are updated.\n\n| Field | Type | Notes |\n|-------|------|-------|\n| `currentPositions` | string (JSON-encoded) | New board state |\n| `guestPlayer` | UUID string \\| null | Assign or clear the guest |\n| `hostPlayer` | UUID string | Reassign the host |\n| `playerTurn` | UUID string | Whose turn it is |\n| `matchResult` | string (JSON-encoded) \\| null | Final result |\n\n### Example — play a move\n\n```json\n{\n  \"currentPositions\": \"{\\\"board\\\": [[1,0,0],[0,2,0],[0,0,0]], \\\"lastMove\\\": {\\\"x\\\":0,\\\"y\\\":0}}\",\n  \"playerTurn\": \"9a02d81c-f5f5-4ed7-91fc-3df7515ff39e\"\n}\n```\n\n### Example — assign a guest\n\n```json\n{\"guestPlayer\": \"9a02d81c-f5f5-4ed7-91fc-3df7515ff39e\"}\n```\n\n### Example — declare a result\n\n```json\n{\"matchResult\": \"{\\\"winner\\\": \\\"X\\\"}\"}\n```\n\n## Response — `204 No Content`\n\nEmpty body. Fetch the gameplay with **Get gameplay by ID** to verify.\n\n## Errors\n\n| Status | Cause |\n|--------|-------|\n| `400` | Invalid JSON, or `guestPlayer` does not exist |\n| `401` | Missing/invalid token |\n| `403` | Caller is not the host or guest |\n| `404` | Gameplay not found, or malformed UUID |\n\n## Notes\n\n- `guestPlayer` with a value of `null` removes the guest from the match.\n- Concurrent updates are not serialized; last write wins."
+          }
+        },
+        {
+          "name": "Delete gameplay",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "http://{{baseUrl}}/api/v1/gameplays/{{gameplayId}}",
+              "protocol": "http",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "gameplays", "{{gameplayId}}"]
+            },
+            "description": "# Delete gameplay\n\nPermanently deletes a gameplay. Only the host may delete.\n\n- **Method**: `DELETE`\n- **Path**: `/api/v1/gameplays/{id}`\n- **Auth**: Required (Bearer JWT)\n\n## Authorization\n\nThe JWT `sub` must equal `hostPlayer`. Guests and strangers get `403 Forbidden`.\n\n## Response — `204 No Content`\n\nEmpty body.\n\n## Errors\n\n| Status | Cause |\n|--------|-------|\n| `401` | Missing/invalid token |\n| `403` | Caller is not the host |\n| `404` | Gameplay not found, or malformed UUID |\n\n## Side effects\n\n- The gameplay row is deleted.\n- WebSocket subscribers (if any) receive no further events for this game ID.\n- **This action cannot be undone.** Guests cannot recover the match."
+          }
+        }
+      ]
+    }
+  ]
+}
