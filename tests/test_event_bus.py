@@ -114,6 +114,53 @@ async def test_event_bus_failing_subscriber_does_not_block_others() -> None:
     await bus.shutdown()
 
 
+async def test_subscribe_idempotent_same_subscriber_id() -> None:
+    bus = EventBus()
+
+    async def first_callback(_event: dict[str, object]) -> None:
+        return None
+
+    async def second_callback(_event: dict[str, object]) -> None:
+        return None
+
+    bus.subscribe("game-1", "user-1", first_callback)
+    bus.subscribe("game-1", "user-1", second_callback)
+
+    assert bus.channel_subscriber_count("game-1") == 1
+    assert "user-1" in bus._subscribers["game-1"]
+    await bus.shutdown()
+
+
+async def test_unsubscribe_last_subscriber_cleans_worker() -> None:
+    bus = EventBus()
+
+    async def callback(_event: dict[str, object]) -> None:
+        return None
+
+    bus.subscribe("game-1", "user-1", callback)
+    bus.unsubscribe("game-1", "user-1")
+
+    assert "game-1" not in bus._subscribers
+    assert "game-1" not in bus._queues
+    assert "game-1" not in bus._workers
+    await bus.shutdown()
+
+
+async def test_shutdown_cancels_all_workers() -> None:
+    bus = EventBus()
+
+    async def callback(_event: dict[str, object]) -> None:
+        await asyncio.sleep(10)
+
+    bus.subscribe("game-1", "user-1", callback)
+    bus.subscribe("game-2", "user-2", callback)
+    await bus.shutdown()
+
+    assert bus._subscribers == {}
+    assert bus._queues == {}
+    assert bus._workers == {}
+
+
 async def test_event_bus_shutdown_cancels_workers_and_clears_state() -> None:
     bus = EventBus()
 

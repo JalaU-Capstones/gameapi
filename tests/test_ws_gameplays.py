@@ -51,6 +51,19 @@ async def test_ws_gameplays_wrong_first_event(
         assert exc.value.code == 4401
 
 
+async def test_auth_with_non_json_message_closes_with_4401(
+    ws_client_factory: Callable[[], AsyncClient],
+) -> None:
+    async with (
+        ws_client_factory() as client,
+        aconnect_ws("ws://test/api/v2/ws/gameplays", client=client) as ws,
+    ):
+        await ws.send_text("not-json")
+        with pytest.raises(WebSocketDisconnect) as exc:
+            await ws.receive_json()
+        assert exc.value.code == 4401
+
+
 async def test_ws_gameplays_invalid_jwt(
     ws_client_factory: Callable[[], AsyncClient],
 ) -> None:

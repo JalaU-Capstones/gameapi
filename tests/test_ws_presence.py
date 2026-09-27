@@ -36,6 +36,18 @@ async def test_ws_presence_valid_auth(
         }
 
 
+async def test_presence_auth_timeout(
+    ws_client_factory: Callable[[], AsyncClient],
+) -> None:
+    async with (
+        ws_client_factory() as client,
+        aconnect_ws("ws://test/api/v2/ws/presence", client=client) as ws,
+    ):
+        with pytest.raises(WebSocketDisconnect) as exc:
+            await ws.receive_json()
+        assert exc.value.code == 4408
+
+
 async def test_ws_presence_list_online_users(
     ws_client_factory: Callable[[], AsyncClient],
     auth_token: str,
@@ -55,6 +67,47 @@ async def test_ws_presence_list_online_users(
         assert await ws.receive_json() == {
             "event": "online_users",
             "payload": {"users": [str(registered_user["id"])]},
+        }
+
+
+async def test_list_online_users_when_alone(
+    ws_client_factory: Callable[[], AsyncClient],
+    auth_token: str,
+    registered_user: dict[str, object],
+) -> None:
+    async with (
+        ws_client_factory() as client,
+        aconnect_ws("ws://test/api/v2/ws/presence", client=client) as ws,
+    ):
+        await ws.send_json({"event": "auth", "payload": {"token": auth_token}})
+        await ws.receive_json()
+
+        await ws.send_json({"event": "list_online_users"})
+        assert await ws.receive_json() == {
+            "event": "online_users",
+            "payload": {"users": [str(registered_user["id"])]},
+        }
+
+
+async def test_unknown_event_returns_not_implemented(
+    ws_client_factory: Callable[[], AsyncClient],
+    auth_token: str,
+    registered_user: dict[str, object],
+) -> None:
+    async with (
+        ws_client_factory() as client,
+        aconnect_ws("ws://test/api/v2/ws/presence", client=client) as ws,
+    ):
+        await ws.send_json({"event": "auth", "payload": {"token": auth_token}})
+        await ws.receive_json()
+
+        await ws.send_json({"event": "unknown"})
+        assert await ws.receive_json() == {
+            "event": "error",
+            "payload": {
+                "code": "NOT_IMPLEMENTED",
+                "message": "Event not implemented yet: unknown",
+            },
         }
 
 
