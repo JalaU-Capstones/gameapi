@@ -14,7 +14,7 @@ resources:
     description: |-
       # Game API
 
-      REST API for managing users and Tic-Tac-Toe gameplays, with WebSocket support for real-time updates.
+      REST API for managing users and Tic-Tac-Toe gameplays, with WebSocket support for real-time play.
 
       ## Base URL
 
@@ -39,22 +39,28 @@ resources:
 
       ## Recommended first-time flow
 
-      1. **Users → Register user** — creates the account and stores `userId`.
+      1. **Users → Register user** — creates the host account and stores `userId`.
       2. **Users → Login** — stores `token` and `userId`.
-      3. **Gameplays → Create gameplay** — stores `gameplayId`.
-      4. **WebSocket (v2) → Presence WS** — connect and send the auth message.
-      5. **WebSocket (v2) → Gameplays WS** — connect and send the auth message.
+      3. (Optional) Register + Login a **second user** for the guest role. The environment provides `guestEmail`, `guestPassword`, `guestId` and `guestToken` for this purpose.
+      4. **Gameplays → Create gameplay** — stores `gameplayId` (REST contract).
+      5. **WebSocket (v2) → Presence WS** — connect and send the auth message.
+      6. **Game Flow (v2 WS)** — walk through the entire match flow (auth → create → accept → play → end).
 
       ## Environment variables
 
       | Variable | Description | Set by |
       |----------|-------------|--------|
       | `baseUrl` | Host and port (no scheme) | User |
-      | `token` | JWT for authenticated requests | Login script |
-      | `userId` | Current user UUID | Register / Login script |
-      | `gameplayId` | Last created gameplay UUID | Create gameplay script |
-      | `testEmail` | Email used for login | User |
-      | `testPassword` | Password used for login | User |
+      | `token` | JWT for the primary (host) user | Login script |
+      | `userId` | UUID of the primary user | Register / Login script |
+      | `gameplayId` | Last created gameplay UUID (REST) | Create gameplay script |
+      | `gameId` | Gameplay UUID used by the WebSocket flow | User / Create Game response |
+      | `guestId` | UUID of the guest user | User |
+      | `guestEmail` | Email of the guest user | User |
+      | `guestPassword` | Password of the guest user | User |
+      | `guestToken` | JWT for the guest user | User (after guest login) |
+      | `testEmail` | Email used for the primary login | User |
+      | `testPassword` | Password used for the primary login | User |
 
       ## Response format
 
@@ -67,7 +73,7 @@ resources:
       ## Versioning
 
       - `/api/v1/*` — frozen contract, backward compatible.
-      - `/api/v2/*` — active version, used for WebSocket endpoints.
+      - `/api/v2/*` — active version, used for REST v2 and WebSocket endpoints.
     scope: collection
     _type: workspace
 
@@ -96,6 +102,11 @@ resources:
       token: ""
       userId: ""
       gameplayId: ""
+      gameId: ""
+      guestId: ""
+      guestEmail: "guest@mail.com"
+      guestPassword: "password123"
+      guestToken: ""
       testEmail: "sandra@mail.com"
       testPassword: "password123"
     dataPropertyOrder:
@@ -104,6 +115,11 @@ resources:
         - token
         - userId
         - gameplayId
+        - gameId
+        - guestId
+        - guestEmail
+        - guestPassword
+        - guestToken
         - testEmail
         - testPassword
     color: null
@@ -167,7 +183,7 @@ resources:
     description: |-
       # Gameplays
 
-      Tic-Tac-Toe match management. A gameplay stores the board state as a JSON string and tracks two players (host and optional guest) plus the current turn.
+      Tic-Tac-Toe match management via REST. A gameplay stores the board state as a JSON string and tracks two players (host and optional guest) plus the current turn.
 
       ## Endpoints
 
@@ -192,8 +208,8 @@ resources:
       | Cell value | Meaning |
       |------------|---------|
       | `0` | Empty |
-      | `1` | Player X |
-      | `2` | Player O |
+      | `1` | Player X (host) |
+      | `2` | Player O (guest) |
 
       ## Authentication and permissions
 
@@ -258,7 +274,7 @@ resources:
       | `ping` | — | Keep-alive probe |
       | `list_online_users` | — | Presence only; list online user IDs |
       | `subscribe_game` | `{"game_id": "<uuid>"}` | Gameplays only; subscribe to a game |
-      | `broadcast_to_game` | `{"game_id": "<uuid>", "message": "<text>"}` | Gameplays only; broadcast to subscribers |
+      | `broadcast_to_game` | `{"game_id": "<uuid>", "message": "<text>"}` | Gameplays only; synthetic broadcast (B2) |
       | `unsubscribe_game` | `{"game_id": "<uuid>"}` | Gameplays only; leave the subscription |
 
       ## Message format
@@ -274,7 +290,46 @@ resources:
       ## Tips
 
       - Run **Users → Login** before connecting so `{{ _.token }}` is populated.
-      - You can open two Insomnia windows (or two WebSocket requests) with **different users** to test cross-user broadcasts.
+      - Open two Insomnia windows (or duplicate the WebSocket request) with **different users** to test cross-user broadcasts.
+    environment: {}
+    environmentPropertyOrder: null
+    metaSortKey: -1790462000000
+    _type: request_group
+
+  - _id: fld_game_flow_ws
+    parentId: wrk_gameapi
+    modified: 1790462000000
+    created: 1790462000000
+    name: Game Flow (v2 WS)
+    description: |-
+      # Game Flow (v2 WebSocket)
+
+      This folder walks through the correct order of messages for a complete match over WebSocket.
+
+      ## Flow
+
+      1. Authenticate the socket.
+      2. Create the game (host invites the guest).
+      3. Guest accepts (or rejects) the invitation.
+      4. Players alternate moves.
+      5. Either player may leave an active game.
+
+      ## Envelope
+
+      All messages follow the same envelope:
+
+      ```json
+      {"event": "<event_name>", "payload": { ... }}
+      ```
+
+      ## Two-connection setup
+
+      Almost every step requires **two sockets open at the same time** — one for the host and one for the guest. Duplicate the WebSocket requests in Insomnia (`Ctrl+D`) and use `{{ _.token }}` for the host and `{{ _.guestToken }}` for the guest.
+
+      To get a `guestToken`:
+
+      1. Register a second user with `{{ _.guestEmail }}` / `{{ _.guestPassword }}`.
+      2. Login as that user and copy the JWT into `guestToken` (or run a dedicated Login request under a different environment).
     environment: {}
     environmentPropertyOrder: null
     metaSortKey: -1790462000000
@@ -301,7 +356,7 @@ resources:
     parameters: []
     headers:
       - name: Content-Type
-      - value: application/json
+        value: application/json
         id: pair_ct_reg
     description: |-
       # Register user
@@ -353,6 +408,8 @@ resources:
       ## Side effects
 
       The **After-response script** stores `userId` and `testEmail` in the environment so subsequent requests can use them.
+
+      > **Guest setup**: to register the guest account instead, temporarily change `testEmail` / `testPassword` to `guestEmail` / `guestPassword`, run this request, then run **Login** with the same credentials and copy the JWT into `guestToken`.
     authentication: {}
     metaSortKey: -1790462000006
     isPrivate: false
@@ -448,6 +505,8 @@ resources:
       ## Side effects
 
       The **After-response script** stores `token` and `userId` in the environment. Every subsequent authenticated request and WebSocket auth message reads these values automatically.
+
+      > **Guest token**: to obtain a token for the guest user, temporarily change `testEmail` / `testPassword` to `guestEmail` / `guestPassword`, run this request, and copy the returned `token` into `guestToken`.
     authentication: {}
     metaSortKey: -1790462000005
     isPrivate: false
@@ -764,11 +823,13 @@ resources:
     description: |-
       # Create gameplay
 
-      Starts a new Tic-Tac-Toe match. The authenticated user becomes the host.
+      Starts a new Tic-Tac-Toe match via REST. The authenticated user becomes the host.
 
       - **Method**: `POST`
       - **Path**: `/api/v1/gameplays`
       - **Auth**: Required (Bearer JWT)
+
+      > **Note**: this request creates a match via REST. The WebSocket flow uses `create_game` instead, which also handles the invitation handshake.
 
       ## Request body
 
@@ -787,18 +848,6 @@ resources:
         "currentPositions": "{\"board\": [[0,0,0],[0,0,0],[0,0,0]], \"lastMove\": null}",
         "hostPlayer": "8df1c70b-e4e4-4dc6-80fb-2ce6404ee28f",
         "playerTurn": "8df1c70b-e4e4-4dc6-80fb-2ce6404ee28f",
-        "matchResult": null
-      }
-      ```
-
-      ### Example — match with guest
-
-      ```json
-      {
-        "currentPositions": "{\"board\": [[0,0,0],[0,0,0],[0,0,0]], \"lastMove\": null}",
-        "hostPlayer": "8df1c70b-e4e4-4dc6-80fb-2ce6404ee28f",
-        "guestPlayer": "9a02d81c-f5f5-4ed7-91fc-3df7515ff39e",
-        "playerTurn": "9a02d81c-f5f5-4ed7-91fc-3df7515ff39e",
         "matchResult": null
       }
       ```
@@ -830,7 +879,7 @@ resources:
 
       ## Side effects
 
-      The **After-response script** stores `gameplayId` in the environment for the subsequent WebSocket and update/delete requests.
+      The **After-response script** stores `gameplayId` in the environment for the subsequent REST update/delete requests.
     authentication:
       type: bearer
       token: "{{ _.token }}"
@@ -931,22 +980,7 @@ resources:
 
       ## Response — `200 OK`
 
-      ```json
-      [
-        {
-          "id": "cd820ba6-b121-4d64-827e-3b2b4fb7b42b",
-          "currentPositions": "{\"board\": [[0,0,0],[0,0,0],[0,0,0]], \"lastMove\": null}",
-          "hostPlayer": "8df1c70b-e4e4-4dc6-80fb-2ce6404ee28f",
-          "guestPlayer": null,
-          "playerTurn": "8df1c70b-e4e4-4dc6-80fb-2ce6404ee28f",
-          "matchResult": null,
-          "createdDate": "2026-09-26T22:34:27.964128Z",
-          "updatedDate": "2026-09-26T22:34:27.964128Z"
-        }
-      ]
-      ```
-
-      Returns `[]` if the user has no gameplays.
+      Same shape as **Get all gameplays**, filtered to the current user. Returns `[]` if the user has no gameplays.
 
       ## Errors
 
@@ -1236,6 +1270,244 @@ resources:
     _type: request
 
   # ==================================================================
+  # GAME FLOW REQUESTS (WS)
+  # ==================================================================
+  - _id: req_game_flow_connect_auth
+    parentId: fld_game_flow_ws
+    modified: 1790462000000
+    created: 1790462000000
+    name: 01 — Connect + Auth
+    url: "ws://{{ _.baseUrl }}/api/v2/ws/gameplays"
+    headers: []
+    authentication: {}
+    description: |-
+      # 01 — Connect + Auth
+
+      Connect to the gameplays WebSocket and authenticate with the JWT.
+
+      ## Send
+
+      ```json
+      {"event": "auth", "payload": {"token": "{{ _.token }}"}}
+      ```
+
+      ## Expected response
+
+      ```json
+      {"event": "auth_ok", "payload": {"user_id": "..."}}
+      ```
+
+      ## Notes
+
+      - The server closes the connection with `auth_timeout` if the auth message is not received shortly after connecting. **Click Connect and send the message immediately.**
+      - For the guest socket, use `{{ _.guestToken }}` instead of `{{ _.token }}`.
+    metaSortKey: -1790462000002
+    isPrivate: false
+    _type: websocket_request
+
+  - _id: req_game_flow_create_game
+    parentId: fld_game_flow_ws
+    modified: 1790462000000
+    created: 1790462000000
+    name: 02 — Create Game
+    url: "ws://{{ _.baseUrl }}/api/v2/ws/gameplays"
+    headers: []
+    authentication: {}
+    description: |-
+      # 02 — Create Game
+
+      Creates a new game and invites the guest. The guest must already be connected to the gameplays WebSocket (see **01 — Connect + Auth**).
+
+      ## Send (from the host socket)
+
+      ```json
+      {"event": "create_game", "payload": {"guest_id": "{{ _.guestId }}"}}
+      ```
+
+      ## Expected responses
+
+      **To the host:**
+
+      ```json
+      {"event": "game_created", "payload": {"game_id": "...", "guest_id": "...", "board": [[0,0,0],[0,0,0],[0,0,0]], "turn": "<host_uuid>"}}
+      ```
+
+      **To the guest:**
+
+      ```json
+      {"event": "invitation_received", "payload": {"game_id": "...", "host": {"id": "<host_uuid>", "name": "..."}}}
+      ```
+
+      ## Notes
+
+      - Requires both sockets to be authenticated.
+      - After receiving `game_created`, copy the `game_id` into `{{ _.gameId }}` in the environment to reuse it in the following steps.
+      - The host always plays first (`turn` equals the host's UUID).
+    metaSortKey: -1790462000001
+    isPrivate: false
+    _type: websocket_request
+
+  - _id: req_game_flow_accept_invitation
+    parentId: fld_game_flow_ws
+    modified: 1790462000000
+    created: 1790462000000
+    name: 03 — Accept Invitation
+    url: "ws://{{ _.baseUrl }}/api/v2/ws/gameplays"
+    headers: []
+    authentication: {}
+    description: |-
+      # 03 — Accept Invitation
+
+      Accepts a pending invitation. Send this from the **guest socket** immediately after receiving `invitation_received`.
+
+      ## Send (from the guest socket)
+
+      ```json
+      {"event": "accept_invitation", "payload": {"game_id": "{{ _.gameId }}"}}
+      ```
+
+      ## Expected response (both players)
+
+      ```json
+      {"event": "invitation_accepted", "payload": {"game_id": "{{ _.gameId }}", "board": [[0,0,0],[0,0,0],[0,0,0]], "turn": "<host_uuid>"}}
+      ```
+
+      ## Notes
+
+      - Both sockets receive the same event, so both clients stay in sync.
+      - The host still plays first.
+    metaSortKey: -1790462000000
+    isPrivate: false
+    _type: websocket_request
+
+  - _id: req_game_flow_play_move
+    parentId: fld_game_flow_ws
+    modified: 1790462000000
+    created: 1790462000000
+    name: 04 — Play Move
+    url: "ws://{{ _.baseUrl }}/api/v2/ws/gameplays"
+    headers: []
+    authentication: {}
+    description: |-
+      # 04 — Play Move
+
+      Plays a move on the board. Send this from the socket of the player whose turn it is.
+
+      ## Send
+
+      ```json
+      {"event": "play_move", "payload": {"game_id": "{{ _.gameId }}", "row": 0, "col": 0}}
+      ```
+
+      | Field | Type | Values |
+      |-------|------|--------|
+      | `row` | int | `0`, `1`, or `2` |
+      | `col` | int | `0`, `1`, or `2` |
+
+      ## Expected responses
+
+      **If the game continues:**
+
+      ```json
+      {"event": "board_updated", "payload": {"board": [[1,0,0],[0,0,0],[0,0,0]], "turn": "<next_uuid>", "last_move": {"row": 0, "col": 0, "player": "host"}}}
+      ```
+
+      **If the move ends the game:**
+
+      ```json
+      {"event": "game_ended", "payload": {"winner": "<uuid>", "reason": "line"}}
+      ```
+
+      **If the board fills without a winner:**
+
+      ```json
+      {"event": "game_ended", "payload": {"winner": null, "reason": "draw"}}
+      ```
+
+      ## Errors (as `error` events)
+
+      | Code | Cause |
+      |------|-------|
+      | `NOT_YOUR_TURN` | You are not the active player |
+      | `INVALID_MOVE` | Cell is out of range or already occupied |
+      | `GAME_NOT_FOUND` | Invalid `game_id` |
+      | `GAME_NOT_ACTIVE` | The game already ended |
+
+      ## Notes
+
+      - `player` in `last_move` is `"host"` or `"guest"`.
+      - Both sockets receive the same `board_updated` or `game_ended` event.
+    metaSortKey: 1790462000000
+    isPrivate: false
+    _type: websocket_request
+
+  - _id: req_game_flow_leave_game
+    parentId: fld_game_flow_ws
+    modified: 1790462000000
+    created: 1790462000000
+    name: 05 — Leave Game
+    url: "ws://{{ _.baseUrl }}/api/v2/ws/gameplays"
+    headers: []
+    authentication: {}
+    description: |-
+      # 05 — Leave Game
+
+      Abandons an active game. Send this from either player's socket while the game is in progress.
+
+      ## Send
+
+      ```json
+      {"event": "leave_game", "payload": {"game_id": "{{ _.gameId }}"}}
+      ```
+
+      ## Expected response (to the opponent)
+
+      ```json
+      {"event": "game_ended", "payload": {"winner": "<opponent_uuid>", "reason": "abandon"}}
+      ```
+
+      ## Notes
+
+      - The player who sends the event forfeits the game.
+      - Only valid while the game is active. Sending `leave_game` on a finished game returns a `GAME_NOT_ACTIVE` error.
+    metaSortKey: 1790462000001
+    isPrivate: false
+    _type: websocket_request
+
+  - _id: req_game_flow_reject_invitation
+    parentId: fld_game_flow_ws
+    modified: 1790462000000
+    created: 1790462000000
+    name: 06 — Reject Invitation
+    url: "ws://{{ _.baseUrl }}/api/v2/ws/gameplays"
+    headers: []
+    authentication: {}
+    description: |-
+      # 06 — Reject Invitation
+
+      Rejects a pending invitation. Send this from the **guest socket** while the invitation is still pending.
+
+      ## Send
+
+      ```json
+      {"event": "reject_invitation", "payload": {"game_id": "{{ _.gameId }}"}}
+      ```
+
+      ## Expected response (to the host)
+
+      ```json
+      {"event": "invitation_rejected", "payload": {"game_id": "{{ _.gameId }}", "guest_id": "{{ _.guestId }}"}}
+      ```
+
+      ## Notes
+
+      - Valid only while the game has not started yet (invitation pending).
+      - After rejection, the game is marked as finished with `reason: "rejected"` and cannot be reused.
+    metaSortKey: 1790462000002
+    isPrivate: false
+    _type: websocket_request
+
+  # ==================================================================
   # WEBSOCKET REQUESTS
   # ==================================================================
   - _id: req_ws_gameplays
@@ -1256,8 +1528,6 @@ resources:
 
       ## Message envelope
 
-      Every message — client to server and server to client — follows:
-
       ```json
       {"event": "<name>", "payload": { ... }}
       ```
@@ -1266,11 +1536,11 @@ resources:
 
       ### 1. Connect
 
-      Click **Connect** in the toolbar. The status indicator turns green (`CONNECTED`).
+      Click **Connect**. The status indicator turns green (`CONNECTED`).
 
       ### 2. Authenticate
 
-      Send immediately (the server enforces a short auth timeout):
+      Send immediately:
 
       ```json
       {"event":"auth","payload":{"token":"{{ _.token }}"}}
@@ -1302,9 +1572,9 @@ resources:
       {"event":"pong"}
       ```
 
-      ### 4. Subscribe to a game
+      ### 4. Subscribe to a game (low-level)
 
-      Requires a valid `gameplayId` (run **Create gameplay** first):
+      > **Note**: `subscribe_game` / `unsubscribe_game` are the low-level subscription primitives. For the full match flow (create, accept, play, leave), see the **Game Flow (v2 WS)** folder.
 
       ```json
       {"event":"subscribe_game","payload":{"game_id":"{{ _.gameplayId }}"}}
@@ -1312,13 +1582,13 @@ resources:
 
       You must be the host or guest of that gameplay. Subscribing to a game you are not part of returns an error event.
 
-      ### 5. Broadcast a message
+      ### 5. Broadcast a message (synthetic — B2)
 
       ```json
       {"event":"broadcast_to_game","payload":{"game_id":"{{ _.gameplayId }}","message":"hello"}}
       ```
 
-      Every other subscriber of that game (across all connected sockets) receives:
+      Every other subscriber receives:
 
       ```json
       {"event":"game_message","payload":{"game_id":"{{ _.gameplayId }}","from_user":"8df1c70b-...","message":"hello"}}
@@ -1332,15 +1602,15 @@ resources:
 
       ### 7. Disconnect
 
-      Click **Disconnect** in the toolbar, or send `Ctrl+C` if using a CLI client.
+      Click **Disconnect**, or send `Ctrl+C` if using a CLI client.
 
       ## Testing multi-user behavior
 
-      To see the broadcast in action, open two WebSocket connections with **different users**:
+      Open two WebSocket connections with **different users**:
 
-      1. In Insomnia, duplicate this request (`Ctrl+D`) and rename it "Gameplays WS (user B)".
-      2. Change the environment: temporarily set `testEmail` / `testPassword` to user B's credentials, run **Login**, then connect.
-      3. In user A's socket, send `broadcast_to_game`; user B's socket should receive the `game_message` event.
+      1. Duplicate this request (`Ctrl+D`) and rename it "Gameplays WS (guest)".
+      2. In the guest socket, authenticate with `{{ _.guestToken }}` instead of `{{ _.token }}`.
+      3. Broadcast from one socket and watch the other receive `game_message`.
 
       ## Error events
 
@@ -1425,7 +1695,7 @@ resources:
 
       ### 5. Disconnect
 
-      Click **Disconnect**, or close the socket. The server broadcasts your departure to remaining clients.
+      Click **Disconnect**. The server broadcasts your departure to remaining clients.
 
       ## Presence events
 
@@ -1438,13 +1708,10 @@ resources:
 
       ## Testing multi-user presence
 
-      Open two Presence WS connections with different users:
-
-      1. Connect with user A, authenticate.
-      2. Duplicate the request (`Ctrl+D`), log in as user B, connect, authenticate.
-      3. In user A's socket, send `list_online_users`. Both users should appear.
-      4. In user B's socket, send `Ctrl+C` to disconnect.
-      5. In user A's socket, watch for the `user_offline` event with user B's ID.
+      1. Connect with the host user (`{{ _.token }}`), authenticate.
+      2. Duplicate this request (`Ctrl+D`), connect with the guest user (`{{ _.guestToken }}`), authenticate.
+      3. In either socket, send `list_online_users`. Both users should appear.
+      4. Disconnect the guest socket (`Ctrl+C`). The host socket should receive a `user_offline` event with the guest's UUID.
 
       ## Error events
 
