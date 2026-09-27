@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
+from sqlalchemy.pool import NullPool
 
 from gameapi.core.config import settings
 
@@ -23,10 +24,8 @@ class PostgresDatabase:
         cls.engine = create_async_engine(
             settings.postgres.uri,
             echo=settings.app.env == "development",
-            pool_size=5,
-            max_overflow=10,
+            poolclass=NullPool,
             pool_pre_ping=True,
-            pool_recycle=3600,
         )
         cls._session_factory = async_sessionmaker(cls.engine, expire_on_commit=False)
 

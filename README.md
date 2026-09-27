@@ -6,9 +6,9 @@ REST API para gestión de usuarios y partidas de Tic-Tac-Toe.
 [![codecov](https://codecov.io/gh/JalaU-Capstones/gameapi/branch/main/graph/badge.svg)](https://codecov.io/gh/JalaU-Capstones/gameapi)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg)](https://fastapi.tiangolo.com/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![Tests](https://img.shields.io/badge/tests-68%20passed-success.svg)](#pruebas)
+[![Tests](https://img.shields.io/badge/tests-119%20passed-success.svg)](#pruebas)
 
-**Stack:** Python 3.11+ · FastAPI · PostgreSQL 16 · SQLAlchemy 2.0 async · Pydantic v2 · JWT · uv · Docker
+**Stack:** Python 3.11+ · FastAPI · PostgreSQL 16 · SQLAlchemy 2.0 async · Pydantic v2 · JWT · WebSocket · uv · Docker
 
 ---
 
@@ -41,6 +41,7 @@ REST API para gestión de usuarios y partidas de Tic-Tac-Toe.
 - Documentación interactiva con Swagger UI y ReDoc.
 - Tests automatizados con pytest + httpx sobre PostgreSQL, con modo local en Docker via `testcontainers` y modo CI con servicio nativo.
 - ORM async con SQLAlchemy 2.0 y PostgreSQL como base de datos principal.
+- Juego en tiempo real sobre WebSocket: invitaciones, turnos, detección de victoria/empate/abandono y broadcast del estado a ambos jugadores.
 - Dockerizado con healthchecks y multi-stage build.
 
 ---
@@ -228,14 +229,36 @@ Los endpoints WebSocket operan bajo `/api/v2/ws` y requieren autenticación JWT 
 | `/api/v2/ws/gameplays`         | Canal de eventos de partidas. Requiere el evento `auth` con `{ "token": "..." }`. |
 | `/api/v2/ws/presence`         | Canal de presencia en línea. Requiere el evento `auth` con `{ "token": "..." }`. |
 
-**Eventos soportados actualmente (B2):**
+**Eventos soportados actualmente (B3):**
 
+**Cliente → Servidor:**
 - `auth` — primer mensaje obligatorio con el JWT.
-- `ping` / `pong` — keepalive.
+- `ping` — keepalive.
+- `create_game` — crear partida e invitar. Payload: `{"guest_id": "<uuid>"}`.
+- `accept_invitation` — aceptar invitación. Payload: `{"game_id": "<uuid>"}`.
+- `reject_invitation` — rechazar invitación. Payload: `{"game_id": "<uuid>"}`.
+- `play_move` — jugar. Payload: `{"game_id": "<uuid>", "row": 0-2, "col": 0-2}`.
+- `leave_game` — abandonar partida activa. Payload: `{"game_id": "<uuid>"}`.
 - `subscribe_game` — unirse al canal de una partida.
 - `unsubscribe_game` — salir del canal.
-- `broadcast_to_game` — **temporal** (será reemplazado por eventos reales del juego en B3).
-- `list_online_users` — solo en el endpoint `presence`.
+
+**Servidor → Cliente:**
+- `auth_ok` / `auth_error` — resultado de autenticación.
+- `pong` — respuesta a `ping`.
+- `game_created` — partida creada (al host).
+- `invitation_received` — invitación entrante (al guest).
+- `invitation_accepted` — el guest aceptó; partida comienza (a ambos).
+- `invitation_rejected` — el guest rechazó (al host).
+- `board_updated` — jugada realizada. Incluye `board`, `turn` y `last_move`.
+- `game_ended` — partida terminada. Incluye `winner` y `reason` (`"line"`, `"draw"`, `"abandon"`, `"rejected"`).
+- `subscribed` / `unsubscribed` — confirmación de suscripción al canal.
+- `error` — error de validación. Incluye `code` y `message`.
+
+**Códigos de error soportados:**
+
+`NOT_YOUR_TURN`, `INVALID_MOVE`, `GAME_NOT_FOUND`, `GAME_NOT_ACTIVE`,
+`NOT_A_PARTICIPANT`, `INVITATION_NOT_PENDING`, `CANNOT_INVITE_SELF`,
+`OPPONENT_OFFLINE`, `INVALID_PAYLOAD`, `INVALID_EVENT`, `NOT_IMPLEMENTED`.
 
 #### Protocolo de autenticación WS
 
@@ -334,7 +357,7 @@ make test
 Salida esperada:
 
 ```
-93 passed in ~50s
+119 passed in ~60s
 Required test coverage of 85.0% reached. Total coverage: 90%
 ```
 
@@ -363,20 +386,50 @@ El proyecto usa un **EventBus in-process** (`services/event_bus.py`) para desaco
 - **Sin estado persistente:** todo vive en memoria del proceso. Un reinicio limpia las suscripciones.
 - **Upgrade path:** si se necesita escalar horizontalmente, se puede reemplazar por Redis Pub/Sub sin cambiar la API del bus.
 
+### Reglas del juego (Tic-Tac-Toe)
+
+El motor del juego vive en `services/game_engine.py` (reglas puras, sin I/O) y
+se orquesta desde `services/game_engine_service.py` (persistencia + broadcast).
+
+- **Tablero:** 3×3 representado como `[[0,0,0],[0,0,0],[0,0,0]]`. Celdas: `0`
+  vacía, `1` jugada del host, `2` jugada del guest.
+- **Turnos:** el host siempre empieza. Cada jugada válida cambia el turno al
+  oponente.
+- **Victoria:** el primero en completar 3 en línea (fila, columna o diagonal)
+  gana. Se detecta con `check_winner()`.
+- **Empate:** si el tablero se llena sin ganador, se marca `reason: "draw"`.
+- **Abandono:** si un jugador se desconecta durante una partida activa, el
+  oponente gana con `reason: "abandon"`.
+- **Rechazo:** si el guest rechaza la invitación, se marca como terminada con
+  `reason: "rejected"` y el host es notificado.
+
+**Estados del juego** (basados en `match_result` y `player_turn` en la BD):
+
+| `match_result` | `player_turn` | Estado |
+|---|---|---|
+| `{"reason": "pending"}` | _(asignado)_ | Invitación pendiente |
+| `null` | no nulo | En curso |
+| `{"winner": "...", "reason": "..."}` | cualquiera | Finalizado |
+
 ### Cobertura
 
 **Umbral mínimo:** 85% (configurado en `pyproject.toml` → `[tool.coverage.report] fail_under`).
 
-**Cobertura actual:** 93% (577 statements, 100 branches).
+**Cobertura actual:** 90% (reporte generado con `make test-cov`).
 
-| Archivo                     | Tests | Qué cubre                                                                                  |
-|-----------------------------|-------|--------------------------------------------------------------------------------------------|
-| `tests/test_security.py`    | 4     | Hashing bcrypt, JWT create/decode, token manipulado.                                       |
-| `tests/test_health.py`      | 1     | Endpoint `/health` con PostgreSQL disponible.                                              |
-| `tests/test_users.py`       | 20    | Registro, duplicado, validación, login, CRUD con permisos, updates parciales.             |
-| `tests/test_gameplays.py`   | 21    | CRUD, validación JSON, permisos host/guest, updates por campo.                            |
-| `tests/test_edge_cases.py`  | 16    | Edge cases: UUID validation, session lifecycle, auth malformado, guest inexistente.       |
-| `tests/test_services_unit.py` | 6    | Unit tests directos a servicios: `_legacy_json_string`, deletes y updates con UUID inválido, `ensure_indexes`. |
+| Archivo | Tests | Qué cubre |
+|---|---|---|
+| `tests/test_security.py` | 4 | Hashing bcrypt, JWT create/decode, token manipulado. |
+| `tests/test_health.py` | 1 | Endpoint `/health`. |
+| `tests/test_users.py` | 20 | CRUD de usuarios + validación + permisos. |
+| `tests/test_gameplays.py` | 21 | CRUD de gameplays + validación JSON + permisos. |
+| `tests/test_edge_cases.py` | 16 | UUIDs inválidos, errores de auth, validaciones. |
+| `tests/test_services_unit.py` | 6 | Tests unitarios de servicios. |
+| `tests/test_event_bus.py` | 9 | Pub/sub del bus, multi-suscriptor, shutdown. |
+| `tests/test_game_engine.py` | 15 | Reglas puras de Tic-Tac-Toe. |
+| `tests/test_ws_gameplays.py` | 11 | Auth WS, ping/pong, subscribe/unsubscribe, cleanup. |
+| `tests/test_ws_presence.py` | 5 | Presencia: online/offline, list. |
+| `tests/test_ws_game_flow.py` | 11 | Flujo completo de partida (happy path, rechazo, abandono, empate, errores). |
 
 **Reporte HTML** (local, tras `make test-cov`):
 
@@ -385,13 +438,6 @@ open htmlcov/index.html
 ```
 
 **Reporte XML** (generado con Coverage.py para CI): `coverage.xml` → subido a Codecov en cada push a `main`.
-
-**Módulos con menor cobertura**:
-
-- `api/deps.py` (89%): branches defensivos de auth.
-- `api/v1/users.py` (91%): branches secundarios del router.
-- `api/v1/gameplays.py` (87%): branches secundarios del update / list.
-- `main.py` (81%): `lifespan` real y algunos branches del exception handler.
 
 ### Calidad de código
 
@@ -464,14 +510,22 @@ gameapi/
 │   ├── db/              # SQLAlchemy ORM + session management
 │   ├── repositories/    # Data access layer (queries SQLAlchemy)
 │   ├── schemas/         # Contratos de API (camelCase, validación)
+│   │   ├── ...
+│   │   └── ws_events.py         # Payloads tipados de eventos WebSocket
 │   ├── services/        # Lógica de negocio async, errores de dominio
 │   │   ├── ...
 │   │   ├── event_bus.py         # Pub/sub in-process por canal (gameplay)
+│   │   ├── game_engine.py       # Reglas puras de Tic-Tac-Toe (sin I/O)
+│   │   ├── game_engine_service.py  # Orquestación: reglas + persistencia + bus
 │   │   └── ...
 │   ├── api/             # Routers FastAPI + dependencias (auth, DI)
+│   │   ├── v1/          # Congelado (compatibilidad legacy C#)
+│   │   └── v2/          # Activo: REST + WebSocket
+│   │       └── ws/      # Endpoints WebSocket (auth, manager, gameplays, presence)
 │   └── main.py          # App FastAPI, lifespan, CORS, exception handlers
 ├── migrations/          # Migraciones Alembic
 ├── tests/               # pytest + httpx + PostgreSQL (local/CI dual-mode)
+├── .docs/collections/   # Colecciones Postman e Insomnia
 ├── Dockerfile
 ├── docker-compose.yml
 ├── Makefile

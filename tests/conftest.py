@@ -44,7 +44,9 @@ async def _run_migrations(postgres_uri: str) -> None:
 
 @pytest.fixture
 async def db_engine(postgres_uri: str, _run_migrations: None) -> AsyncIterator:
-    engine = create_async_engine(postgres_uri, echo=False)
+    from sqlalchemy.pool import NullPool
+
+    engine = create_async_engine(postgres_uri, echo=False, poolclass=NullPool)
     try:
         yield engine
     finally:
@@ -54,9 +56,21 @@ async def db_engine(postgres_uri: str, _run_migrations: None) -> AsyncIterator:
 @pytest.fixture
 async def db_session(db_engine) -> AsyncIterator[AsyncSession]:
     factory = async_sessionmaker(db_engine, expire_on_commit=False)
+
+    from gameapi.db.session import PostgresDatabase
+
+    PostgresDatabase.engine = db_engine
+    PostgresDatabase._session_factory = factory
+
     async with factory() as session:
-        yield session
-        await session.rollback()
+        try:
+            yield session
+        finally:
+            await session.rollback()
+            await session.close()
+
+    PostgresDatabase.engine = None
+    PostgresDatabase._session_factory = None
 
 
 @pytest.fixture(autouse=True)
@@ -78,6 +92,7 @@ def _override_dependencies(db_session: AsyncSession) -> Iterator[None]:
 
     async def _session() -> AsyncIterator[AsyncSession]:
         yield db_session
+        await db_session.commit()
 
     app.dependency_overrides[get_session] = _session
     yield
@@ -101,13 +116,20 @@ async def ws_client_factory(
 
     from gameapi.main import app
 
+    clients: list[AsyncClient] = []
+
     def factory() -> AsyncClient:
-        return AsyncClient(
+        client = AsyncClient(
             transport=ASGIWebSocketTransport(app=app),
             base_url="http://test",
         )
+        clients.append(client)
+        return client
 
     yield factory
+
+    for client in clients:
+        await client.aclose()
 
 
 @pytest.fixture(autouse=True)
@@ -155,3 +177,53 @@ async def auth_token(client: AsyncClient, registered_user: dict[str, object]) ->
 @pytest.fixture
 def auth_headers(auth_token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {auth_token}"}
+
+
+@pytest.fixture
+async def registered_user_a(client: AsyncClient) -> dict[str, object]:
+    payload = {
+        "name": "User A",
+        "email": "a@example.com",
+        "password": "password123",
+    }
+    response = await client.post("/api/v1/users", json=payload)
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
+@pytest.fixture
+async def auth_token_a(client: AsyncClient, registered_user_a: dict[str, object]) -> str:
+    response = await client.post(
+        "/api/v1/users/login",
+        json={
+            "email": registered_user_a["email"],
+            "password": "password123",
+        },
+    )
+    assert response.status_code == 200, response.text
+    return str(response.json()["token"])
+
+
+@pytest.fixture
+async def registered_user_b(client: AsyncClient) -> dict[str, object]:
+    payload = {
+        "name": "User B",
+        "email": "b@example.com",
+        "password": "password123",
+    }
+    response = await client.post("/api/v1/users", json=payload)
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
+@pytest.fixture
+async def auth_token_b(client: AsyncClient, registered_user_b: dict[str, object]) -> str:
+    response = await client.post(
+        "/api/v1/users/login",
+        json={
+            "email": registered_user_b["email"],
+            "password": "password123",
+        },
+    )
+    assert response.status_code == 200, response.text
+    return str(response.json()["token"])
