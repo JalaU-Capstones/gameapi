@@ -5,7 +5,7 @@ import uvicorn
 from gameapi.core.config import settings
 
 
-def main() -> None:
+def main() -> None:  # pragma: no cover
     uvicorn.run(
         "gameapi.main:app",
         host=settings.app.host,
@@ -15,5 +15,5 @@ def main() -> None:
     )
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()
