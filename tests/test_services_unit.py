@@ -20,6 +20,16 @@ async def test_gameplay_service_legacy_json_string_handles_bool_str_and_fallback
         _legacy_json_string(set())
 
 
+async def test_gameplay_service_get_by_id_invalid_uuid(db_session) -> None:
+    service = GameplayService(db_session)
+    assert await service.get_by_id("not-a-uuid") is None
+
+
+async def test_gameplay_service_list_by_player_invalid_uuid(db_session) -> None:
+    service = GameplayService(db_session)
+    assert await service.list_by_player("not-a-uuid") == []
+
+
 async def test_gameplay_service_update_nonexistent_uuid(db_session) -> None:
     service = GameplayService(db_session)
     with pytest.raises(GameplayNotFoundError):
@@ -30,6 +40,11 @@ async def test_gameplay_service_delete_nonexistent_uuid(db_session) -> None:
     service = GameplayService(db_session)
     with pytest.raises(GameplayNotFoundError):
         await service.delete(str(uuid.uuid4()))
+
+
+async def test_user_service_get_by_id_invalid_uuid(db_session) -> None:
+    service = UserService(db_session)
+    assert await service.get_by_id("not-a-uuid") is None
 
 
 async def test_user_service_update_nonexistent_uuid(db_session) -> None:
