@@ -3,34 +3,28 @@ from datetime import datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Query
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from gameapi.api.deps import CurrentUser, SessionDep
+from gameapi.api.deps import CurrentUser, LogAdmin, SessionDep
 from gameapi.repositories.log_repository import LogRepository
 from gameapi.schemas.log import LogEntryResponse, LogsQueryResponse
 
-router = APIRouter(tags=["Logs"])
+router = APIRouter(prefix="/logs", tags=["Logs"])
 
 
-@router.get(
-    "/logs",
-    response_model=LogsQueryResponse,
-    summary="Query persistent logs",
-)
-async def query_logs(
-    current_user: CurrentUser,
-    session: SessionDep,
-    level: Annotated[str | None, Query()] = None,
-    event_type: Annotated[str | None, Query()] = None,
-    player_id: Annotated[uuid.UUID | None, Query()] = None,
-    gameplay_id: Annotated[uuid.UUID | None, Query()] = None,
-    from_dt: Annotated[datetime | None, Query(alias="from")] = None,
-    to_dt: Annotated[datetime | None, Query(alias="to")] = None,
-    limit: Annotated[int, Query(ge=1, le=200)] = 50,
-    offset: Annotated[int, Query(ge=0)] = 0,
+async def _query_logs(
+    session: AsyncSession,
+    *,
+    level: str | None,
+    event_type: str | None,
+    player_id: uuid.UUID | None,
+    gameplay_id: uuid.UUID | None,
+    from_dt: datetime | None,
+    to_dt: datetime | None,
+    limit: int,
+    offset: int,
 ) -> LogsQueryResponse:
-    del current_user
-    repo = LogRepository(session)
-    entries, total = await repo.query(
+    entries, total = await LogRepository(session).query(
         level=level,
         event_type=event_type,
         player_id=player_id,
@@ -45,4 +39,65 @@ async def query_logs(
         limit=limit,
         offset=offset,
         items=[LogEntryResponse.from_model(entry) for entry in entries],
+    )
+
+
+@router.get(
+    "/me",
+    response_model=LogsQueryResponse,
+    summary="Query logs belonging to the current user",
+)
+async def query_my_logs(
+    current_user: CurrentUser,
+    session: SessionDep,
+    level: Annotated[str | None, Query()] = None,
+    event_type: Annotated[str | None, Query()] = None,
+    gameplay_id: Annotated[uuid.UUID | None, Query()] = None,
+    from_dt: Annotated[datetime | None, Query(alias="from")] = None,
+    to_dt: Annotated[datetime | None, Query(alias="to")] = None,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> LogsQueryResponse:
+    """Query only the current user's logs; unknown query parameters are ignored."""
+    return await _query_logs(
+        session,
+        level=level,
+        event_type=event_type,
+        player_id=uuid.UUID(str(current_user.id)),
+        gameplay_id=gameplay_id,
+        from_dt=from_dt,
+        to_dt=to_dt,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@router.get(
+    "",
+    response_model=LogsQueryResponse,
+    summary="Query all logs (admin only)",
+    responses={403: {"description": "Admin access required"}},
+)
+async def query_all_logs(
+    _: LogAdmin,
+    session: SessionDep,
+    level: Annotated[str | None, Query()] = None,
+    event_type: Annotated[str | None, Query()] = None,
+    player_id: Annotated[uuid.UUID | None, Query()] = None,
+    gameplay_id: Annotated[uuid.UUID | None, Query()] = None,
+    from_dt: Annotated[datetime | None, Query(alias="from")] = None,
+    to_dt: Annotated[datetime | None, Query(alias="to")] = None,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> LogsQueryResponse:
+    return await _query_logs(
+        session,
+        level=level,
+        event_type=event_type,
+        player_id=player_id,
+        gameplay_id=gameplay_id,
+        from_dt=from_dt,
+        to_dt=to_dt,
+        limit=limit,
+        offset=offset,
     )
