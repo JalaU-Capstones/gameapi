@@ -8,12 +8,12 @@ from gameapi.db.models.log_entry import LogEntry
 from gameapi.services.log_service import LogService
 
 
-async def test_logging_integration_register_user_event_is_persisted(
+async def test_logging_integration_user_registered_event_is_persisted(
     client: AsyncClient,
     db_session,
 ) -> None:
     factory = async_sessionmaker(db_session.bind, expire_on_commit=False)
-    service = LogService(factory, buffer_size=10, flush_interval=999)
+    service = LogService(factory, buffer_size=50, flush_interval=999)
     root_logger = logging.getLogger()
     previous_level = root_logger.level
     root_logger.setLevel(logging.INFO)
@@ -29,6 +29,7 @@ async def test_logging_integration_register_user_event_is_persisted(
             },
         )
         assert response.status_code == 201
+        await service.flush_now()
     finally:
         root_logger.removeHandler(service.get_handler())
         root_logger.setLevel(previous_level)

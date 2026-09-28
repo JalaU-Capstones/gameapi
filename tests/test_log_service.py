@@ -1,6 +1,7 @@
 import asyncio
 import io
-import uuid
+import logging
+import threading
 from contextlib import redirect_stderr
 from datetime import UTC, datetime, timedelta
 
@@ -66,7 +67,6 @@ async def test_log_service_enqueues_record(log_service_factory) -> None:
             level="INFO",
             event_type="user_registered",
             message="User registered",
-            player_id=str(uuid.uuid4()),
             metadata={"email": "alice@example.com"},
         )
         assert service._queue.qsize() >= 1
@@ -172,4 +172,58 @@ async def test_log_service_queue_full_drops_silently(log_service_factory) -> Non
         await service.log(level="INFO", event_type="three", message="three")
         assert service._queue.qsize() <= 1
     finally:
+        await service.stop()
+
+
+async def test_log_service_flush_now_is_deterministic(
+    log_service_factory,
+    db_session,
+) -> None:
+    service = await log_service_factory(buffer_size=100, flush_interval=999)
+    try:
+        await service.log(level="INFO", event_type="user_registered", message="event")
+        await service.flush_now()
+        rows = (await db_session.execute(select(LogEntry))).scalars().all()
+        assert len(rows) >= 1
+    finally:
+        await service.stop()
+
+
+async def test_log_service_stop_is_idempotent(log_service_factory) -> None:
+    service = await log_service_factory()
+
+    await service.stop()
+    await service.stop()
+
+
+async def test_log_service_handler_is_thread_safe(
+    log_service_factory,
+    db_session,
+) -> None:
+    service = await log_service_factory(buffer_size=10, flush_interval=999)
+    root_logger = logging.getLogger()
+    previous_level = root_logger.level
+    root_logger.setLevel(logging.INFO)
+    handler = service.get_handler()
+    assert handler is service.get_handler()
+    root_logger.addHandler(handler)
+    try:
+
+        def _emit_from_thread() -> None:
+            logging.getLogger("test_threaded").info(
+                "from other thread",
+                extra={"event_type": "threaded_log"},
+            )
+
+        thread = threading.Thread(target=_emit_from_thread)
+        thread.start()
+        thread.join(timeout=2)
+        assert not thread.is_alive()
+
+        await service.flush_now()
+        rows = (await db_session.execute(select(LogEntry))).scalars().all()
+        assert any(row.event_type == "threaded_log" for row in rows)
+    finally:
+        root_logger.removeHandler(handler)
+        root_logger.setLevel(previous_level)
         await service.stop()

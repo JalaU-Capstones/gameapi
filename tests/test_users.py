@@ -1,4 +1,15 @@
+import pytest
 from httpx import AsyncClient
+
+from gameapi.api.v1.users import _require_self
+from gameapi.schemas.user import UserResponse
+
+
+def test_require_self_rejects_user_without_persisted_id() -> None:
+    current_user = UserResponse.model_construct(id=None)
+
+    with pytest.raises(RuntimeError, match="Authenticated user has no _id"):
+        _require_self(current_user, "user-id")
 
 
 async def test_register_user_returns_created(client: AsyncClient) -> None:

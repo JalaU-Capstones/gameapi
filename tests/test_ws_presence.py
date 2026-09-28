@@ -111,6 +111,43 @@ async def test_unknown_event_returns_not_implemented(
         }
 
 
+async def test_presence_missing_event_returns_invalid_event(
+    ws_client_factory: Callable[[], AsyncClient],
+    auth_token: str,
+) -> None:
+    async with (
+        ws_client_factory() as client,
+        aconnect_ws("ws://test/api/v2/ws/presence", client=client) as ws,
+    ):
+        await ws.send_json({"event": "auth", "payload": {"token": auth_token}})
+        await ws.receive_json()
+
+        await ws.send_json({})
+
+        assert await ws.receive_json() == {
+            "event": "error",
+            "payload": {"code": "INVALID_EVENT", "message": "Missing 'event' field"},
+        }
+
+
+async def test_presence_auth_without_token_closes_unauthorized(
+    ws_client_factory: Callable[[], AsyncClient],
+) -> None:
+    async with (
+        ws_client_factory() as client,
+        aconnect_ws("ws://test/api/v2/ws/presence", client=client) as ws,
+    ):
+        await ws.send_json({"event": "auth", "payload": {}})
+
+        assert await ws.receive_json() == {
+            "event": "auth_error",
+            "payload": {"reason": "invalid_token"},
+        }
+        with pytest.raises(WebSocketDisconnect) as exc:
+            await ws.receive_json()
+        assert exc.value.code == 4401
+
+
 async def test_ws_presence_notifies_other_connections(
     ws_client_factory: Callable[[], AsyncClient],
     client: AsyncClient,
