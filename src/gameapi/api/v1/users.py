@@ -1,5 +1,7 @@
 """v1 API — Frozen. Mirrors the C# legacy migration 1:1. Do not modify."""
 
+import logging
+
 from fastapi import APIRouter, HTTPException, Response, status
 
 from gameapi.api.deps import CurrentUser, UserServiceDep
@@ -8,6 +10,8 @@ from gameapi.db.models.user import User
 from gameapi.schemas.token import LoginRequest, LoginResponse
 from gameapi.schemas.user import UserCreate, UserResponse, UserUpdate
 from gameapi.services import EmailAlreadyExistsError, UserNotFoundError
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
@@ -134,6 +138,13 @@ async def delete_user(
 async def login(payload: LoginRequest, service: UserServiceDep) -> LoginResponse:
     user = await service.get_by_email(payload.email)
     if user is None or not verify_password(payload.password, user.password):
+        logger.warning(
+            "Login failed",
+            extra={
+                "event_type": "login_failed",
+                "metadata": {"email": payload.email},
+            },
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials",

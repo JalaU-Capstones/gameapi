@@ -1,3 +1,4 @@
+import logging
 import uuid
 
 from sqlalchemy.exc import IntegrityError
@@ -8,6 +9,8 @@ from gameapi.db.models.user import User
 from gameapi.repositories.user_repository import UserRepository
 from gameapi.schemas.user import UserCreate, UserResponse, UserUpdate
 from gameapi.services.exceptions import EmailAlreadyExistsError, UserNotFoundError
+
+logger = logging.getLogger(__name__)
 
 
 class UserService:
@@ -51,6 +54,15 @@ class UserService:
             # IntegrityError we expect. Reaching this line requires a different
             # database-level error which is not reachable via the API.
             raise  # pragma: no cover
+
+        logger.info(
+            "User registered",
+            extra={
+                "event_type": "user_registered",
+                "player_id": str(user.id),
+                "metadata": {"email": user.email},
+            },
+        )
         return UserResponse.model_validate(created)
 
     async def update(self, user_id: str, data: UserUpdate) -> UserResponse:
@@ -88,6 +100,14 @@ class UserService:
             # database-level error which is not reachable via the API.
             raise  # pragma: no cover
 
+        logger.info(
+            "User updated",
+            extra={
+                "event_type": "user_updated",
+                "player_id": str(user.id),
+                "metadata": {"user_id": str(user.id)},
+            },
+        )
         return UserResponse.model_validate(user)
 
     async def delete(self, user_id: str) -> None:
@@ -100,3 +120,11 @@ class UserService:
         if user is None:
             raise UserNotFoundError(user_id)
         await self._repo.delete(user)
+        logger.info(
+            "User deleted",
+            extra={
+                "event_type": "user_deleted",
+                "player_id": str(user.id),
+                "metadata": {"user_id": str(user.id)},
+            },
+        )

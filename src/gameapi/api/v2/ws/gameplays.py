@@ -82,6 +82,13 @@ async def _handle_message(
         await websocket.send_json({"event": "pong", "payload": {}})
         return current_game_id
 
+    if event == "ws_connected":
+        logger.info(
+            "WebSocket connected",
+            extra={"event_type": "ws_connected", "player_id": user_id},
+        )
+        return current_game_id
+
     if event == "unknown":
         await websocket.send_json(
             {
@@ -132,6 +139,18 @@ async def _handle_message(
                 event_bus.unsubscribe(current_game_id, user_id)
 
             event_bus.subscribe(game_id, user_id, _ws_callback)
+            logger.info(
+                "Game created",
+                extra={
+                    "event_type": "game_created",
+                    "player_id": user_id,
+                    "metadata": {
+                        "game_id": game_id,
+                        "host_id": user_id,
+                        "guest_id": payload_sub.get("guest_id"),
+                    },
+                },
+            )
             await websocket.send_json({"event": "subscribed", "payload": {"game_id": game_id}})
             return game_id
 
@@ -197,6 +216,18 @@ async def _handle_message(
 
             event_bus.subscribe(game_id, user_id, _ws_callback)
 
+            logger.info(
+                "Game created",
+                extra={
+                    "event_type": "game_created",
+                    "player_id": user_id,
+                    "metadata": {
+                        "game_id": game_id,
+                        "host_id": user_id,
+                        "guest_id": payload.guest_id,
+                    },
+                },
+            )
             await websocket.send_json(
                 {
                     "event": "game_created",
@@ -236,6 +267,14 @@ async def _handle_message(
             gameplay = await engine_service.gameplay_service.get_by_id(game_id)
             host_id = gameplay.host_player if gameplay else ""
 
+            logger.info(
+                "Invitation accepted",
+                extra={
+                    "event_type": "invitation_accepted",
+                    "player_id": user_id,
+                    "metadata": {"game_id": game_id},
+                },
+            )
             await event_bus.publish(
                 game_id,
                 {
@@ -276,7 +315,20 @@ async def _handle_message(
                 game_id=game_id, player_id=user_id, row=payload_play.row, col=payload_play.col
             )
             await session.commit()
-
+            logger.info(
+                "Move made",
+                extra={
+                    "event_type": "move_made",
+                    "player_id": user_id,
+                    "gameplay_id": game_id,
+                    "metadata": {
+                        "game_id": game_id,
+                        "player_id": user_id,
+                        "row": payload_play.row,
+                        "col": payload_play.col,
+                    },
+                },
+            )
             await event_bus.publish(game_id, response_event)
             return current_game_id
 
@@ -296,6 +348,15 @@ async def _handle_message(
                     else gameplay.host_player
                 )
 
+            logger.warning(
+                "Game abandoned",
+                extra={
+                    "event_type": "game_abandoned",
+                    "player_id": user_id,
+                    "gameplay_id": game_id,
+                    "metadata": {"game_id": game_id, "player_id": user_id},
+                },
+            )
             await event_bus.publish(
                 game_id,
                 {"event": "game_ended", "payload": {"winner": opponent_id, "reason": "abandon"}},
@@ -342,7 +403,14 @@ async def gameplays_websocket(websocket: WebSocket) -> None:
                     user_id, message, websocket, current_game_id, engine_service, session
                 )
         except WebSocketDisconnect:
-            pass
+            logger.info(
+                "WebSocket disconnected",
+                extra={
+                    "event_type": "ws_disconnected",
+                    "player_id": user_id,
+                    "metadata": {"user_id": user_id, "code": "disconnect"},
+                },
+            )
         finally:
             if current_game_id is not None:
                 try:
@@ -354,6 +422,19 @@ async def gameplays_websocket(websocket: WebSocket) -> None:
                             gameplay.guest_player
                             if user_id == gameplay.host_player
                             else gameplay.host_player
+                        )
+                        logger.info(
+                            "Game ended",
+                            extra={
+                                "event_type": "game_ended",
+                                "player_id": user_id,
+                                "gameplay_id": current_game_id,
+                                "metadata": {
+                                    "game_id": current_game_id,
+                                    "winner": str(opponent_id),
+                                    "reason": "abandon",
+                                },
+                            },
                         )
                         await event_bus.publish(
                             current_game_id,
