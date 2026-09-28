@@ -6,7 +6,7 @@ REST API para gestión de usuarios y partidas de Tic-Tac-Toe.
 [![codecov](https://codecov.io/gh/JalaU-Capstones/gameapi/branch/main/graph/badge.svg)](https://codecov.io/gh/JalaU-Capstones/gameapi)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg)](https://fastapi.tiangolo.com/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![Tests](https://img.shields.io/badge/tests-168%20passed-success.svg)](#pruebas)
+[![Tests](https://img.shields.io/badge/tests-193%20passed-success.svg)](#pruebas)
 
 **Stack:** Python 3.11+ · FastAPI · PostgreSQL 16 · SQLAlchemy 2.0 async · Pydantic v2 · JWT · WebSocket · uv · Docker
 
@@ -255,6 +255,10 @@ Cuando se implemente un sistema de roles formal, esta validación se reemplaza p
 
 En `/api/v2/logs/me` no existe el parámetro `player_id`: siempre filtra por el usuario autenticado. FastAPI ignora parámetros desconocidos, por lo que enviar `player_id` no cambia el filtro. En `/api/v2/logs` (administrador) sí está disponible para buscar logs de un usuario específico. Los resultados se ordenan del más reciente al más antiguo; los eventos se escriben por lotes y se eliminan según `LOG_RETENTION_DAYS`.
 
+**Seguridad entre hilos del handler**
+
+`asyncio.Queue` no es segura entre hilos. Como el handler está conectado al root logger global, los mensajes pueden llegar desde hilos distintos al event loop, como workers de anyio, pools de threads o librerías de terceros. El handler los envía a la cola mediante `loop.call_soon_threadsafe`, lo que mantiene la integridad de la cola en Python 3.11+ sin bloquear el hilo emisor.
+
 ### WebSockets v2
 
 Los endpoints WebSocket operan bajo `/api/v2/ws` y requieren autenticación JWT mediante el primer mensaje JSON.
@@ -392,8 +396,8 @@ make test
 Salida esperada:
 
 ```
-168 passed in ~100s
-Required test coverage of 85.0% reached. Total coverage: 90.33%
+193 passed in ~130s
+Required test coverage of 93.0% reached. Total coverage: 93.55%
 ```
 
 Los tests usan **PostgreSQL** de dos formas según el entorno:
@@ -448,22 +452,25 @@ se orquesta desde `services/game_engine_service.py` (persistencia + broadcast).
 
 ### Cobertura
 
-**Umbral mínimo:** 85% (configurado en `pyproject.toml` → `[tool.coverage.report] fail_under`).
+**Umbral mínimo:** 93% (configurado en `pyproject.toml` → `[tool.coverage.report] fail_under`).
 
-**Cobertura actual:** 92% (reporte generado con `make test-cov`).
+**Cobertura actual:** 93.55% (1,411 instrucciones y 310 ramas; reporte medido con `coverage report --precision=2`).
 
 | Archivo | Tests | Qué cubre |
 |---|---|---|
 | `tests/test_security.py` | 4 | Hashing bcrypt, JWT create/decode, token manipulado. |
-| `tests/test_health.py` | 1 | Endpoint `/health`. |
-| `tests/test_users.py` | 20 | CRUD de usuarios + validación + permisos. |
-| `tests/test_gameplays.py` | 21 | CRUD de gameplays + validación JSON + permisos. |
+| `tests/test_health.py` | 2 | Endpoint `/health` y ciclo de vida de la aplicación. |
+| `tests/test_users.py` | 21 | CRUD de usuarios, validación, permisos e invariantes de identidad. |
+| `tests/test_gameplays.py` | 23 | CRUD de gameplays + validación JSON + permisos + UUID válido inexistente. |
 | `tests/test_edge_cases.py` | 16 | UUIDs inválidos, errores de auth, validaciones. |
-| `tests/test_services_unit.py` | 6 | Tests unitarios de servicios. |
+| `tests/test_services_unit.py` | 16 | Servicios, configuración, entrypoint y repositorio de logs. |
+| `tests/test_game_engine_service_unit.py` | 14 | Excepciones y transiciones de partidas. |
+| `tests/test_api_deps.py` | 2 | Sesión de base de datos y autenticación de cuentas eliminadas. |
+| `tests/test_ws_manager.py` | 2 | Envío a usuarios desconectados y limpieza de sockets fallidos. |
 | `tests/test_event_bus.py` | 9 | Pub/sub del bus, multi-suscriptor, shutdown. |
 | `tests/test_game_engine.py` | 15 | Reglas puras de Tic-Tac-Toe. |
 | `tests/test_ws_gameplays.py` | 11 | Auth WS, ping/pong, subscribe/unsubscribe, cleanup. |
-| `tests/test_ws_presence.py` | 5 | Presencia: online/offline, list. |
+| `tests/test_ws_presence.py` | 10 | Presencia online/offline, listado, mensajes inválidos y autenticación. |
 | `tests/test_ws_game_flow.py` | 11 | Flujo completo de partida (happy path, rechazo, abandono, empate, errores). |
 
 **Reporte HTML** (local, tras `make test-cov`):
@@ -497,13 +504,13 @@ Hooks configurados: `ruff`, `ruff-format`, `mypy`, `trailing-whitespace`, `end-o
 
 - `quality`: ruff + mypy (Python 3.12).
 - `test`: matriz de compatibilidad **Python 3.11 / 3.12 / 3.13 / 3.14**, cada
-  versión ejecuta los tests con cobertura (`coverage run` + `--fail-under=85`)
+  versión ejecuta los tests con cobertura (`coverage run` + `--fail-under=93`)
   contra un servicio PostgreSQL 16. El reporte se sube a Codecov una sola vez
   desde Python 3.14.
 - `docker`: build de la imagen + smoke test con PostgreSQL en red dedicada.
 
 **GitLab CI** (`.gitlab-ci.yml`) — mismo esquema: `test:python` corre la matriz
-3.11–3.14 con cobertura y umbral aplicado en cada versión.
+3.11–3.14 con cobertura y umbral del 93% aplicado en cada versión.
 
 **Dependabot** (`.github/dependabot.yml`) — PR semanal para `uv.lock` y
 GitHub Actions.
