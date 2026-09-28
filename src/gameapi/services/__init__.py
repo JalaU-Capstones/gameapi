@@ -5,6 +5,7 @@ from gameapi.services.exceptions import (
     UserNotFoundError,
 )
 from gameapi.services.gameplay_service import GameplayService
+from gameapi.services.log_service import LogService
 from gameapi.services.user_service import UserService
 
 __all__ = [
@@ -12,6 +13,7 @@ __all__ = [
     "EmailAlreadyExistsError",
     "GameplayNotFoundError",
     "GameplayService",
+    "LogService",
     "UserNotFoundError",
     "UserService",
 ]

@@ -9,6 +9,7 @@ from gameapi.schemas.user import UserCreate
 from gameapi.services.event_bus import EventBus
 from gameapi.services.exceptions import (
     GameNotActiveError,
+    GameplayNotFoundError,
     InvitationNotPendingError,
     NotAParticipantError,
     NotYourTurnError,
@@ -68,6 +69,42 @@ async def test_reject_invitation_when_not_pending_raises(
 
     with pytest.raises(InvitationNotPendingError):
         await engine_service.reject_invitation(game_id, guest_id)
+
+
+async def test_accept_invitation_when_game_not_found_raises(
+    engine_service: GameEngineService,
+) -> None:
+    with pytest.raises(GameplayNotFoundError):
+        await engine_service.accept_invitation("00000000-0000-0000-0000-000000000000", "guest")
+
+
+async def test_accept_invitation_when_not_pending_raises(
+    engine_service: GameEngineService,
+    db_session: AsyncSession,
+) -> None:
+    host_id, guest_id = await _create_users(db_session)
+    game_id = await engine_service.create_game(host_id, guest_id)
+    await engine_service.accept_invitation(game_id, guest_id)
+
+    with pytest.raises(InvitationNotPendingError):
+        await engine_service.accept_invitation(game_id, guest_id)
+
+
+async def test_reject_invitation_when_game_not_found_raises(
+    engine_service: GameEngineService,
+) -> None:
+    with pytest.raises(GameplayNotFoundError):
+        await engine_service.reject_invitation("00000000-0000-0000-0000-000000000000", "guest")
+
+
+async def test_play_move_when_game_not_found_raises(engine_service: GameEngineService) -> None:
+    with pytest.raises(GameplayNotFoundError):
+        await engine_service.play_move("00000000-0000-0000-0000-000000000000", "player", 0, 0)
+
+
+async def test_leave_game_when_game_not_found_raises(engine_service: GameEngineService) -> None:
+    with pytest.raises(GameplayNotFoundError):
+        await engine_service.leave_game("00000000-0000-0000-0000-000000000000", "player")
 
 
 async def test_play_move_by_non_participant_raises(

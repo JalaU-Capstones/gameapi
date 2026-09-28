@@ -303,6 +303,21 @@ async def test_update_gameplay_with_invalid_uuid_returns_404(
     assert response.status_code == 404
 
 
+async def test_update_gameplay_with_valid_nonexistent_uuid_returns_404(
+    client: AsyncClient,
+    registered_user: dict,
+    auth_headers: dict[str, str],
+) -> None:
+    response = await client.put(
+        "/api/v1/gameplays/00000000-0000-0000-0000-000000000000",
+        json={"matchResult": '{"winner":"X"}'},
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 404
+    assert response.json()["message"] == "Gameplay not found"
+
+
 async def test_delete_gameplay_with_invalid_uuid_returns_404(
     client: AsyncClient,
     registered_user: dict,
@@ -310,6 +325,20 @@ async def test_delete_gameplay_with_invalid_uuid_returns_404(
 ) -> None:
     response = await client.delete("/api/v1/gameplays/not-a-uuid", headers=auth_headers)
     assert response.status_code == 404
+
+
+async def test_delete_gameplay_with_valid_nonexistent_uuid_returns_404(
+    client: AsyncClient,
+    registered_user: dict,
+    auth_headers: dict[str, str],
+) -> None:
+    response = await client.delete(
+        "/api/v1/gameplays/00000000-0000-0000-0000-000000000000",
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 404
+    assert response.json()["message"] == "Gameplay not found"
 
 
 async def test_update_gameplay_by_stranger_returns_403(

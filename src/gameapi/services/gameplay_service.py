@@ -1,4 +1,5 @@
 import json
+import logging
 import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -7,6 +8,8 @@ from gameapi.db.models.gameplay import Gameplay
 from gameapi.repositories.gameplay_repository import GameplayRepository
 from gameapi.schemas.gameplay import GameplayCreate, GameplayResponse, GameplayUpdate
 from gameapi.services.exceptions import GameplayNotFoundError
+
+logger = logging.getLogger(__name__)
 
 
 def _legacy_json_string(value: object, *, level: int = 0) -> str:
@@ -88,6 +91,15 @@ class GameplayService:
             match_result=json.loads(data.match_result) if data.match_result else None,
         )
         created = await self._repo.create(gameplay)
+        logger.info(
+            "Gameplay created",
+            extra={
+                "event_type": "gameplay_created",
+                "player_id": str(gameplay.host_player),
+                "gameplay_id": str(created.id),
+                "metadata": {"gameplay_id": str(created.id), "host_id": str(gameplay.host_player)},
+            },
+        )
         return self._to_response(created)
 
     async def update(self, gameplay_id: str, data: GameplayUpdate) -> GameplayResponse:
@@ -128,3 +140,11 @@ class GameplayService:
         if gameplay is None:
             raise GameplayNotFoundError(gameplay_id)
         await self._repo.delete(gameplay)
+        logger.info(
+            "Gameplay deleted",
+            extra={
+                "event_type": "gameplay_deleted",
+                "gameplay_id": str(gameplay.id),
+                "metadata": {"gameplay_id": str(gameplay.id)},
+            },
+        )

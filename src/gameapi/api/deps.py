@@ -5,6 +5,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from gameapi.core.config import settings
 from gameapi.core.security import TokenDecodeError, decode_access_token
 from gameapi.db.session import session_scope
 from gameapi.schemas.user import UserResponse
@@ -63,3 +64,17 @@ async def get_current_user(
 
 
 CurrentUser = Annotated[UserResponse, Depends(get_current_user)]
+
+
+async def require_log_admin(current_user: CurrentUser) -> UserResponse:
+    """Ensure the authenticated user is configured for global log access."""
+    admin_emails = {email.lower() for email in settings.log.admin_emails}
+    if current_user.email.lower() not in admin_emails:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required",
+        )
+    return current_user
+
+
+LogAdmin = Annotated[UserResponse, Depends(require_log_admin)]

@@ -14,6 +14,7 @@ from gameapi.api.v2.router import api_router as v2_router
 from gameapi.core.config import settings
 from gameapi.db import PostgresDatabase
 from gameapi.services.event_bus import event_bus
+from gameapi.services.log_service import LogService
 
 logger = logging.getLogger(__name__)
 
@@ -21,9 +22,27 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     await PostgresDatabase.connect()
+
+    log_service = LogService(
+        PostgresDatabase.session_factory(),
+        buffer_size=settings.log.buffer_size,
+        flush_interval=settings.log.flush_interval_seconds,
+        retention_days=settings.log.retention_days,
+        queue_maxsize=settings.log.queue_maxsize,
+    )
+    await log_service.start()
+
+    root_logger = logging.getLogger()
+    root_logger.addHandler(log_service.get_handler())
+    root_logger.setLevel(logging.INFO)
+
+    _.state.log_service = log_service
+
     try:
         yield
     finally:
+        root_logger.removeHandler(log_service.get_handler())
+        await log_service.stop()
         await event_bus.shutdown()
         await PostgresDatabase.disconnect()
 

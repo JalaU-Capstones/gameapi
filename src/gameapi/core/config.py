@@ -55,12 +55,32 @@ class AppSettings(BaseSettings):
         return value
 
 
+class LogSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="LOG_", env_file=".env", extra="ignore")
+
+    buffer_size: int = Field(default=100, gt=0)
+    flush_interval_seconds: float = Field(default=5.0, gt=0)
+    retention_days: int = Field(default=30, gt=0)
+    queue_maxsize: int = Field(default=1000, gt=0)
+    admin_emails: Annotated[list[str], NoDecode] = Field(default_factory=list)
+
+    @field_validator("admin_emails", mode="before")
+    @classmethod
+    def _split_emails(cls, value: object) -> object:
+        if isinstance(value, str):
+            return [email.strip().lower() for email in value.split(",") if email.strip()]
+        if isinstance(value, list):
+            return [str(email).strip().lower() for email in value]
+        return value
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     postgres: PostgresSettings = Field(default_factory=PostgresSettings)
     jwt: JWTSettings = Field(default_factory=JWTSettings)
     app: AppSettings = Field(default_factory=AppSettings)
+    log: LogSettings = Field(default_factory=LogSettings)
 
 
 @lru_cache
