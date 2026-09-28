@@ -6,7 +6,7 @@ REST API para gestión de usuarios y partidas de Tic-Tac-Toe.
 [![codecov](https://codecov.io/gh/JalaU-Capstones/gameapi/branch/main/graph/badge.svg)](https://codecov.io/gh/JalaU-Capstones/gameapi)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg)](https://fastapi.tiangolo.com/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![Tests](https://img.shields.io/badge/tests-148%20passed-success.svg)](#pruebas)
+[![Tests](https://img.shields.io/badge/tests-164%20passed-success.svg)](#pruebas)
 
 **Stack:** Python 3.11+ · FastAPI · PostgreSQL 16 · SQLAlchemy 2.0 async · Pydantic v2 · JWT · WebSocket · uv · Docker
 
@@ -42,6 +42,7 @@ REST API para gestión de usuarios y partidas de Tic-Tac-Toe.
 - Tests automatizados con pytest + httpx sobre PostgreSQL, con modo local en Docker via `testcontainers` y modo CI con servicio nativo.
 - ORM async con SQLAlchemy 2.0 y PostgreSQL como base de datos principal.
 - Juego en tiempo real sobre WebSocket: invitaciones, turnos, detección de victoria/empate/abandono y broadcast del estado a ambos jugadores.
+- Registro persistente de eventos de aplicación con escritura por lotes, retención configurable y consulta protegida.
 - Dockerizado con healthchecks y multi-stage build.
 
 ---
@@ -109,6 +110,10 @@ Todas las variables se leen desde `.env` (ver `.env.example`):
 | `APP_HOST`           | Host de escucha                                    | `0.0.0.0`                                                     |
 | `APP_PORT`           | Puerto de escucha                                  | `8080`                                                        |
 | `CORS_ORIGINS`       | Orígenes permitidos (coma-separados o `*`)         | `*`                                                           |
+| `LOG_BUFFER_SIZE`    | Cantidad de eventos por lote                         | `100`                                                         |
+| `LOG_FLUSH_INTERVAL_SECONDS` | Intervalo máximo entre escrituras               | `5.0`                                                         |
+| `LOG_RETENTION_DAYS` | Días que se conservan los logs                     | `30`                                                          |
+| `LOG_QUEUE_MAXSIZE`  | Capacidad de la cola de logs                       | `1000`                                                        |
 
 ---
 
@@ -219,6 +224,14 @@ El proyecto mantiene dos contratos activos:
 | `POST`   | `/api/v2/gameplays`              | ✅   | Mismo contrato v2                |
 | `PUT`    | `/api/v2/gameplays/{id}`         | ✅   | Mismo contrato v2                |
 | `DELETE` | `/api/v2/gameplays/{id}`         | ✅   | Mismo contrato v2                |
+
+### Logs persistentes v2
+
+| Método | Ruta           | Auth | Descripción |
+|--------|----------------|------|-------------|
+| `GET`  | `/api/v2/logs` | ✅   | Consultar logs persistidos con filtros y paginación |
+
+La consulta admite `level`, `event_type`, `player_id`, `gameplay_id`, `from` y `to`. La paginación usa `limit` (1–200, predeterminado 50) y `offset` (predeterminado 0); los resultados se ordenan del más reciente al más antiguo. Los eventos se acumulan en una cola acotada y se escriben por lotes; los registros anteriores a `LOG_RETENTION_DAYS` se eliminan periódicamente.
 
 ### WebSockets v2
 
@@ -357,8 +370,8 @@ make test
 Salida esperada:
 
 ```
-148 passed in ~95s
-Required test coverage of 85.0% reached. Total coverage: 92%
+164 passed in ~100s
+Required test coverage of 85.0% reached. Total coverage: 90.48%
 ```
 
 Los tests usan **PostgreSQL** de dos formas según el entorno:

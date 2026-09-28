@@ -230,6 +230,24 @@ resources:
     metaSortKey: -1790462000000
     _type: request_group
 
+  - _id: fld_logs
+    parentId: wrk_gameapi
+    modified: 1790462000000
+    created: 1790462000000
+    name: Logs (v2)
+    description: |-
+      # Persistent logs (v2)
+
+      Query application events persisted by the API. A valid JWT Bearer token is required.
+
+      ## Optional query parameters
+
+      `level`, `event_type`, `player_id`, `gameplay_id`, `from`, `to`, `limit` (1–200, default 50), and `offset` (default 0).
+    environment: {}
+    environmentPropertyOrder: null
+    metaSortKey: -1790462000000
+    _type: request_group
+
   - _id: fld_ws
     parentId: wrk_gameapi
     modified: 1790462000000
@@ -1510,6 +1528,62 @@ resources:
   # ==================================================================
   # WEBSOCKET REQUESTS
   # ==================================================================
+  - _id: req_query_logs
+    parentId: fld_logs
+    modified: 1790462000000
+    created: 1790462000000
+    name: Query persistent logs
+    url: "http://{{ _.baseUrl }}/api/v2/logs"
+    method: GET
+    body:
+      mimeType: null
+      text: ""
+    parameters: []
+    headers: []
+    description: |-
+      # Query persistent logs
+
+      Returns the newest persisted application events. Add optional query parameters such as `level`, `event_type`, `player_id`, `gameplay_id`, `from`, `to`, `limit`, and `offset` in the Parameters tab.
+
+      - **Method**: `GET`
+      - **Path**: `/api/v2/logs`
+      - **Auth**: Bearer token required
+
+      ## Example response
+
+      ```json
+      {
+        "total": 1,
+        "limit": 50,
+        "offset": 0,
+        "items": [
+          {
+            "id": "<uuid>",
+            "level": "INFO",
+            "eventType": "user_registered",
+            "message": "User registered",
+            "playerId": "<uuid>",
+            "gameplayId": null,
+            "metadata": {"email": "player@example.com"},
+            "timestamp": "2026-09-26T22:34:27Z"
+          }
+        ]
+      }
+      ```
+    authentication:
+      type: bearer
+      token: "{{ _.token }}"
+      prefix: ""
+    metaSortKey: -1790462000000
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+
   - _id: req_ws_gameplays
     parentId: fld_ws
     modified: 1790462000000
