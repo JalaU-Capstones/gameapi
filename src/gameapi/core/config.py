@@ -62,6 +62,16 @@ class LogSettings(BaseSettings):
     flush_interval_seconds: float = Field(default=5.0, gt=0)
     retention_days: int = Field(default=30, gt=0)
     queue_maxsize: int = Field(default=1000, gt=0)
+    admin_emails: Annotated[list[str], NoDecode] = Field(default_factory=list)
+
+    @field_validator("admin_emails", mode="before")
+    @classmethod
+    def _split_emails(cls, value: object) -> object:
+        if isinstance(value, str):
+            return [email.strip().lower() for email in value.split(",") if email.strip()]
+        if isinstance(value, list):
+            return [str(email).strip().lower() for email in value]
+        return value
 
 
 class Settings(BaseSettings):
