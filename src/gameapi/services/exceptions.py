@@ -2,6 +2,16 @@ class DomainError(Exception):
     """Base class for domain-level errors."""
 
 
+class InvalidCredentialsError(DomainError):
+    def __init__(self) -> None:
+        super().__init__("Invalid credentials")
+
+
+class InvalidRefreshTokenError(DomainError):
+    def __init__(self) -> None:
+        super().__init__("Invalid or expired refresh token")
+
+
 class UserNotFoundError(DomainError):
     def __init__(self, user_id: str) -> None:
         self.user_id = user_id

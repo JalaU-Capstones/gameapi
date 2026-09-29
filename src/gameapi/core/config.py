@@ -1,7 +1,7 @@
 from functools import lru_cache
 from typing import Annotated, Literal
 
-from pydantic import AliasChoices, Field, field_validator
+from pydantic import AliasChoices, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
@@ -74,6 +74,26 @@ class LogSettings(BaseSettings):
         return value
 
 
+class AuthSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="AUTH_", env_file=".env", extra="ignore")
+
+    access_cookie_name: str = "gameapi_at"
+    refresh_cookie_name: str = "gameapi_rt"
+    access_token_expire_minutes: int = Field(default=15, gt=0)
+    refresh_token_expire_days: int = Field(default=7, gt=0)
+    cookie_secure: bool = False
+    cookie_samesite: Literal["lax", "strict", "none"] = "lax"
+    cookie_domain: str | None = None
+    refresh_cookie_path: str = "/api/v2/auth"
+    access_cookie_path: str = "/"
+
+    @model_validator(mode="after")
+    def _validate_samesite(self) -> "AuthSettings":
+        if self.cookie_samesite == "none" and not self.cookie_secure:
+            raise ValueError("cookie_samesite='none' requires cookie_secure=True")
+        return self
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
@@ -81,6 +101,7 @@ class Settings(BaseSettings):
     jwt: JWTSettings = Field(default_factory=JWTSettings)
     app: AppSettings = Field(default_factory=AppSettings)
     log: LogSettings = Field(default_factory=LogSettings)
+    auth: AuthSettings = Field(default_factory=AuthSettings)
 
 
 @lru_cache
