@@ -25,11 +25,12 @@ resources:
 
       ## Authentication
 
-      The API uses **JWT Bearer tokens** for authenticated endpoints.
+      Authenticated REST endpoints accept **JWT Bearer tokens**. The v2 auth endpoints also support browser sessions with HttpOnly access and refresh cookies. The v2 login returns the access token in JSON for CLI compatibility; it never returns the refresh token in JSON.
 
       1. Run **Users → Register user** to create an account.
       2. Run **Users → Login** to obtain a JWT. The response is stored automatically in the `token` environment variable.
       3. Authenticated requests inject the token via the `Authorization: Bearer <token>` header.
+      4. For cookie-based browser auth, run **Auth (v2) → Login (v2)**. Insomnia stores the HttpOnly cookies and the request script stores `access_token`.
 
       WebSocket connections authenticate via a **JSON message** sent immediately after the socket opens:
 
@@ -60,6 +61,8 @@ resources:
       | `guestToken` | JWT for the guest user | Login as guest |
       | `testEmail` | Email used for the primary login | User |
       | `testPassword` | Password used for the primary login | User |
+      | `access_token` | Access token returned by v2 login | Login (v2) script |
+      | `refresh_token` | Refresh token captured from the v2 login cookie | Login (v2) script |
 
       ## Response format
 
@@ -107,6 +110,8 @@ resources:
       guestToken: ""
       testEmail: "sandra@mail.com"
       testPassword: "password123"
+      access_token: ""
+      refresh_token: ""
     dataPropertyOrder:
       "&":
         - baseUrl
@@ -119,6 +124,8 @@ resources:
         - guestToken
         - testEmail
         - testPassword
+        - access_token
+        - refresh_token
     color: null
     isPrivate: false
     metaSortKey: 1790553600001
@@ -127,6 +134,25 @@ resources:
   # ==================================================================
   # REQUEST GROUPS
   # ==================================================================
+  - _id: fld_auth_v2
+    parentId: wrk_gameapi
+    modified: 1790553600000
+    created: 1790553600000
+    name: Auth (v2)
+    description: |-
+      # Auth (v2)
+
+      Authentication endpoints for browsers, frontends, and clients using HttpOnly cookies.
+
+      - `POST /api/v2/auth/login` — validates credentials, sets the `gameapi_at` and `gameapi_rt` cookies, and returns the access token in the body without exposing the refresh token.
+      - `POST /api/v2/auth/refresh` — rotates the refresh token and issues a new access token.
+      - `POST /api/v2/auth/logout` — revokes the refresh token and clears both cookies.
+      - `GET /api/v2/auth/me` — returns the current user using either the cookie or the Authorization header.
+    environment: {}
+    environmentPropertyOrder: null
+    metaSortKey: -1790553600001
+    _type: request_group
+
   - _id: fld_users
     parentId: wrk_gameapi
     modified: 1790553600000
@@ -326,6 +352,214 @@ resources:
     environmentPropertyOrder: null
     metaSortKey: -1790553600000
     _type: request_group
+
+  # ==================================================================
+  # AUTH (V2) REQUESTS
+  # ==================================================================
+  - _id: req_login_v2
+    parentId: fld_auth_v2
+    modified: 1790553600000
+    created: 1790553600000
+    name: Login (v2)
+    url: "http://{{ _.baseUrl }}/api/v2/auth/login"
+    method: POST
+    body:
+      mimeType: application/json
+      text: |-
+        {
+          "email": "{{ _.testEmail }}",
+          "password": "{{ _.testPassword }}"
+        }
+    parameters: []
+    headers:
+      - name: Content-Type
+        value: application/json
+        id: pair_ct_auth_login
+    description: |-
+      # Login (v2)
+
+      Authenticates the user and sets the HttpOnly `gameapi_at` and `gameapi_rt` cookies.
+
+      - **Method**: `POST`
+      - **Path**: `/api/v2/auth/login`
+      - **Auth**: No
+
+      ## Request body
+
+      ```json
+      {"email":"sandra@mail.com","password":"password123"}
+      ```
+
+      ## Response — `200 OK`
+
+      ```json
+      {"access_token":"...","token_type":"bearer","user":{"id":"...","name":"Sandra Dee","email":"sandra@mail.com","registerDate":"..."}}
+      ```
+
+      The response sets `gameapi_at` with the access token (`HttpOnly`, 15 minutes) and `gameapi_rt` with the refresh token (`HttpOnly`, 7 days, scoped to `/api/v2/auth`). It does **not** include `refresh_token` in the JSON body.
+
+      ## Errors
+
+      | Status | Cause |
+      |--------|-------|
+      | `401` | Email not registered or password is incorrect |
+
+      ## Notes
+
+      The `access_token` in the body is provided for compatibility with Postman, Insomnia, and CLI clients. Browsers send the cookie automatically.
+    authentication: {}
+    metaSortKey: -1790553600003
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    afterResponseScript: |-
+      const res = insomnia.response;
+      if (res.code === 200) {
+        const body = res.json();
+        insomnia.environment.set("access_token", body.access_token);
+        if (body.user && body.user.id) {
+          insomnia.environment.set("userId", body.user.id);
+        }
+        const refreshCookie = res.headers["set-cookie"] || "";
+        if (refreshCookie.includes("gameapi_rt=")) {
+          const match = refreshCookie.match(/gameapi_rt=([^;]+)/);
+          if (match) {
+            insomnia.environment.set("refresh_token", decodeURIComponent(match[1]));
+          }
+        }
+      }
+    _type: request
+
+  - _id: req_refresh_v2
+    parentId: fld_auth_v2
+    modified: 1790553600000
+    created: 1790553600000
+    name: Refresh token
+    url: "http://{{ _.baseUrl }}/api/v2/auth/refresh"
+    method: POST
+    body:
+      mimeType: null
+      text: ""
+    parameters: []
+    headers: []
+    description: |-
+      # Refresh token
+
+      Rotates the current refresh token and issues a new access token.
+
+      - **Method**: `POST`
+      - **Path**: `/api/v2/auth/refresh`
+      - **Auth**: Uses the `gameapi_rt` cookie (or the browser's cookie jar).
+
+      ## Response — `200 OK`
+
+      ```json
+      {"access_token":"...","token_type":"bearer"}
+      ```
+
+      The refresh cookie is rotated; the previous value becomes invalid.
+
+      ## Errors
+
+      | Status | Cause |
+      |--------|-------|
+      | `401` | Refresh cookie is missing, invalid, revoked, or expired |
+
+      Can be chained directly after the previous login: Insomnia's cookie jar stores the refresh cookie and resends it automatically.
+    authentication: {}
+    metaSortKey: -1790553600002
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+
+  - _id: req_logout_v2
+    parentId: fld_auth_v2
+    modified: 1790553600000
+    created: 1790553600000
+    name: Logout
+    url: "http://{{ _.baseUrl }}/api/v2/auth/logout"
+    method: POST
+    body:
+      mimeType: null
+      text: ""
+    parameters: []
+    headers: []
+    description: |-
+      # Logout
+
+      Revokes the refresh token and clears both cookies (`gameapi_at` and `gameapi_rt`).
+
+      - **Method**: `POST`
+      - **Path**: `/api/v2/auth/logout`
+      - **Auth**: Reads the refresh token from the browser cookie when present; no token is required to clear cookies.
+
+      ## Response — `204 No Content`
+
+      The session is invalidated, even if logout is retried. Both auth cookies are cleared.
+    authentication: {}
+    metaSortKey: -1790553600001
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+
+  - _id: req_me_v2
+    parentId: fld_auth_v2
+    modified: 1790553600000
+    created: 1790553600000
+    name: Me
+    url: "http://{{ _.baseUrl }}/api/v2/auth/me"
+    method: GET
+    body:
+      mimeType: null
+      text: ""
+    parameters: []
+    headers: []
+    description: |-
+      # Me
+
+      Returns the current user validated from the `gameapi_at` cookie or the `Authorization: Bearer <token>` header.
+
+      - **Method**: `GET`
+      - **Path**: `/api/v2/auth/me`
+      - **Auth**: Access cookie or Bearer token.
+
+      ## Response — `200 OK`
+
+      Returns the same user object included in the login response.
+
+      ## Errors
+
+      | Status | Cause |
+      |--------|-------|
+      | `401` | Access token is missing, invalid, or expired |
+
+      ## Notes
+
+      Useful for hydrating the frontend's initial state on app load.
+    authentication: {}
+    metaSortKey: -1790553600000
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
 
   # ==================================================================
   # USERS REQUESTS
@@ -1243,6 +1477,15 @@ resources:
       - **URL**: `ws://{{ _.baseUrl }}/api/v2/ws/presence`
       - **Auth**: JWT sent as the first message
 
+      ## Message envelope and events
+
+      Every message uses `{"event":"<event_name>","payload":{...}}`; events without data may omit `payload`.
+
+      | Direction | Events |
+      |-----------|--------|
+      | Client → server | `auth`, `ping`, `list_online_users` |
+      | Server → client | `auth_ok`, `auth_error`, `error`, `pong`, `online_users`, `user_online`, `user_offline` |
+
       ## Step-by-step flow
 
       ### 1. Connect
@@ -1345,6 +1588,13 @@ resources:
 
       - **URL**: `ws://{{ _.baseUrl }}/api/v2/ws/gameplays`
       - **Auth**: JWT sent as the first message (see Step 1)
+
+      ## Complete event list
+
+      | Direction | Events |
+      |-----------|--------|
+      | Client → server | `auth`, `ping`, `create_game`, `accept_invitation`, `reject_invitation`, `play_move`, `leave_game`, `subscribe_game`, `unsubscribe_game`, `broadcast_to_game` |
+      | Server → client | `auth_ok`, `auth_error`, `pong`, `error`, `game_created`, `invitation_received`, `invitation_accepted`, `invitation_rejected`, `board_updated`, `game_ended`, `subscribed`, `unsubscribed`, `broadcast_sent`, `game_message` |
 
       ## Envelope
 
@@ -1523,7 +1773,7 @@ resources:
       Sender receives `{"event":"broadcast_sent","payload":{"game_id":"..."}}`. Other subscribers receive:
 
       ```json
-      {"event":"game_message","payload":{"game_id":"{{ _.gameplayId }}","from_user":"8df1c70b-...","message":"hello"}}
+      {"event":"game_message","payload":{"game_id":"{{ _.gameplayId }}","from":"8df1c70b-...","message":"hello"}}
       ```
 
       ## Keepalive

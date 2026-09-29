@@ -1,224 +1,228 @@
-# Colecciones de cliente
+# Client Collections
 
-Este directorio contiene las colecciones de cliente para probar la API de GameAPI manualmente desde Postman o Insomnia.
+This directory contains client collections for manually testing the GameAPI with Postman or Insomnia.
 
-## Índice
+## Contents
 
-- [¿Por qué dos colecciones?](#por-qué-dos-colecciones)
-- [Postman — solo REST](#postman--solo-rest)
+- [Why two collections?](#why-two-collections)
+- [Postman — REST only](#postman--rest-only)
 - [Insomnia — REST + WebSocket](#insomnia--rest--websocket)
-- [Contenido del directorio](#contenido-del-directorio)
-- [Flujo recomendado](#flujo-recomendado)
-- [Diferencias de sintaxis](#diferencias-de-sintaxis-entre-postman-e-insomnia)
-- [Solución de problemas](#solución-de-problemas)
+- [Directory contents](#directory-contents)
+- [Recommended flow](#recommended-flow)
+- [Syntax differences between Postman and Insomnia](#syntax-differences-between-postman-and-insomnia)
+- [Troubleshooting](#troubleshooting)
+- [References](#references)
 
 ---
 
-## ¿Por qué dos colecciones?
+## Why two collections?
 
-La API expone dos familias de endpoints — REST (`/api/v1/*`) y WebSocket (`/api/v2/ws/*`) — pero **ninguna herramienta cubre ambos casos con la misma calidad**:
+The API exposes two endpoint families — REST (`/api/v1/*`) and WebSocket (`/api/v2/ws/*`) — but **neither tool covers both equally well**:
 
-| Herramienta  | REST      | WebSocket  | Rol en este proyecto           |
-|--------------|-----------|------------|--------------------------------|
-| **Postman**  | Excelente | Problemático | Se usa **solo para REST**      |
-| **Insomnia** | Excelente | Nativo     | Se usa para **REST + WebSocket** |
+| Tool | REST | WebSocket | Role in this project |
+|------|------|-----------|----------------------|
+| **Postman** | Excellent | Problematic | Used for **REST only** |
+| **Insomnia** | Excellent | Native | Used for **REST + WebSocket** |
 
-### El problema con WebSocket en Postman
+### The problem with WebSocket in Postman
 
-Postman tiene soporte de WebSocket, pero **no convive bien con requests REST en la misma colección**:
+Postman supports WebSocket, but **HTTP requests and WebSocket requests do not coexist reliably in the same collection**:
 
-1. Al **importar** una colección que mezcla requests HTTP y WS, Postman frecuentemente convierte los requests WS en `GET` HTTP — incluso si el JSON declara `protocolProfileBehavior.useWebSocket: true` y `url.protocol: "ws"`.
-2. El resultado es el error:
+1. When you **import** a collection that mixes HTTP and WebSocket requests, Postman often converts WebSocket requests to HTTP `GET` requests, even if the JSON declares `protocolProfileBehavior.useWebSocket: true` and `url.protocol: "ws"`.
+2. The result is this error:
    ```
    Invalid protocol: ws:
    ```
-   porque Postman intenta procesar `ws://...` como una URL HTTP y rechaza el protocolo.
-3. Cambiar el método manualmente a **WebSocket** en la UI funciona, pero **el cambio se pierde al reimportar** la colección, lo que rompe la reproducibilidad.
-4. En algunas versiones, el soporte de WebSocket requiere plan de pago.
+   Postman attempts to process `ws://...` as an HTTP URL and rejects the protocol.
+3. Changing the method manually to **WebSocket** in the UI works, but **the change is lost when the collection is reimported**, breaking reproducibility.
+4. In some versions, WebSocket support requires a paid plan.
 
-**Conclusión**: Postman queda relegado a las pruebas REST. Los WebSocket se prueban con Insomnia (o con `websocat` / `wscat` desde la terminal).
+**Conclusion**: Postman is limited to REST testing. Use Insomnia (or `websocat` / `wscat` from the terminal) to test WebSockets.
 
-### Por qué Insomnia
+### Why Insomnia
 
-Insomnia tiene soporte **nativo y estable** de WebSocket desde la versión 8:
+Insomnia has had **native, stable** WebSocket support since version 8:
 
-- Los requests se declaran con `_type: websocket_request` en el YAML de exportación.
-- Al importar, la UI muestra el botón **Connect** (no **Send**), sin ambigüedad HTTP.
-- El editor de mensajes soporta formato JSON, lo que hace trivial enviar y leer el protocolo del WebSocket (`auth`, `ping`, `subscribe_game`, etc.).
-- Los scripts de ciclo de vida (`afterResponseScript`) funcionan igual que en Postman.
+- Requests use `_type: websocket_request` in the exported YAML.
+- After import, the UI shows a **Connect** button (not **Send**), with no HTTP ambiguity.
+- The message editor supports JSON, making it easy to send and inspect the WebSocket protocol (`auth`, `ping`, `subscribe_game`, etc.).
+- Lifecycle scripts (`afterResponseScript`) work similarly to Postman.
 
-Por eso Insomnia es la herramienta de referencia para probar **todo** el API.
+For these reasons, Insomnia is the reference tool for testing the **entire** API.
 
 ---
 
-## Postman — solo REST
+## Postman — REST only
 
-**Archivo:** [`GameAPI.postman_collection.json`](./postman/GameAPI.postman_collection.json)
+**File:** [`GameAPI.postman_collection.json`](./postman/GameAPI.postman_collection.json)
 
-**Cubre:**
+**Includes:**
 
-- Registro y login de usuarios.
-- CRUD de usuarios con permisos (ownership).
-- CRUD de gameplays con permisos (host / guest).
+- User registration and login.
+- User CRUD operations with ownership permissions.
+- Gameplay CRUD operations with host / guest permissions.
 
-**NO cubre WebSockets** por las razones explicadas arriba. Si agregas los endpoints WS a la colección, esta se rompe al reimportar.
+**WebSockets are not included** for the reasons described above. Adding WebSocket endpoints to the collection can make it fail after reimport.
 
-**Importar:**
+**Import:**
 
-1. Abre Postman.
-2. **File → Import → Upload Files**.
-3. Selecciona `GameAPI.postman_collection.json`.
-4. Selecciona la colección en la barra lateral.
+1. Open Postman.
+2. Select **File → Import → Upload Files**.
+3. Choose `GameAPI.postman_collection.json`.
+4. Select the collection in the sidebar.
 
-**Variables** (definidas en la colección; se actualizan automáticamente desde los scripts):
+**Variables** (defined in the collection and updated automatically by scripts):
 
-| Variable       | Descripción                              | Set por                        |
-|----------------|------------------------------------------|--------------------------------|
-| `baseUrl`      | Host + puerto (sin esquema)              | Usuario                        |
-| `token`        | JWT para endpoints autenticados          | Script de **Login**            |
-| `userId`       | UUID del usuario actual                  | Script de **Register / Login** |
-| `gameplayId`   | UUID del último gameplay creado          | Script de **Create gameplay**  |
-| `testEmail`    | Email para login                         | Usuario                        |
-| `testPassword` | Password para login                      | Usuario                        |
+| Variable | Description | Set by |
+|----------|-------------|--------|
+| `baseUrl` | Host and port (no scheme) | User |
+| `token` | JWT for authenticated endpoints | **Login** script |
+| `userId` | Current user's UUID | **Register / Login** script |
+| `gameplayId` | UUID of the most recently created gameplay | **Create gameplay** script |
+| `testEmail` | Email used for login | User |
+| `testPassword` | Password used for login | User |
 
-**Cada request tiene documentación completa** en el panel **Documentation** (icono de documento en el panel derecho de Postman). También los folders **Users** y **Gameplays** tienen documentación general.
+**Every request has full documentation** in Postman's **Documentation** panel (document icon in the right panel). The **Users** and **Gameplays** folders also include general documentation.
 
 ---
 
 ## Insomnia — REST + WebSocket
 
-**Archivo:** [`GameAPI.insomnia.yaml`](./insomnia/GameAPI.insomnia.yaml)
+**File:** [`GameAPI.insomnia.yaml`](./insomnia/GameAPI.insomnia.yaml)
 
-**Cubre:**
+**Includes:**
 
-- Todo lo de la colección Postman (REST).
-- Los dos endpoints WebSocket: `/api/v2/ws/presence` y `/api/v2/ws/gameplays`.
+- All REST requests from the Postman collection.
+- The v2 auth endpoints, including the HttpOnly cookie flow.
+- Both WebSocket endpoints: `/api/v2/ws/presence` and `/api/v2/ws/gameplays`.
 
-**Importar:**
+**Import:**
 
-1. Abre Insomnia.
-2. **Application → Preferences → Data → Import Data → From File**.
-3. Selecciona `GameAPI.insomnia.yaml`.
-4. Activa el entorno **Local** en el desplegable superior izquierdo.
+1. Open Insomnia.
+2. Select **Application → Preferences → Data → Import Data → From File**.
+3. Choose `GameAPI.insomnia.yaml`.
+4. Select the **Local** environment from the dropdown in the upper-left corner.
 
-**Variables del entorno `Local`:**
+**`Local` environment variables:**
 
-| Variable       | Descripción                              | Set por                        |
-|----------------|------------------------------------------|--------------------------------|
-| `baseUrl`      | Host + puerto (sin esquema)              | Usuario                        |
-| `token`        | JWT para endpoints autenticados          | Script de **Login**            |
-| `userId`       | UUID del usuario actual                  | Script de **Register / Login** |
-| `gameplayId`   | UUID del último gameplay creado          | Script de **Create gameplay**  |
-| `testEmail`    | Email para login                         | Usuario                        |
-| `testPassword` | Password para login                      | Usuario                        |
+| Variable | Description | Set by |
+|----------|-------------|--------|
+| `baseUrl` | Host and port (no scheme) | User |
+| `token` | JWT for authenticated endpoints and WebSockets | **Login** script |
+| `userId` | Current user's UUID | **Register / Login** script |
+| `gameplayId` | UUID of the most recently created gameplay | **Create gameplay** script |
+| `testEmail` | Email used for login | User |
+| `testPassword` | Password used for login | User |
+| `access_token` | Access token returned by v2 login | **Login (v2)** script |
+| `refresh_token` | Refresh token captured from the v2 login cookie | **Login (v2)** script |
 
-**Cada request tiene documentación completa** en el panel **Docs** (icono de libro en el panel central de Insomnia). Los folders y el workspace también están documentados.
+**Every request has full documentation** in Insomnia's **Docs** panel (book icon in the center panel). The folders and workspace are documented as well.
 
 ---
 
-## Contenido del directorio
+## Directory contents
 
 ```
 .docs/collections/
-├── README.md                                 # Este archivo
-├── postman/GameAPI.postman_collection.json    # Colección Postman (solo REST)
-└── insomnia/GameAPI.insomnia.yaml              # Colección Insomnia (REST + WebSocket)
+├── README.md                                      # This file
+├── postman/GameAPI.postman_collection.json         # Postman collection (REST only)
+└── insomnia/GameAPI.insomnia.yaml                  # Insomnia collection (REST + WebSocket)
 ```
 
 ---
 
-## Flujo recomendado
+## Recommended flow
 
-Para cualquiera de las dos herramientas, el orden de ejecución es el mismo:
+The execution order is the same for either tool:
 
-1. **Users → Register user** — crea la cuenta; guarda `userId` y `testEmail`.
-2. **Users → Login** — obtiene el JWT; guarda `token` y `userId`.
-3. **Gameplays → Create gameplay** — crea una partida; guarda `gameplayId`.
-4. A partir de aquí puedes probar cualquier endpoint REST.
+1. **Users → Register user** — creates the account and stores `userId` and `testEmail`.
+2. **Users → Login** — obtains a JWT and stores `token` and `userId`.
+3. **Gameplays → Create gameplay** — creates a gameplay and stores `gameplayId`.
+4. Continue with any REST endpoint.
 
-> Los scripts de respuesta son los que rellenan las variables. Si ejecutas requests fuera de este orden, verás `{{userId}}` o `{{token}}` vacíos.
+> Response scripts populate the variables. If you run requests out of order, `{{userId}}` or `{{token}}` may be empty.
 
-### Probar WebSocket (solo Insomnia)
+### Test WebSocket (Insomnia only)
 
-1. Abre **WebSocket (v2) → Presence WS** o **Gameplays WS**.
-2. Pulsa **Connect**.
-3. Envía inmediatamente (el servidor cierra la conexión si tardas más de unos segundos):
+1. Open **WebSocket (v2) → Presence WS** or **Gameplays WS**.
+2. Click **Connect**.
+3. Send this immediately (the server closes the connection if you wait more than a few seconds):
    ```json
    {"event":"auth","payload":{"token":"{{ _.token }}"}}
    ```
-4. Espera la respuesta:
+4. Wait for the response:
    ```json
    {"event":"auth_ok","payload":{"user_id":"..."}}
    ```
-5. A partir de ahí puedes enviar `ping`, `list_online_users`, `subscribe_game`, `broadcast_to_game`, etc.
+5. You can then send `ping`, `list_online_users`, `subscribe_game`, `broadcast_to_game`, and other events.
 
-### Probar WebSocket sin Insomnia
+### Test WebSocket without Insomnia
 
-Si prefieres la terminal:
+From a terminal, use either:
 
 ```bash
-# Con websocat (recomendado, interactivo)
+# With websocat (recommended, interactive)
 websocat -t ws://localhost:8080/api/v2/ws/presence
 
-# Con wscat (Node.js)
+# With wscat (Node.js)
 npx wscat -c ws://localhost:8080/api/v2/ws/presence
 ```
 
-Ambas herramientas te dejan pegar el mensaje de `auth` en la sesión interactiva y ver las respuestas.
+Both tools let you paste the `auth` message into the interactive session and view the responses.
 
 ---
 
-## Diferencias de sintaxis entre Postman e Insomnia
+## Syntax differences between Postman and Insomnia
 
-Si editas ambos archivos, ten presente que la sintaxis de plantillas y scripts cambia:
+If you edit both files, keep in mind that template and script syntax differs:
 
-| Concepto                    | Postman                              | Insomnia                            |
-|-----------------------------|--------------------------------------|-------------------------------------|
-| Interpolación de variables  | `{{variable}}`                       | `{{ _.variable }}`                  |
-| Asignar variable            | `pm.collectionVariables.set("x", v)` | `insomnia.environment.set("x", v)`  |
-| Leer respuesta              | `pm.response.json()`                 | `insomnia.response.json()`          |
-| Código HTTP                 | `pm.response.code`                   | `insomnia.response.code`            |
-| Aserciones                  | `pm.test(...)`                       | No nativo (usa `console.log`)       |
+| Concept | Postman | Insomnia |
+|---------|---------|----------|
+| Variable interpolation | `{{variable}}` | `{{ _.variable }}` |
+| Set a variable | `pm.collectionVariables.set("x", v)` | `insomnia.environment.set("x", v)` |
+| Read a response | `pm.response.json()` | `insomnia.response.json()` |
+| HTTP status code | `pm.response.code` | `insomnia.response.code` |
+| Assertions | `pm.test(...)` | Not built in (use `console.log`) |
 
 ---
 
-## Solución de problemas
+## Troubleshooting
 
-### Postman muestra `Invalid protocol: ws:`
+### Postman shows `Invalid protocol: ws:`
 
-**Síntoma**: intentaste agregar un request WebSocket a la colección Postman y ahora falla.
+**Symptom**: You tried adding a WebSocket request to the Postman collection, and it now fails.
 
-**Solución**: **no agregues WebSockets a Postman**. Usa Insomnia para eso. Ver [El problema con WebSocket en Postman](#el-problema-con-websocket-en-postman).
+**Solution**: **Do not add WebSockets to Postman**. Use Insomnia instead. See [The problem with WebSocket in Postman](#the-problem-with-websocket-in-postman).
 
-### Insomnia cierra la conexión con `auth_timeout`
+### Insomnia closes the connection with `auth_timeout`
 
-**Síntoma**: te conectas al WebSocket pero la conexión se cierra a los pocos segundos sin respuesta.
+**Symptom**: You connect to the WebSocket, but it closes after a few seconds without responding.
 
-**Causa**: el servidor exige que el **primer mensaje** sea `auth`, y cierra la conexión si tardas más de unos segundos.
+**Cause**: The server requires `auth` as the **first message** and closes the connection if you wait too long.
 
-**Solución**: conecta y envía el mensaje `auth` **inmediatamente**. Ten el JSON listo en el editor antes de pulsar **Connect**. Si necesitas más margen, sube el timeout en el servidor WebSocket.
+**Solution**: Connect and send the `auth` message **immediately**. Have the JSON ready in the editor before clicking **Connect**. Increase the server WebSocket timeout if you need more time.
 
-### El token expira durante la sesión
+### The token expires during the session
 
-Los JWT duran 60 minutos por defecto (`JWT_EXPIRE_MINUTES`). Si recibes `401`, vuelve a ejecutar **Login** para refrescar `{{token}}` (Postman) o `{{ _.token }}` (Insomnia).
+JWTs last 60 minutes by default (`JWT_EXPIRE_MINUTES`). If you receive `401`, run **Login** again to refresh `{{token}}` (Postman) or `{{ _.token }}` (Insomnia).
 
-### `websocat: WebSocketError: I/O failure` en modo interactivo
+### `websocat: WebSocketError: I/O failure` in interactive mode
 
-**Síntoma**: al ejecutar `websocat -t ws://...` en la terminal, falla con `I/O failure`.
+**Symptom**: Running `websocat -t ws://...` in the terminal fails with `I/O failure`.
 
-**Causa**: websocat cambia la terminal a modo raw y algunos shells/terminales no lo manejan bien.
+**Cause**: websocat switches the terminal to raw mode, which some shells and terminals do not handle well.
 
-**Solución**: envuelve con `rlwrap` (`rlwrap websocat -t ws://...`) o usa un pipe con `begin...end` + `sleep` para enviar varios mensajes sin modo interactivo.
+**Solution**: Wrap it with `rlwrap` (`rlwrap websocat -t ws://...`) or use a pipe with `begin...end` and `sleep` to send multiple messages without interactive mode.
 
 ### `curl: option --ws: is unknown`
 
-**Causa**: tu versión de curl es anterior a 7.86 (octubre 2022), que es cuando se añadió soporte de WebSocket.
+**Cause**: Your curl version predates 7.86 (October 2022), when WebSocket support was added.
 
-**Solución**: actualiza curl (`sudo apt install --only-upgrade curl`) o simplemente usa `websocat`/`wscat`. Curl además solo permite enviar **un** frame, así que no sirve para flujos interactivos de todos modos.
+**Solution**: Update curl (`sudo apt install --only-upgrade curl`) or use `websocat` / `wscat`. Curl also only allows sending **one** frame, so it is not suitable for interactive flows.
 
 ---
 
-## Referencias
+## References
 
 - [Postman — WebSocket requests](https://learning.postman.com/docs/sending-requests/websocket/websocket-overview/)
 - [Insomnia — WebSockets](https://docs.insomnia.rest/insomnia/websockets)
