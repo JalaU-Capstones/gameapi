@@ -180,6 +180,35 @@ def auth_headers(auth_token: str) -> dict[str, str]:
 
 
 @pytest.fixture
+async def authed_client(client: AsyncClient, registered_user: dict[str, object]) -> AsyncClient:
+    response = await client.post(
+        "/api/v2/auth/login",
+        json={
+            "email": registered_user["email"],
+            "password": "password123",
+        },
+    )
+    assert response.status_code == 200, response.text
+    return client
+
+
+@pytest.fixture
+async def authed_client_bearer(
+    client: AsyncClient,
+    registered_user: dict[str, object],
+) -> dict[str, str]:
+    response = await client.post(
+        "/api/v1/users/login",
+        json={
+            "email": registered_user["email"],
+            "password": "password123",
+        },
+    )
+    assert response.status_code == 200, response.text
+    return {"Authorization": f"Bearer {response.json()['token']}"}
+
+
+@pytest.fixture
 async def registered_user_a(client: AsyncClient) -> dict[str, object]:
     payload = {
         "name": "User A",
