@@ -54,10 +54,11 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Cookies require credentials and an explicit origin list when browser-based clients are used.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.app.cors_origins,
-    allow_credentials=False,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )

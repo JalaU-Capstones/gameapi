@@ -1,3 +1,4 @@
+import secrets
 from base64 import b64encode
 from datetime import UTC, datetime, timedelta
 from hashlib import sha256
@@ -43,6 +44,22 @@ class AccessTokenClaims(BaseModel):
     aud: str
 
 
+def create_access_token_short(*, subject: str, email: str, name: str) -> str:
+    now = datetime.now(UTC)
+    expires_at = now + timedelta(minutes=settings.auth.access_token_expire_minutes)
+    claims = {
+        "sub": subject,
+        "email": email,
+        "name": name,
+        "jti": str(uuid4()),
+        "iat": int(now.timestamp()),
+        "exp": int(expires_at.timestamp()),
+        "iss": settings.jwt.issuer,
+        "aud": settings.jwt.audience,
+    }
+    return str(jwt.encode(claims, settings.jwt.secret_key, algorithm=settings.jwt.algorithm))
+
+
 def create_access_token(*, subject: str, email: str, name: str) -> str:
     now = datetime.now(UTC)
     expires_at = now + timedelta(minutes=settings.jwt.expire_minutes)
@@ -57,6 +74,22 @@ def create_access_token(*, subject: str, email: str, name: str) -> str:
         "aud": settings.jwt.audience,
     }
     return str(jwt.encode(claims, settings.jwt.secret_key, algorithm=settings.jwt.algorithm))
+
+
+def generate_refresh_token() -> tuple[str, str]:
+    """
+    Return (raw_token, token_hash).
+    - raw_token: 32 random bytes, base64url-encoded (43 chars, no padding).
+    - token_hash: hex-encoded SHA-256 of the raw_token.
+    """
+    raw = secrets.token_urlsafe(32)
+    hashed = sha256(raw.encode("utf-8")).hexdigest()
+    return raw, hashed
+
+
+def hash_refresh_token(raw_token: str) -> str:
+    """Return the hex-encoded SHA-256 hash of a raw refresh token."""
+    return sha256(raw_token.encode("utf-8")).hexdigest()
 
 
 def decode_access_token(token: str) -> AccessTokenClaims:

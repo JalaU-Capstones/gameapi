@@ -115,6 +115,15 @@ Todas las variables se leen desde `.env` (ver `.env.example`):
 | `LOG_RETENTION_DAYS` | Días que se conservan los logs                     | `30`                                                          |
 | `LOG_QUEUE_MAXSIZE`  | Capacidad de la cola de logs                       | `1000`                                                        |
 | `LOG_ADMIN_EMAILS` | Correos con acceso al endpoint global de logs (CSV) | _(vacío)_ |
+| `AUTH_ACCESS_COOKIE_NAME` | Nombre de la cookie del access token | `gameapi_at` |
+| `AUTH_REFRESH_COOKIE_NAME` | Nombre de la cookie del refresh token | `gameapi_rt` |
+| `AUTH_ACCESS_TOKEN_EXPIRE_MINUTES` | Expiración del access token | `15` |
+| `AUTH_REFRESH_TOKEN_EXPIRE_DAYS` | Expiración del refresh token | `7` |
+| `AUTH_COOKIE_SECURE` | Envía la cookie solo sobre HTTPS | `false` |
+| `AUTH_COOKIE_SAMESITE` | Política SameSite | `lax` |
+| `AUTH_COOKIE_DOMAIN` | Dominio opcional para cookies | *(vacío)* |
+| `AUTH_REFRESH_COOKIE_PATH` | Path del refresh cookie | `/api/v2/auth` |
+| `AUTH_ACCESS_COOKIE_PATH` | Path del access cookie | `/` |
 
 ---
 
@@ -189,6 +198,42 @@ El proyecto mantiene dos contratos activos:
 - `/api/v2`: versión activa para nuevas integraciones y WebSockets.
 
 > La versión v1 queda fija para compatibilidad. La v2 puede evolucionar sin romper la v1.
+
+## Autenticación
+
+El backend soporta dos mecanismos de autenticación simultáneamente:
+
+### 1. Cookie HttpOnly (recomendado para el frontend)
+
+Los endpoints `/api/v2/auth/*` establecen cookies HttpOnly tras un login exitoso. El frontend no necesita manipular el token: el navegador lo envía automáticamente en cada request posterior.
+
+- `gameapi_at` — access token (15 minutos).
+- `gameapi_rt` — refresh token (7 días), enviado solo a `/api/v2/auth`.
+
+### 2. Bearer header (compatible con CLI, Postman, Insomnia)
+
+El login tradicional sigue devolviendo el access token en el body. Se puede usar como `Authorization: Bearer <token>`. Este es el modo por defecto para herramientas de testing y scripts.
+
+### Endpoints
+
+| Método | Ruta | Auth | Descripción |
+|--------|------|------|-------------|
+| `POST` | `/api/v2/auth/login` | ❌ | Login: setea cookies + devuelve token. |
+| `POST` | `/api/v2/auth/refresh` | 🔄 | Rota el refresh token y emite nuevo access. |
+| `POST` | `/api/v2/auth/logout` | 🔄 | Revoca refresh token y limpia cookies. |
+| `GET` | `/api/v2/auth/me` | ✅ | Usuario actual (desde cookie o header). |
+
+### Variables de entorno relacionadas
+
+| Variable | Default | Descripción |
+|---|---|---|
+| `AUTH_ACCESS_TOKEN_EXPIRE_MINUTES` | 15 | Expiración del access token |
+| `AUTH_REFRESH_TOKEN_EXPIRE_DAYS` | 7 | Expiración del refresh token |
+| `AUTH_COOKIE_SECURE` | `false` | `true` en producción (HTTPS) |
+| `AUTH_COOKIE_SAMESITE` | `lax` | `none` requiere `AUTH_COOKIE_SECURE=true` |
+| `AUTH_COOKIE_DOMAIN` | _(vacío)_ | Dominio de la cookie (ej. `.onrender.com`) |
+| `AUTH_REFRESH_COOKIE_PATH` | `/api/v2/auth` | Path de la cookie de refresh |
+| `AUTH_ACCESS_COOKIE_PATH` | `/` | Path de la cookie de access |
 
 ### Usuarios v1 y v2
 
