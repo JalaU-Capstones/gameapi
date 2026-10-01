@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help install dev run test test-cov lint format typecheck clean docker-up docker-down docker-logs docker-reset test-clean migrate migrate-create pre-commit pre-commit-install
+.PHONY: help install dev run test test-cov lint format typecheck clean docker-up docker-down docker-logs docker-reset test-clean migrate migrate-create pre-commit pre-commit-install openapi-export openapi-check asyncapi-validate contracts-check
 
 help:
 	@echo "Comandos disponibles:"
@@ -11,6 +11,10 @@ help:
 	@echo "  make lint        Analiza el código con ruff"
 	@echo "  make format      Formatea el código con ruff"
 	@echo "  make typecheck   Verifica tipos con mypy"
+	@echo "  make openapi-export    Exporta el OpenAPI a .docs/contracts/openapi/openapi.json"
+	@echo "  make openapi-check     Verifica que el OpenAPI commiteado esté sincronizado"
+	@echo "  make asyncapi-validate Valida el contrato AsyncAPI"
+	@echo "  make contracts-check   Verifica ambos contratos"
 	@echo "  make clean       Limpia cachés y artefactos"
 	@echo "  make docker-up   Levanta PostgreSQL y la API con docker-compose"
 	@echo "  make docker-down Detiene los contenedores"
@@ -68,6 +72,30 @@ pre-commit:
 
 pre-commit-install:
 	uv run pre-commit install
+
+openapi-export:
+	uv run python scripts/export_openapi.py
+
+openapi-check:
+	uv run python scripts/export_openapi.py
+	@if ! git diff --quiet .docs/contracts/openapi/openapi.json; then \
+		echo "ERROR: openapi.json is out of date. Run 'make openapi-export' and commit the result."; \
+		git diff .docs/contracts/openapi/openapi.json; \
+		exit 1; \
+	fi
+	@echo "openapi.json is in sync."
+
+asyncapi-validate:
+	@if command -v asyncapi >/dev/null 2>&1; then \
+		asyncapi validate .docs/contracts/asyncapi/asyncapi.json; \
+	elif command -v npx >/dev/null 2>&1; then \
+		npx --yes @asyncapi/cli validate .docs/contracts/asyncapi/asyncapi.json; \
+	else \
+		echo "Skipping AsyncAPI validation: neither 'asyncapi' nor 'npx' available."; \
+	fi
+
+contracts-check: openapi-check asyncapi-validate
+	@echo "Both contracts are valid and up to date."
 
 migrate:
 	uv run alembic upgrade head
