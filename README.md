@@ -6,7 +6,7 @@ REST API para gestión de usuarios y partidas de Tic-Tac-Toe.
 [![codecov](https://codecov.io/gh/JalaU-Capstones/gameapi/branch/main/graph/badge.svg)](https://codecov.io/gh/JalaU-Capstones/gameapi)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg)](https://fastapi.tiangolo.com/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![Tests](https://img.shields.io/badge/tests-193%20passed-success.svg)](#pruebas)
+[![Tests](https://img.shields.io/badge/tests-231%20passed-success.svg)](#pruebas)
 
 **Stack:** Python 3.11+ · FastAPI · PostgreSQL 16 · SQLAlchemy 2.0 async · Pydantic v2 · JWT · WebSocket · uv · Docker
 
@@ -432,6 +432,16 @@ Para el detalle de por qué hay dos colecciones, el flujo recomendado y la soluc
 
 ---
 
+## Contratos de API
+
+Los contratos formales de la API — OpenAPI para REST y AsyncAPI para WebSocket — viven en el repositorio bajo `.docs/contracts/`. Son la fuente de verdad para todos los clientes y se validan automáticamente en CI.
+
+- **Contrato REST (v1 + v2):** `.docs/contracts/openapi/openapi.json` — generado desde el código FastAPI.
+- **Contrato WebSocket (v2):** `.docs/contracts/asyncapi/asyncapi.json` — mantenido manualmente.
+- **Política de versionado y mantenimiento:** ver `.docs/contracts/README.md`.
+
+---
+
 ## Pruebas
 
 ```bash
@@ -441,8 +451,8 @@ make test
 Salida esperada:
 
 ```
-193 passed in ~130s
-Required test coverage of 93.0% reached. Total coverage: 93.55%
+231 passed in ~130s
+Required test coverage of 93.0% reached. Total coverage: 93.85%
 ```
 
 Los tests usan **PostgreSQL** de dos formas según el entorno:
@@ -499,7 +509,7 @@ se orquesta desde `services/game_engine_service.py` (persistencia + broadcast).
 
 **Umbral mínimo:** 93% (configurado en `pyproject.toml` → `[tool.coverage.report] fail_under`).
 
-**Cobertura actual:** 93.55% (1,411 instrucciones y 310 ramas; reporte medido con `coverage report --precision=2`).
+**Cobertura actual:** 93.85% (reporte medido con `coverage report --precision=2`).
 
 | Archivo                                  | Tests | Qué cubre                                                                   |
 |------------------------------------------|-------|-----------------------------------------------------------------------------|
