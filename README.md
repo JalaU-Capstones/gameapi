@@ -218,6 +218,7 @@ El login tradicional sigue devolviendo el access token en el body. Se puede usar
 
 | Método | Ruta | Auth | Descripción |
 |--------|------|------|-------------|
+| `POST` | `/api/v2/auth/register` | ❌ | Registro + auto-login, setea cookies. |
 | `POST` | `/api/v2/auth/login` | ❌ | Login: setea cookies + devuelve token. |
 | `POST` | `/api/v2/auth/refresh` | 🔄 | Rota el refresh token y emite nuevo access. |
 | `POST` | `/api/v2/auth/logout` | 🔄 | Revoca refresh token y limpia cookies. |
@@ -237,39 +238,56 @@ El login tradicional sigue devolviendo el access token en el body. Se puede usar
 
 ### Usuarios v1 y v2
 
-| Método   | Ruta                    | Auth | Descripción                     |
-|----------|-------------------------|------|---------------------------------|
-| `POST`   | `/api/v1/users`         | ❌   | Registrar usuario               |
-| `GET`    | `/api/v1/users`         | ❌   | Listar usuarios                 |
-| `GET`    | `/api/v1/users/{id}`    | ❌   | Obtener un usuario              |
-| `PUT`    | `/api/v1/users/{id}`    | ✅   | Actualizar **tu propia** cuenta |
-| `DELETE` | `/api/v1/users/{id}`    | ✅   | Eliminar **tu propia** cuenta   |
-| `POST`   | `/api/v1/users/login`   | ❌   | Login (devuelve JWT)            |
-| `POST`   | `/api/v2/users`         | ❌   | Mismo contrato v2              |
-| `GET`    | `/api/v2/users`         | ❌   | Mismo contrato v2              |
-| `GET`    | `/api/v2/users/{id}`    | ❌   | Mismo contrato v2              |
-| `PUT`    | `/api/v2/users/{id}`    | ✅   | Mismo contrato v2              |
-| `DELETE` | `/api/v2/users/{id}`    | ✅   | Mismo contrato v2              |
-| `POST`   | `/api/v2/users/login`   | ❌   | Mismo contrato v2              |
+| Versión | Método | Ruta | Auth | Descripción |
+|---------|--------|------|------|-------------|
+| v1 | `POST` | `/api/v1/users` | ❌ | Registrar usuario |
+| v1 | `GET` | `/api/v1/users` | ✅ | Listar usuarios (requirió endurecimiento de seguridad) |
+| v1 | `GET` | `/api/v1/users/{id}` | ✅ | Obtener un usuario por id |
+| v1 | `PUT` | `/api/v1/users/{id}` | ✅ | Actualizar **tu propia** cuenta |
+| v1 | `DELETE` | `/api/v1/users/{id}` | ✅ | Eliminar **tu propia** cuenta |
+| v1 | `POST` | `/api/v1/users/login` | ❌ | Login (devuelve JWT) |
+| v2 | `GET` | `/api/v2/users/{id}` | ✅ | Obtener un usuario por id |
+| v2 | `PUT` | `/api/v2/users/{id}` | ✅ | Actualizar **tu propia** cuenta |
+| v2 | `DELETE` | `/api/v2/users/{id}` | ✅ | Eliminar **tu propia** cuenta |
+
+> `POST /api/v2/users`, `POST /api/v2/users/login` y `GET /api/v2/users` fueron eliminados porque ahora la identidad se maneja bajo `/api/v2/auth/*` y la privacidad de usuarios ya no se expone sin autenticación.
 
 ### Gameplays v1 y v2
 
-| Método   | Ruta                             | Auth | Descripción                      |
-|----------|----------------------------------|------|----------------------------------|
-| `GET`    | `/api/v1/gameplays`              | ❌   | Listar todas las partidas        |
-| `GET`    | `/api/v1/gameplays/my-gameplays` | ✅   | Partidas del usuario autenticado |
-| `GET`    | `/api/v1/gameplays/player/{id}`  | ❌   | Partidas de un jugador           |
-| `GET`    | `/api/v1/gameplays/{id}`         | ❌   | Obtener una partida              |
-| `POST`   | `/api/v1/gameplays`              | ✅   | Crear partida (host = tú)        |
-| `PUT`    | `/api/v1/gameplays/{id}`         | ✅   | Actualizar (solo participantes)  |
-| `DELETE` | `/api/v1/gameplays/{id}`         | ✅   | Eliminar (solo host)             |
-| `GET`    | `/api/v2/gameplays`              | ❌   | Mismo contrato v2                |
-| `GET`    | `/api/v2/gameplays/my-gameplays` | ✅   | Mismo contrato v2                |
-| `GET`    | `/api/v2/gameplays/player/{id}`  | ❌   | Mismo contrato v2                |
-| `GET`    | `/api/v2/gameplays/{id}`         | ❌   | Mismo contrato v2                |
-| `POST`   | `/api/v2/gameplays`              | ✅   | Mismo contrato v2                |
-| `PUT`    | `/api/v2/gameplays/{id}`         | ✅   | Mismo contrato v2                |
-| `DELETE` | `/api/v2/gameplays/{id}`         | ✅   | Mismo contrato v2                |
+| Versión | Método | Ruta | Auth | Descripción |
+|---------|--------|------|------|-------------|
+| v1 | `GET` | `/api/v1/gameplays` | ✅ | Listar todas las partidas |
+| v1 | `GET` | `/api/v1/gameplays/my-gameplays` | ✅ | Partidas del usuario autenticado |
+| v1 | `GET` | `/api/v1/gameplays/player/{id}` | ✅ | Partidas de un jugador |
+| v1 | `GET` | `/api/v1/gameplays/{id}` | ✅ | Obtener una partida |
+| v1 | `POST` | `/api/v1/gameplays` | ✅ | Crear partida (host = tú) |
+| v1 | `PUT` | `/api/v1/gameplays/{id}` | ✅ | Actualizar (solo participantes) |
+| v1 | `DELETE` | `/api/v1/gameplays/{id}` | ✅ | Eliminar (solo host) |
+| v2 | `GET` | `/api/v2/gameplays/my-gameplays` | ✅ | Historial del usuario autenticado |
+| v2 | `GET` | `/api/v2/gameplays/{id}` | ✅ | Obtener partida si eres participante |
+
+> Los endpoints REST de creación, movimiento y abandono quedaron eliminados en v2 porque `ws/gameplays` ya cubre el ciclo de vida real de la partida y mantener ambos contratos introducía inconsistencia.
+
+#### Seguridad y cambios de v1
+
+Como parte del endurecimiento de seguridad, v1 ahora requiere autenticación en todos los endpoints que exponen datos de usuarios o gameplays (listar usuarios, obtener usuario por id, listar gameplays, obtener gameplay por id, listar gameplays por jugador). Los paths y las formas de request/response no cambiaron; solo se agregó el requisito de JWT.
+
+#### Filosofía de la API
+
+- `auth` maneja identidad.
+- `users` maneja recursos de usuario.
+- `gameplays` (REST) maneja consultas históricas.
+- `ws/gameplays` maneja el ciclo de vida en tiempo real de las partidas.
+- Los endpoints REST de creación/movimiento en v2 fueron eliminados porque el WebSocket ya los cubre; mantener ambos era una fuente de inconsistencias.
+
+### Logs v2
+
+Los logs se pueden consultar a través de dos endpoints bajo `/api/v2/logs`, ambos protegidos con JWT:
+
+| Método | Ruta | Auth | Descripción |
+|--------|------|------|-------------|
+| `GET` | `/api/v2/logs/me` | ✅ | Logs del usuario autenticado. |
+| `GET` | `/api/v2/logs` | ✅ | Logs globales. Requiere administrador. |
 
 ### Logs v2
 

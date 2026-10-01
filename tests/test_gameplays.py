@@ -136,7 +136,7 @@ async def test_list_gameplays(
     await _create_gameplay(client, auth_headers, registered_user["id"])
     await _create_gameplay(client, auth_headers, registered_user["id"])
 
-    response = await client.get("/api/v1/gameplays")
+    response = await client.get("/api/v1/gameplays", headers=auth_headers)
     assert response.status_code == 200
     assert len(response.json()) == 2
 
@@ -148,15 +148,19 @@ async def test_list_gameplays_by_player(
 ) -> None:
     await _create_gameplay(client, auth_headers, registered_user["id"])
 
-    response = await client.get(f"/api/v1/gameplays/player/{registered_user['id']}")
+    response = await client.get(
+        f"/api/v1/gameplays/player/{registered_user['id']}",
+        headers=auth_headers,
+    )
     assert response.status_code == 200
     assert len(response.json()) == 1
 
 
 async def test_list_gameplays_by_player_with_invalid_uuid_returns_empty(
     client: AsyncClient,
+    auth_headers: dict[str, str],
 ) -> None:
-    response = await client.get("/api/v1/gameplays/player/not-a-uuid")
+    response = await client.get("/api/v1/gameplays/player/not-a-uuid", headers=auth_headers)
     assert response.status_code == 200
     assert response.json() == []
 
@@ -168,14 +172,153 @@ async def test_get_gameplay_by_id(
 ) -> None:
     gameplay = await _create_gameplay(client, auth_headers, registered_user["id"])
 
-    response = await client.get(f"/api/v1/gameplays/{gameplay['id']}")
+    response = await client.get(f"/api/v1/gameplays/{gameplay['id']}", headers=auth_headers)
     assert response.status_code == 200
     assert response.json()["id"] == gameplay["id"]
 
 
-async def test_get_gameplay_not_found(client: AsyncClient) -> None:
-    response = await client.get("/api/v1/gameplays/00000000-0000-0000-0000-000000000000")
+async def test_get_gameplay_not_found(
+    client: AsyncClient,
+    auth_headers: dict[str, str],
+) -> None:
+    response = await client.get(
+        "/api/v1/gameplays/00000000-0000-0000-0000-000000000000",
+        headers=auth_headers,
+    )
     assert response.status_code == 404
+
+
+async def test_v2_get_gameplay_by_stranger_returns_403(
+    client: AsyncClient,
+    registered_user_a: dict,
+    registered_user_b: dict,
+    auth_token_a: str,
+    auth_token_b: str,
+) -> None:
+    payload = {
+        "currentPositions": VALID_BOARD,
+        "hostPlayer": registered_user_a["id"],
+        "guestPlayer": registered_user_b["id"],
+        "playerTurn": registered_user_a["id"],
+    }
+    create_response = await client.post(
+        "/api/v1/gameplays",
+        json=payload,
+        headers={"Authorization": f"Bearer {auth_token_a}"},
+    )
+    assert create_response.status_code == 201, create_response.text
+    gameplay_id = create_response.json()["id"]
+
+    stranger = await client.post(
+        "/api/v1/users",
+        json={"name": "Stranger", "email": "stranger@example.com", "password": "password123"},
+    )
+    assert stranger.status_code == 201
+    stranger_login = await client.post(
+        "/api/v1/users/login",
+        json={"email": "stranger@example.com", "password": "password123"},
+    )
+    stranger_headers = {"Authorization": f"Bearer {stranger_login.json()['token']}"}
+
+    response = await client.get(f"/api/v2/gameplays/{gameplay_id}", headers=stranger_headers)
+    assert response.status_code == 403, response.text
+
+
+async def test_v2_get_gameplay_by_participant_returns_200(
+    client: AsyncClient,
+    registered_user_a: dict,
+    registered_user_b: dict,
+    auth_token_a: str,
+) -> None:
+    gameplay = await client.post(
+        "/api/v1/gameplays",
+        json={
+            "currentPositions": VALID_BOARD,
+            "hostPlayer": registered_user_a["id"],
+            "guestPlayer": registered_user_b["id"],
+            "playerTurn": registered_user_a["id"],
+        },
+        headers={"Authorization": f"Bearer {auth_token_a}"},
+    )
+    assert gameplay.status_code == 201, gameplay.text
+
+    response = await client.get(
+        f"/api/v2/gameplays/{gameplay.json()['id']}",
+        headers={"Authorization": f"Bearer {auth_token_a}"},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["id"] == gameplay.json()["id"]
+
+
+async def test_v2_my_gameplays_only_returns_own(
+    client: AsyncClient,
+    registered_user_a: dict,
+    registered_user_b: dict,
+    auth_token_a: str,
+    auth_token_b: str,
+) -> None:
+    first = await client.post(
+        "/api/v1/gameplays",
+        json={
+            "currentPositions": VALID_BOARD,
+            "hostPlayer": registered_user_a["id"],
+            "playerTurn": registered_user_a["id"],
+        },
+        headers={"Authorization": f"Bearer {auth_token_a}"},
+    )
+    second = await client.post(
+        "/api/v1/gameplays",
+        json={
+            "currentPositions": VALID_BOARD,
+            "hostPlayer": registered_user_b["id"],
+            "guestPlayer": registered_user_a["id"],
+            "playerTurn": registered_user_b["id"],
+        },
+        headers={"Authorization": f"Bearer {auth_token_b}"},
+    )
+    assert first.status_code == 201
+    assert second.status_code == 201
+
+    response = await client.get(
+        "/api/v2/gameplays/my-gameplays",
+        headers={"Authorization": f"Bearer {auth_token_a}"},
+    )
+    assert response.status_code == 200, response.text
+    ids = {item["id"] for item in response.json()}
+    assert first.json()["id"] in ids
+    assert second.json()["id"] in ids
+    assert len(ids) == 2
+
+
+async def test_v2_gameplay_access_rejects_non_participants_and_missing_records(
+    client: AsyncClient,
+    registered_user_a: dict,
+    registered_user_b: dict,
+    auth_token_a: str,
+    auth_token_b: str,
+) -> None:
+    gameplay = await client.post(
+        "/api/v1/gameplays",
+        json={
+            "currentPositions": VALID_BOARD,
+            "hostPlayer": registered_user_a["id"],
+            "playerTurn": registered_user_a["id"],
+        },
+        headers={"Authorization": f"Bearer {auth_token_a}"},
+    )
+    assert gameplay.status_code == 201
+
+    stranger = await client.get(
+        f"/api/v2/gameplays/{gameplay.json()['id']}",
+        headers={"Authorization": f"Bearer {auth_token_b}"},
+    )
+    assert stranger.status_code == 403
+
+    missing = await client.get(
+        "/api/v2/gameplays/00000000-0000-0000-0000-000000000000",
+        headers={"Authorization": f"Bearer {auth_token_a}"},
+    )
+    assert missing.status_code == 404
 
 
 async def test_update_gameplay(
@@ -193,7 +336,7 @@ async def test_update_gameplay(
     )
     assert response.status_code == 204
 
-    fetched = await client.get(f"/api/v1/gameplays/{gameplay['id']}")
+    fetched = await client.get(f"/api/v1/gameplays/{gameplay['id']}", headers=auth_headers)
     assert fetched.json()["currentPositions"] == updated_board
 
 
@@ -211,7 +354,7 @@ async def test_update_gameplay_with_match_result(
     )
     assert response.status_code == 204
 
-    fetched = await client.get(f"/api/v1/gameplays/{gameplay['id']}")
+    fetched = await client.get(f"/api/v1/gameplays/{gameplay['id']}", headers=auth_headers)
     assert fetched.json()["matchResult"] == '{"winner": "X"}'
 
 
@@ -234,7 +377,7 @@ async def test_update_gameplay_with_new_guest_player(
     )
     assert response.status_code == 204
 
-    fetched = await client.get(f"/api/v1/gameplays/{gameplay['id']}")
+    fetched = await client.get(f"/api/v1/gameplays/{gameplay['id']}", headers=auth_headers)
     assert fetched.json()["guestPlayer"] == guest.json()["id"]
 
 
@@ -286,7 +429,7 @@ async def test_update_gameplay_with_new_player_turn(
     )
     assert response.status_code == 204
 
-    fetched = await client.get(f"/api/v1/gameplays/{gameplay['id']}")
+    fetched = await client.get(f"/api/v1/gameplays/{gameplay['id']}", headers=auth_headers)
     assert fetched.json()["playerTurn"] == other.json()["id"]
 
 
@@ -377,5 +520,5 @@ async def test_delete_gameplay_by_host(
     response = await client.delete(f"/api/v1/gameplays/{gameplay['id']}", headers=auth_headers)
     assert response.status_code == 204
 
-    fetched = await client.get(f"/api/v1/gameplays/{gameplay['id']}")
+    fetched = await client.get(f"/api/v1/gameplays/{gameplay['id']}", headers=auth_headers)
     assert fetched.status_code == 404

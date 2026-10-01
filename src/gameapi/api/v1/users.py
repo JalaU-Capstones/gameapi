@@ -1,4 +1,9 @@
-"""v1 API — Frozen. Mirrors the C# legacy migration 1:1. Do not modify."""
+"""v1 API — Frozen contract.
+
+Paths, request/response shapes, and status codes are stable. The only
+allowed evolution is tightening authentication; this is documented as a
+deliberate security hardening.
+"""
 
 import logging
 
@@ -60,7 +65,7 @@ async def create_user(
     response_model=list[UserResponse],
     summary="List all users",
 )
-async def list_users(service: UserServiceDep) -> list[UserResponse]:
+async def list_users(_current_user: CurrentUser, service: UserServiceDep) -> list[UserResponse]:
     users = await service.list_all()
     return [_to_response(u) for u in users]
 
@@ -70,7 +75,11 @@ async def list_users(service: UserServiceDep) -> list[UserResponse]:
     response_model=UserResponse,
     summary="Get a user by id",
 )
-async def get_user(user_id: str, service: UserServiceDep) -> UserResponse:
+async def get_user(
+    user_id: str,
+    _current_user: CurrentUser,
+    service: UserServiceDep,
+) -> UserResponse:
     user = await service.get_by_id(user_id)
     if user is None:
         raise HTTPException(
