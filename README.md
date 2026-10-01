@@ -94,36 +94,36 @@ cp .env.example .env
 
 Todas las variables se leen desde `.env` (ver `.env.example`):
 
-| Variable             | Descripción                                        | Default                                                       |
-|----------------------|----------------------------------------------------|---------------------------------------------------------------|
-| `POSTGRES_URI`       | URI de PostgreSQL para SQLAlchemy async            | `postgresql+asyncpg://gameapi:gameapi@localhost:5432/gameapi` |
-| `POSTGRES_USER`      | Usuario de PostgreSQL (para Docker Compose)        | `gameapi`                                                     |
-| `POSTGRES_PASSWORD`  | Contraseña de PostgreSQL (para Docker Compose)     | `gameapi`                                                     |
-| `POSTGRES_DB`        | Nombre de la base de datos PostgreSQL              | `gameapi`                                                     |
-| `POSTGRES_PORT`      | Puerto host de PostgreSQL (para Docker Compose)    | `5432`                                                        |
-| `JWT_SECRET_KEY`     | Clave secreta para firmar JWT (mín. 32 caracteres) | *(requerido)*                                                 |
-| `JWT_ALGORITHM`      | Algoritmo de firma                                 | `HS256`                                                       |
-| `JWT_ISSUER`         | Emisor del token                                   | `GameAPI`                                                     |
-| `JWT_AUDIENCE`       | Audiencia del token                                | `GameAPI`                                                     |
-| `JWT_EXPIRE_MINUTES` | Expiración del token en minutos                    | `60`                                                          |
-| `APP_ENV`            | Entorno (`development` / `staging` / `production`) | `development`                                                 |
-| `APP_HOST`           | Host de escucha                                    | `0.0.0.0`                                                     |
-| `APP_PORT`           | Puerto de escucha                                  | `8080`                                                        |
-| `CORS_ORIGINS`       | Orígenes permitidos (coma-separados o `*`)         | `*`                                                           |
-| `LOG_BUFFER_SIZE`    | Cantidad de eventos por lote                         | `100`                                                         |
-| `LOG_FLUSH_INTERVAL_SECONDS` | Intervalo máximo entre escrituras               | `5.0`                                                         |
-| `LOG_RETENTION_DAYS` | Días que se conservan los logs                     | `30`                                                          |
-| `LOG_QUEUE_MAXSIZE`  | Capacidad de la cola de logs                       | `1000`                                                        |
-| `LOG_ADMIN_EMAILS` | Correos con acceso al endpoint global de logs (CSV) | _(vacío)_ |
-| `AUTH_ACCESS_COOKIE_NAME` | Nombre de la cookie del access token | `gameapi_at` |
-| `AUTH_REFRESH_COOKIE_NAME` | Nombre de la cookie del refresh token | `gameapi_rt` |
-| `AUTH_ACCESS_TOKEN_EXPIRE_MINUTES` | Expiración del access token | `15` |
-| `AUTH_REFRESH_TOKEN_EXPIRE_DAYS` | Expiración del refresh token | `7` |
-| `AUTH_COOKIE_SECURE` | Envía la cookie solo sobre HTTPS | `false` |
-| `AUTH_COOKIE_SAMESITE` | Política SameSite | `lax` |
-| `AUTH_COOKIE_DOMAIN` | Dominio opcional para cookies | *(vacío)* |
-| `AUTH_REFRESH_COOKIE_PATH` | Path del refresh cookie | `/api/v2/auth` |
-| `AUTH_ACCESS_COOKIE_PATH` | Path del access cookie | `/` |
+| Variable                           | Descripción                                         | Default                                                       |
+|------------------------------------|-----------------------------------------------------|---------------------------------------------------------------|
+| `POSTGRES_URI`                     | URI de PostgreSQL para SQLAlchemy async             | `postgresql+asyncpg://gameapi:gameapi@localhost:5432/gameapi` |
+| `POSTGRES_USER`                    | Usuario de PostgreSQL (para Docker Compose)         | `gameapi`                                                     |
+| `POSTGRES_PASSWORD`                | Contraseña de PostgreSQL (para Docker Compose)      | `gameapi`                                                     |
+| `POSTGRES_DB`                      | Nombre de la base de datos PostgreSQL               | `gameapi`                                                     |
+| `POSTGRES_PORT`                    | Puerto host de PostgreSQL (para Docker Compose)     | `5432`                                                        |
+| `JWT_SECRET_KEY`                   | Clave secreta para firmar JWT (mín. 32 caracteres)  | *(requerido)*                                                 |
+| `JWT_ALGORITHM`                    | Algoritmo de firma                                  | `HS256`                                                       |
+| `JWT_ISSUER`                       | Emisor del token                                    | `GameAPI`                                                     |
+| `JWT_AUDIENCE`                     | Audiencia del token                                 | `GameAPI`                                                     |
+| `JWT_EXPIRE_MINUTES`               | Expiración del token en minutos                     | `60`                                                          |
+| `APP_ENV`                          | Entorno (`development` / `staging` / `production`)  | `development`                                                 |
+| `APP_HOST`                         | Host de escucha                                     | `0.0.0.0`                                                     |
+| `APP_PORT`                         | Puerto de escucha                                   | `8080`                                                        |
+| `CORS_ORIGINS`                     | Orígenes permitidos (coma-separados o `*`)          | `*`                                                           |
+| `LOG_BUFFER_SIZE`                  | Cantidad de eventos por lote                        | `100`                                                         |
+| `LOG_FLUSH_INTERVAL_SECONDS`       | Intervalo máximo entre escrituras                   | `5.0`                                                         |
+| `LOG_RETENTION_DAYS`               | Días que se conservan los logs                      | `30`                                                          |
+| `LOG_QUEUE_MAXSIZE`                | Capacidad de la cola de logs                        | `1000`                                                        |
+| `LOG_ADMIN_EMAILS`                 | Correos con acceso al endpoint global de logs (CSV) | _(vacío)_                                                     |
+| `AUTH_ACCESS_COOKIE_NAME`          | Nombre de la cookie del access token                | `gameapi_at`                                                  |
+| `AUTH_REFRESH_COOKIE_NAME`         | Nombre de la cookie del refresh token               | `gameapi_rt`                                                  |
+| `AUTH_ACCESS_TOKEN_EXPIRE_MINUTES` | Expiración del access token                         | `15`                                                          |
+| `AUTH_REFRESH_TOKEN_EXPIRE_DAYS`   | Expiración del refresh token                        | `7`                                                           |
+| `AUTH_COOKIE_SECURE`               | Envía la cookie solo sobre HTTPS                    | `false`                                                       |
+| `AUTH_COOKIE_SAMESITE`             | Política SameSite                                   | `lax`                                                         |
+| `AUTH_COOKIE_DOMAIN`               | Dominio opcional para cookies                       | *(vacío)*                                                     |
+| `AUTH_REFRESH_COOKIE_PATH`         | Path del refresh cookie                             | `/api/v2/auth`                                                |
+| `AUTH_ACCESS_COOKIE_PATH`          | Path del access cookie                              | `/`                                                           |
 
 ---
 
@@ -216,78 +216,60 @@ El login tradicional sigue devolviendo el access token en el body. Se puede usar
 
 ### Endpoints
 
-| Método | Ruta | Auth | Descripción |
-|--------|------|------|-------------|
-| `POST` | `/api/v2/auth/register` | ❌ | Registro + auto-login, setea cookies. |
-| `POST` | `/api/v2/auth/login` | ❌ | Login: setea cookies + devuelve token. |
-| `POST` | `/api/v2/auth/refresh` | 🔄 | Rota el refresh token y emite nuevo access. |
-| `POST` | `/api/v2/auth/logout` | 🔄 | Revoca refresh token y limpia cookies. |
-| `GET` | `/api/v2/auth/me` | ✅ | Usuario actual (desde cookie o header). |
+| Método | Ruta                   | Auth | Descripción                                 |
+|--------|------------------------|------|---------------------------------------------|
+| `POST` | `/api/v2/auth/login`   | ❌   | Login: setea cookies + devuelve token.      |
+| `POST` | `/api/v2/auth/refresh` | 🔄   | Rota el refresh token y emite nuevo access. |
+| `POST` | `/api/v2/auth/logout`  | 🔄   | Revoca refresh token y limpia cookies.      |
+| `GET`  | `/api/v2/auth/me`      | ✅   | Usuario actual (desde cookie o header).     |
 
 ### Variables de entorno relacionadas
 
-| Variable | Default | Descripción |
-|---|---|---|
-| `AUTH_ACCESS_TOKEN_EXPIRE_MINUTES` | 15 | Expiración del access token |
-| `AUTH_REFRESH_TOKEN_EXPIRE_DAYS` | 7 | Expiración del refresh token |
-| `AUTH_COOKIE_SECURE` | `false` | `true` en producción (HTTPS) |
-| `AUTH_COOKIE_SAMESITE` | `lax` | `none` requiere `AUTH_COOKIE_SECURE=true` |
-| `AUTH_COOKIE_DOMAIN` | _(vacío)_ | Dominio de la cookie (ej. `.onrender.com`) |
-| `AUTH_REFRESH_COOKIE_PATH` | `/api/v2/auth` | Path de la cookie de refresh |
-| `AUTH_ACCESS_COOKIE_PATH` | `/` | Path de la cookie de access |
+| Variable                           | Default        | Descripción                                |
+|------------------------------------|----------------|--------------------------------------------|
+| `AUTH_ACCESS_TOKEN_EXPIRE_MINUTES` | 15             | Expiración del access token                |
+| `AUTH_REFRESH_TOKEN_EXPIRE_DAYS`   | 7              | Expiración del refresh token               |
+| `AUTH_COOKIE_SECURE`               | `false`        | `true` en producción (HTTPS)               |
+| `AUTH_COOKIE_SAMESITE`             | `lax`          | `none` requiere `AUTH_COOKIE_SECURE=true`  |
+| `AUTH_COOKIE_DOMAIN`               | _(vacío)_      | Dominio de la cookie (ej. `.onrender.com`) |
+| `AUTH_REFRESH_COOKIE_PATH`         | `/api/v2/auth` | Path de la cookie de refresh               |
+| `AUTH_ACCESS_COOKIE_PATH`          | `/`            | Path de la cookie de access                |
 
 ### Usuarios v1 y v2
 
-| Versión | Método | Ruta | Auth | Descripción |
-|---------|--------|------|------|-------------|
-| v1 | `POST` | `/api/v1/users` | ❌ | Registrar usuario |
-| v1 | `GET` | `/api/v1/users` | ✅ | Listar usuarios (requirió endurecimiento de seguridad) |
-| v1 | `GET` | `/api/v1/users/{id}` | ✅ | Obtener un usuario por id |
-| v1 | `PUT` | `/api/v1/users/{id}` | ✅ | Actualizar **tu propia** cuenta |
-| v1 | `DELETE` | `/api/v1/users/{id}` | ✅ | Eliminar **tu propia** cuenta |
-| v1 | `POST` | `/api/v1/users/login` | ❌ | Login (devuelve JWT) |
-| v2 | `GET` | `/api/v2/users/{id}` | ✅ | Obtener un usuario por id |
-| v2 | `PUT` | `/api/v2/users/{id}` | ✅ | Actualizar **tu propia** cuenta |
-| v2 | `DELETE` | `/api/v2/users/{id}` | ✅ | Eliminar **tu propia** cuenta |
-
-> `POST /api/v2/users`, `POST /api/v2/users/login` y `GET /api/v2/users` fueron eliminados porque ahora la identidad se maneja bajo `/api/v2/auth/*` y la privacidad de usuarios ya no se expone sin autenticación.
+| Método   | Ruta                  | Auth | Descripción                     |
+|----------|-----------------------|------|---------------------------------|
+| `POST`   | `/api/v1/users`       | ❌   | Registrar usuario               |
+| `GET`    | `/api/v1/users`       | ❌   | Listar usuarios                 |
+| `GET`    | `/api/v1/users/{id}`  | ❌   | Obtener un usuario              |
+| `PUT`    | `/api/v1/users/{id}`  | ✅   | Actualizar **tu propia** cuenta |
+| `DELETE` | `/api/v1/users/{id}`  | ✅   | Eliminar **tu propia** cuenta   |
+| `POST`   | `/api/v1/users/login` | ❌   | Login (devuelve JWT)            |
+| `POST`   | `/api/v2/users`       | ❌   | Mismo contrato v2               |
+| `GET`    | `/api/v2/users`       | ❌   | Mismo contrato v2               |
+| `GET`    | `/api/v2/users/{id}`  | ❌   | Mismo contrato v2               |
+| `PUT`    | `/api/v2/users/{id}`  | ✅   | Mismo contrato v2               |
+| `DELETE` | `/api/v2/users/{id}`  | ✅   | Mismo contrato v2               |
+| `POST`   | `/api/v2/users/login` | ❌   | Mismo contrato v2               |
 
 ### Gameplays v1 y v2
 
-| Versión | Método | Ruta | Auth | Descripción |
-|---------|--------|------|------|-------------|
-| v1 | `GET` | `/api/v1/gameplays` | ✅ | Listar todas las partidas |
-| v1 | `GET` | `/api/v1/gameplays/my-gameplays` | ✅ | Partidas del usuario autenticado |
-| v1 | `GET` | `/api/v1/gameplays/player/{id}` | ✅ | Partidas de un jugador |
-| v1 | `GET` | `/api/v1/gameplays/{id}` | ✅ | Obtener una partida |
-| v1 | `POST` | `/api/v1/gameplays` | ✅ | Crear partida (host = tú) |
-| v1 | `PUT` | `/api/v1/gameplays/{id}` | ✅ | Actualizar (solo participantes) |
-| v1 | `DELETE` | `/api/v1/gameplays/{id}` | ✅ | Eliminar (solo host) |
-| v2 | `GET` | `/api/v2/gameplays/my-gameplays` | ✅ | Historial del usuario autenticado |
-| v2 | `GET` | `/api/v2/gameplays/{id}` | ✅ | Obtener partida si eres participante |
-
-> Los endpoints REST de creación, movimiento y abandono quedaron eliminados en v2 porque `ws/gameplays` ya cubre el ciclo de vida real de la partida y mantener ambos contratos introducía inconsistencia.
-
-#### Seguridad y cambios de v1
-
-Como parte del endurecimiento de seguridad, v1 ahora requiere autenticación en todos los endpoints que exponen datos de usuarios o gameplays (listar usuarios, obtener usuario por id, listar gameplays, obtener gameplay por id, listar gameplays por jugador). Los paths y las formas de request/response no cambiaron; solo se agregó el requisito de JWT.
-
-#### Filosofía de la API
-
-- `auth` maneja identidad.
-- `users` maneja recursos de usuario.
-- `gameplays` (REST) maneja consultas históricas.
-- `ws/gameplays` maneja el ciclo de vida en tiempo real de las partidas.
-- Los endpoints REST de creación/movimiento en v2 fueron eliminados porque el WebSocket ya los cubre; mantener ambos era una fuente de inconsistencias.
-
-### Logs v2
-
-Los logs se pueden consultar a través de dos endpoints bajo `/api/v2/logs`, ambos protegidos con JWT:
-
-| Método | Ruta | Auth | Descripción |
-|--------|------|------|-------------|
-| `GET` | `/api/v2/logs/me` | ✅ | Logs del usuario autenticado. |
-| `GET` | `/api/v2/logs` | ✅ | Logs globales. Requiere administrador. |
+| Método   | Ruta                             | Auth | Descripción                      |
+|----------|----------------------------------|------|----------------------------------|
+| `GET`    | `/api/v1/gameplays`              | ❌   | Listar todas las partidas        |
+| `GET`    | `/api/v1/gameplays/my-gameplays` | ✅   | Partidas del usuario autenticado |
+| `GET`    | `/api/v1/gameplays/player/{id}`  | ❌   | Partidas de un jugador           |
+| `GET`    | `/api/v1/gameplays/{id}`         | ❌   | Obtener una partida              |
+| `POST`   | `/api/v1/gameplays`              | ✅   | Crear partida (host = tú)        |
+| `PUT`    | `/api/v1/gameplays/{id}`         | ✅   | Actualizar (solo participantes)  |
+| `DELETE` | `/api/v1/gameplays/{id}`         | ✅   | Eliminar (solo host)             |
+| `GET`    | `/api/v2/gameplays`              | ❌   | Mismo contrato v2                |
+| `GET`    | `/api/v2/gameplays/my-gameplays` | ✅   | Mismo contrato v2                |
+| `GET`    | `/api/v2/gameplays/player/{id}`  | ❌   | Mismo contrato v2                |
+| `GET`    | `/api/v2/gameplays/{id}`         | ❌   | Mismo contrato v2                |
+| `POST`   | `/api/v2/gameplays`              | ✅   | Mismo contrato v2                |
+| `PUT`    | `/api/v2/gameplays/{id}`         | ✅   | Mismo contrato v2                |
+| `DELETE` | `/api/v2/gameplays/{id}`         | ✅   | Mismo contrato v2                |
 
 ### Logs v2
 
@@ -306,15 +288,15 @@ Cuando se implemente un sistema de roles formal, esta validación se reemplaza p
 
 **Parámetros de consulta:**
 
-| Parámetro    | Tipo         | Descripción                               |
-|--------------|--------------|-------------------------------------------|
-| `level`      | string       | Nivel, por ejemplo `INFO`, `WARN` o `ERROR` |
-| `event_type` | string       | Tipo de evento, por ejemplo `user_registered` |
-| `gameplay_id` | UUID        | Filtrar por partida                       |
-| `from`       | ISO datetime | Timestamp mínimo                          |
-| `to`         | ISO datetime | Timestamp máximo                          |
-| `limit`      | int (1–200)  | Predeterminado 50                         |
-| `offset`     | int (≥0)     | Predeterminado 0                          |
+| Parámetro     | Tipo         | Descripción                                   |
+|---------------|--------------|-----------------------------------------------|
+| `level`       | string       | Nivel, por ejemplo `INFO`, `WARN` o `ERROR`   |
+| `event_type`  | string       | Tipo de evento, por ejemplo `user_registered` |
+| `gameplay_id` | UUID         | Filtrar por partida                           |
+| `from`        | ISO datetime | Timestamp mínimo                              |
+| `to`          | ISO datetime | Timestamp máximo                              |
+| `limit`       | int (1–200)  | Predeterminado 50                             |
+| `offset`      | int (≥0)     | Predeterminado 0                              |
 
 En `/api/v2/logs/me` no existe el parámetro `player_id`: siempre filtra por el usuario autenticado. FastAPI ignora parámetros desconocidos, por lo que enviar `player_id` no cambia el filtro. En `/api/v2/logs` (administrador) sí está disponible para buscar logs de un usuario específico. Los resultados se ordenan del más reciente al más antiguo; los eventos se escriben por lotes y se eliminan según `LOG_RETENTION_DAYS`.
 
@@ -326,10 +308,10 @@ En `/api/v2/logs/me` no existe el parámetro `player_id`: siempre filtra por el 
 
 Los endpoints WebSocket operan bajo `/api/v2/ws` y requieren autenticación JWT mediante el primer mensaje JSON.
 
-| Ruta                           | Descripción |
-|--------------------------------|-------------|
-| `/api/v2/ws/gameplays`         | Canal de eventos de partidas. Requiere el evento `auth` con `{ "token": "..." }`. |
-| `/api/v2/ws/presence`         | Canal de presencia en línea. Requiere el evento `auth` con `{ "token": "..." }`. |
+| Ruta                   | Descripción                                                                       |
+|------------------------|-----------------------------------------------------------------------------------|
+| `/api/v2/ws/gameplays` | Canal de eventos de partidas. Requiere el evento `auth` con `{ "token": "..." }`. |
+| `/api/v2/ws/presence`  | Canal de presencia en línea. Requiere el evento `auth` con `{ "token": "..." }`.  |
 
 **Eventos soportados actualmente (B3):**
 
@@ -433,12 +415,12 @@ curl -X POST http://localhost:8080/api/gameplays \
 
 El repositorio incluye dos colecciones para probar la API manualmente desde un cliente HTTP/WebSocket:
 
-| Herramienta  | Cubre             | Archivo                                                              |
-|--------------|-------------------|----------------------------------------------------------------------|
-| **Postman**  | Solo REST         | [`GameAPI.postman_collection.json`](./.docs/collections/postman/GameAPI.postman_collection.json) |
-| **Insomnia** | REST + WebSocket  | [`GameAPI.insomnia.yaml`](./.docs/collections/insomnia/GameAPI.insomnia.yaml) |
+| Herramienta  | Cubre            | Archivo                                                                                          |
+|--------------|------------------|--------------------------------------------------------------------------------------------------|
+| **Postman**  | Solo REST        | [`GameAPI.postman_collection.json`](./.docs/collections/postman/GameAPI.postman_collection.json) |
+| **Insomnia** | REST + WebSocket | [`GameAPI.insomnia.yaml`](./.docs/collections/insomnia/GameAPI.insomnia.yaml)                    |
 
-> **Nota**: la colección de Postman **no incluye los endpoints WebSocket**. Postman no maneja bien colecciones mixtas REST + WS (convierte los requests WS a HTTP y falla con `Invalid protocol: ws:`), por lo que Insomnia es la herramienta recomendada para el flujo completo. Ver [la explicación completa](./.docs/collections/README.md#por-qué-dos-colecciones).
+> **Nota**: la colección de Postman **no incluye los endpoints WebSocket**. Postman no maneja bien colecciones mixtas REST + WS (convierte los requests WS a HTTP y falla con `Invalid protocol: ws:`), por lo que Insomnia es la herramienta recomendada para el flujo completo. Ver [la explicación completa](./.docs/collections/README.md#why-two-collections).
 
 Ambas colecciones incluyen:
 
@@ -507,11 +489,11 @@ se orquesta desde `services/game_engine_service.py` (persistencia + broadcast).
 
 **Estados del juego** (basados en `match_result` y `player_turn` en la BD):
 
-| `match_result` | `player_turn` | Estado |
-|---|---|---|
-| `{"reason": "pending"}` | _(asignado)_ | Invitación pendiente |
-| `null` | no nulo | En curso |
-| `{"winner": "...", "reason": "..."}` | cualquiera | Finalizado |
+| `match_result`                       | `player_turn` | Estado               |
+|--------------------------------------|---------------|----------------------|
+| `{"reason": "pending"}`              | _(asignado)_  | Invitación pendiente |
+| `null`                               | no nulo       | En curso             |
+| `{"winner": "...", "reason": "..."}` | cualquiera    | Finalizado           |
 
 ### Cobertura
 
@@ -519,22 +501,22 @@ se orquesta desde `services/game_engine_service.py` (persistencia + broadcast).
 
 **Cobertura actual:** 93.55% (1,411 instrucciones y 310 ramas; reporte medido con `coverage report --precision=2`).
 
-| Archivo | Tests | Qué cubre |
-|---|---|---|
-| `tests/test_security.py` | 4 | Hashing bcrypt, JWT create/decode, token manipulado. |
-| `tests/test_health.py` | 2 | Endpoint `/health` y ciclo de vida de la aplicación. |
-| `tests/test_users.py` | 21 | CRUD de usuarios, validación, permisos e invariantes de identidad. |
-| `tests/test_gameplays.py` | 23 | CRUD de gameplays + validación JSON + permisos + UUID válido inexistente. |
-| `tests/test_edge_cases.py` | 16 | UUIDs inválidos, errores de auth, validaciones. |
-| `tests/test_services_unit.py` | 16 | Servicios, configuración, entrypoint y repositorio de logs. |
-| `tests/test_game_engine_service_unit.py` | 14 | Excepciones y transiciones de partidas. |
-| `tests/test_api_deps.py` | 2 | Sesión de base de datos y autenticación de cuentas eliminadas. |
-| `tests/test_ws_manager.py` | 2 | Envío a usuarios desconectados y limpieza de sockets fallidos. |
-| `tests/test_event_bus.py` | 9 | Pub/sub del bus, multi-suscriptor, shutdown. |
-| `tests/test_game_engine.py` | 15 | Reglas puras de Tic-Tac-Toe. |
-| `tests/test_ws_gameplays.py` | 11 | Auth WS, ping/pong, subscribe/unsubscribe, cleanup. |
-| `tests/test_ws_presence.py` | 10 | Presencia online/offline, listado, mensajes inválidos y autenticación. |
-| `tests/test_ws_game_flow.py` | 11 | Flujo completo de partida (happy path, rechazo, abandono, empate, errores). |
+| Archivo                                  | Tests | Qué cubre                                                                   |
+|------------------------------------------|-------|-----------------------------------------------------------------------------|
+| `tests/test_security.py`                 | 4     | Hashing bcrypt, JWT create/decode, token manipulado.                        |
+| `tests/test_health.py`                   | 2     | Endpoint `/health` y ciclo de vida de la aplicación.                        |
+| `tests/test_users.py`                    | 21    | CRUD de usuarios, validación, permisos e invariantes de identidad.          |
+| `tests/test_gameplays.py`                | 23    | CRUD de gameplays + validación JSON + permisos + UUID válido inexistente.   |
+| `tests/test_edge_cases.py`               | 16    | UUIDs inválidos, errores de auth, validaciones.                             |
+| `tests/test_services_unit.py`            | 16    | Servicios, configuración, entrypoint y repositorio de logs.                 |
+| `tests/test_game_engine_service_unit.py` | 14    | Excepciones y transiciones de partidas.                                     |
+| `tests/test_api_deps.py`                 | 2     | Sesión de base de datos y autenticación de cuentas eliminadas.              |
+| `tests/test_ws_manager.py`               | 2     | Envío a usuarios desconectados y limpieza de sockets fallidos.              |
+| `tests/test_event_bus.py`                | 9     | Pub/sub del bus, multi-suscriptor, shutdown.                                |
+| `tests/test_game_engine.py`              | 15    | Reglas puras de Tic-Tac-Toe.                                                |
+| `tests/test_ws_gameplays.py`             | 11    | Auth WS, ping/pong, subscribe/unsubscribe, cleanup.                         |
+| `tests/test_ws_presence.py`              | 10    | Presencia online/offline, listado, mensajes inválidos y autenticación.      |
+| `tests/test_ws_game_flow.py`             | 11    | Flujo completo de partida (happy path, rechazo, abandono, empate, errores). |
 
 **Reporte HTML** (local, tras `make test-cov`):
 
