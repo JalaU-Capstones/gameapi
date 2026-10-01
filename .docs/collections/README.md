@@ -8,7 +8,7 @@ This directory contains client collections for manually testing the GameAPI with
 - [Postman — REST only](#postman--rest-only)
 - [Insomnia — REST + WebSocket](#insomnia--rest--websocket)
 - [Directory contents](#directory-contents)
-- [Recommended flow](#recommended-flow)
+- [Recommended first-time flow](#recommended-first-time-flow)
 - [Syntax differences between Postman and Insomnia](#syntax-differences-between-postman-and-insomnia)
 - [Troubleshooting](#troubleshooting)
 - [References](#references)
@@ -131,14 +131,15 @@ For these reasons, Insomnia is the reference tool for testing the **entire** API
 
 ---
 
-## Recommended flow
+## Recommended first-time flow
 
-The execution order is the same for either tool:
+The execution order is the same for either tool, with the v2 flow recommended for new clients:
 
-1. **Users → Register user** — creates the account and stores `userId` and `testEmail`.
-2. **Users → Login** — obtains a JWT and stores `token` and `userId`.
-3. **Gameplays → Create gameplay** — creates a gameplay and stores `gameplayId`.
-4. Continue with any REST endpoint.
+1. **Auth (v2) → Register** — creates the user, logs them in, and sets the HttpOnly cookies.
+2. **Auth (v2) → Me** — verifies the session and confirms the authenticated user.
+3. **Auth (v2) → Refresh / Logout** — rotate or revoke the session as needed.
+4. **Users (v2) / Gameplays (v2)** — access user and gameplay resources through the explicit v2 contract.
+5. **WebSocket (v2)** — use the realtime gameplay channel for create/move/leave operations.
 
 > Response scripts populate the variables. If you run requests out of order, `{{userId}}` or `{{token}}` may be empty.
 
