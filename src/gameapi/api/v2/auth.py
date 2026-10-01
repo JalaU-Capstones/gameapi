@@ -5,8 +5,12 @@ from fastapi import APIRouter, Cookie, HTTPException, Response, status
 from gameapi.api.deps import AuthServiceDep, CurrentUser
 from gameapi.core.config import settings
 from gameapi.schemas.auth import LoginRequest, LoginResponse, RefreshResponse
-from gameapi.schemas.user import UserResponse
-from gameapi.services.exceptions import InvalidCredentialsError, InvalidRefreshTokenError
+from gameapi.schemas.user import UserCreate, UserResponse
+from gameapi.services.exceptions import (
+    EmailAlreadyExistsError,
+    InvalidCredentialsError,
+    InvalidRefreshTokenError,
+)
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -75,6 +79,30 @@ async def login(
         access_token=access_token,
         token_type="bearer",
         user=user,
+    )
+
+
+@router.post(
+    "/register",
+    response_model=LoginResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Register a new user and log them in",
+)
+async def register(
+    payload: UserCreate,
+    service: AuthServiceDep,
+    response: Response,
+) -> LoginResponse:
+    try:
+        access_token, refresh_token, user = await service.register(payload)
+    except EmailAlreadyExistsError as exc:
+        raise HTTPException(409, "Email is currently registered") from exc
+
+    _set_auth_cookies(response, access_token, refresh_token)
+    return LoginResponse(
+        access_token=access_token,
+        token_type="bearer",
+        user=UserResponse.model_validate(user, from_attributes=True),
     )
 
 
