@@ -1,4 +1,9 @@
-"""v1 API — Frozen. Mirrors the C# legacy migration 1:1. Do not modify."""
+"""v1 API — Frozen contract.
+
+Paths, request/response shapes, and status codes are stable. The only
+allowed evolution is tightening authentication; this is documented as a
+deliberate security hardening.
+"""
 
 from fastapi import APIRouter, HTTPException, Response, status
 
@@ -18,7 +23,10 @@ def _to_response(gameplay: GameplayResponse) -> GameplayResponse:
     response_model=list[GameplayResponse],
     summary="List all gameplays",
 )
-async def list_gameplays(service: GameplayServiceDep) -> list[GameplayResponse]:
+async def list_gameplays(
+    _current_user: CurrentUser,
+    service: GameplayServiceDep,
+) -> list[GameplayResponse]:
     gameplays = await service.list_all()
     return [_to_response(g) for g in gameplays]
 
@@ -45,6 +53,7 @@ async def list_my_gameplays(
 )
 async def list_gameplays_by_player(
     player_id: str,
+    _current_user: CurrentUser,
     service: GameplayServiceDep,
 ) -> list[GameplayResponse]:
     gameplays = await service.list_by_player(player_id)
@@ -58,6 +67,7 @@ async def list_gameplays_by_player(
 )
 async def get_gameplay(
     gameplay_id: str,
+    _current_user: CurrentUser,
     service: GameplayServiceDep,
 ) -> GameplayResponse:
     gameplay = await service.get_by_id(gameplay_id)
