@@ -8,7 +8,7 @@ This directory contains client collections for manually testing the GameAPI with
 - [Postman — REST only](#postman--rest-only)
 - [Insomnia — REST + WebSocket](#insomnia--rest--websocket)
 - [Directory contents](#directory-contents)
-- [Recommended first-time flow](#recommended-first-time-flow)
+- [Recommended flow](#recommended-flow)
 - [Syntax differences between Postman and Insomnia](#syntax-differences-between-postman-and-insomnia)
 - [Troubleshooting](#troubleshooting)
 - [References](#references)
@@ -19,10 +19,10 @@ This directory contains client collections for manually testing the GameAPI with
 
 The API exposes two endpoint families — REST (`/api/v1/*`) and WebSocket (`/api/v2/ws/*`) — but **neither tool covers both equally well**:
 
-| Tool | REST | WebSocket | Role in this project |
-|------|------|-----------|----------------------|
-| **Postman** | Excellent | Problematic | Used for **REST only** |
-| **Insomnia** | Excellent | Native | Used for **REST + WebSocket** |
+| Tool         | REST      | WebSocket   | Role in this project          |
+|--------------|-----------|-------------|-------------------------------|
+| **Postman**  | Excellent | Problematic | Used for **REST only**        |
+| **Insomnia** | Excellent | Native      | Used for **REST + WebSocket** |
 
 ### The problem with WebSocket in Postman
 
@@ -73,14 +73,14 @@ For these reasons, Insomnia is the reference tool for testing the **entire** API
 
 **Variables** (defined in the collection and updated automatically by scripts):
 
-| Variable | Description | Set by |
-|----------|-------------|--------|
-| `baseUrl` | Host and port (no scheme) | User |
-| `token` | JWT for authenticated endpoints | **Login** script |
-| `userId` | Current user's UUID | **Register / Login** script |
-| `gameplayId` | UUID of the most recently created gameplay | **Create gameplay** script |
-| `testEmail` | Email used for login | User |
-| `testPassword` | Password used for login | User |
+| Variable       | Description                                | Set by                      |
+|----------------|--------------------------------------------|-----------------------------|
+| `baseUrl`      | Host and port (no scheme)                  | User                        |
+| `token`        | JWT for authenticated endpoints            | **Login** script            |
+| `userId`       | Current user's UUID                        | **Register / Login** script |
+| `gameplayId`   | UUID of the most recently created gameplay | **Create gameplay** script  |
+| `testEmail`    | Email used for login                       | User                        |
+| `testPassword` | Password used for login                    | User                        |
 
 **Every request has full documentation** in Postman's **Documentation** panel (document icon in the right panel). The **Users** and **Gameplays** folders also include general documentation.
 
@@ -105,16 +105,16 @@ For these reasons, Insomnia is the reference tool for testing the **entire** API
 
 **`Local` environment variables:**
 
-| Variable | Description | Set by |
-|----------|-------------|--------|
-| `baseUrl` | Host and port (no scheme) | User |
-| `token` | JWT for authenticated endpoints and WebSockets | **Login** script |
-| `userId` | Current user's UUID | **Register / Login** script |
-| `gameplayId` | UUID of the most recently created gameplay | **Create gameplay** script |
-| `testEmail` | Email used for login | User |
-| `testPassword` | Password used for login | User |
-| `access_token` | Access token returned by v2 login | **Login (v2)** script |
-| `refresh_token` | Refresh token captured from the v2 login cookie | **Login (v2)** script |
+| Variable        | Description                                     | Set by                      |
+|-----------------|-------------------------------------------------|-----------------------------|
+| `baseUrl`       | Host and port (no scheme)                       | User                        |
+| `token`         | JWT for authenticated endpoints and WebSockets  | **Login** script            |
+| `userId`        | Current user's UUID                             | **Register / Login** script |
+| `gameplayId`    | UUID of the most recently created gameplay      | **Create gameplay** script  |
+| `testEmail`     | Email used for login                            | User                        |
+| `testPassword`  | Password used for login                         | User                        |
+| `access_token`  | Access token returned by v2 login               | **Login (v2)** script       |
+| `refresh_token` | Refresh token captured from the v2 login cookie | **Login (v2)** script       |
 
 **Every request has full documentation** in Insomnia's **Docs** panel (book icon in the center panel). The folders and workspace are documented as well.
 
@@ -131,15 +131,14 @@ For these reasons, Insomnia is the reference tool for testing the **entire** API
 
 ---
 
-## Recommended first-time flow
+## Recommended flow
 
-The execution order is the same for either tool, with the v2 flow recommended for new clients:
+The execution order is the same for either tool:
 
-1. **Auth (v2) → Register** — creates the user, logs them in, and sets the HttpOnly cookies.
-2. **Auth (v2) → Me** — verifies the session and confirms the authenticated user.
-3. **Auth (v2) → Refresh / Logout** — rotate or revoke the session as needed.
-4. **Users (v2) / Gameplays (v2)** — access user and gameplay resources through the explicit v2 contract.
-5. **WebSocket (v2)** — use the realtime gameplay channel for create/move/leave operations.
+1. **Users → Register user** — creates the account and stores `userId` and `testEmail`.
+2. **Users → Login** — obtains a JWT and stores `token` and `userId`.
+3. **Gameplays → Create gameplay** — creates a gameplay and stores `gameplayId`.
+4. Continue with any REST endpoint.
 
 > Response scripts populate the variables. If you run requests out of order, `{{userId}}` or `{{token}}` may be empty.
 
@@ -177,13 +176,13 @@ Both tools let you paste the `auth` message into the interactive session and vie
 
 If you edit both files, keep in mind that template and script syntax differs:
 
-| Concept | Postman | Insomnia |
-|---------|---------|----------|
-| Variable interpolation | `{{variable}}` | `{{ _.variable }}` |
-| Set a variable | `pm.collectionVariables.set("x", v)` | `insomnia.environment.set("x", v)` |
-| Read a response | `pm.response.json()` | `insomnia.response.json()` |
-| HTTP status code | `pm.response.code` | `insomnia.response.code` |
-| Assertions | `pm.test(...)` | Not built in (use `console.log`) |
+| Concept                | Postman                              | Insomnia                           |
+|------------------------|--------------------------------------|------------------------------------|
+| Variable interpolation | `{{variable}}`                       | `{{ _.variable }}`                 |
+| Set a variable         | `pm.collectionVariables.set("x", v)` | `insomnia.environment.set("x", v)` |
+| Read a response        | `pm.response.json()`                 | `insomnia.response.json()`         |
+| HTTP status code       | `pm.response.code`                   | `insomnia.response.code`           |
+| Assertions             | `pm.test(...)`                       | Not built in (use `console.log`)   |
 
 ---
 
