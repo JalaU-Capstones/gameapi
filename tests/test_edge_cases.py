@@ -30,8 +30,21 @@ def test_exception_messages_include_identifier() -> None:
 # ------------------------------------------------------- users: edge cases
 
 
-async def test_get_user_with_invalid_object_id_returns_404(client: AsyncClient) -> None:
-    response = await client.get("/api/v1/users/not-an-object-id")
+async def test_list_users_without_token_returns_401(client: AsyncClient) -> None:
+    response = await client.get("/api/v1/users")
+    assert response.status_code == 401
+
+
+async def test_get_user_by_id_without_token_returns_401(client: AsyncClient) -> None:
+    response = await client.get("/api/v1/users/00000000-0000-0000-0000-000000000000")
+    assert response.status_code == 401
+
+
+async def test_get_user_with_invalid_object_id_returns_404(
+    client: AsyncClient,
+    auth_headers: dict[str, str],
+) -> None:
+    response = await client.get("/api/v1/users/not-an-object-id", headers=auth_headers)
     assert response.status_code == 404
     assert response.json()["message"] == "User not found"
 
@@ -93,8 +106,26 @@ async def test_register_user_missing_fields_returns_400(client: AsyncClient) -> 
 # --------------------------------------------------- gameplays: edge cases
 
 
-async def test_get_gameplay_with_invalid_object_id_returns_404(client: AsyncClient) -> None:
-    response = await client.get("/api/v1/gameplays/not-an-object-id")
+async def test_list_gameplays_without_token_returns_401(client: AsyncClient) -> None:
+    response = await client.get("/api/v1/gameplays")
+    assert response.status_code == 401
+
+
+async def test_get_gameplay_by_id_without_token_returns_401(client: AsyncClient) -> None:
+    response = await client.get("/api/v1/gameplays/00000000-0000-0000-0000-000000000000")
+    assert response.status_code == 401
+
+
+async def test_list_gameplays_by_player_without_token_returns_401(client: AsyncClient) -> None:
+    response = await client.get("/api/v1/gameplays/player/00000000-0000-0000-0000-000000000000")
+    assert response.status_code == 401
+
+
+async def test_get_gameplay_with_invalid_object_id_returns_404(
+    client: AsyncClient,
+    auth_headers: dict[str, str],
+) -> None:
+    response = await client.get("/api/v1/gameplays/not-an-object-id", headers=auth_headers)
     assert response.status_code == 404
     assert response.json()["message"] == "Gameplay not found"
 
