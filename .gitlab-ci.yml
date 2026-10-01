@@ -1,6 +1,7 @@
 default:
   image: python:3.12-slim
   before_script:
+    - apt-get update && apt-get install -y --no-install-recommends make
     - pip install --no-cache-dir uv
     - uv python install
     - uv sync --frozen --all-extras --dev
