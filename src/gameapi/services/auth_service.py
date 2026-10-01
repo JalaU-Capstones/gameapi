@@ -11,7 +11,7 @@ from gameapi.core.security import (
 from gameapi.db.models.refresh_token import RefreshToken
 from gameapi.db.models.user import User
 from gameapi.repositories.refresh_token_repository import RefreshTokenRepository
-from gameapi.schemas.user import UserResponse
+from gameapi.schemas.user import UserCreate, UserResponse
 from gameapi.services.exceptions import InvalidCredentialsError, InvalidRefreshTokenError
 from gameapi.services.user_service import UserService
 
@@ -25,6 +25,26 @@ class AuthService:
         self._user_service = user_service
         self._refresh_repo = refresh_repo
 
+    async def _issue_tokens_for_user(self, user: User | UserResponse) -> tuple[str, str]:
+        if user.id is None:
+            raise RuntimeError("Persisted user has no _id")
+
+        subject_id = uuid.UUID(str(user.id))
+        access_token = create_access_token_short(
+            subject=str(user.id),
+            email=user.email,
+            name=user.name,
+        )
+        raw_refresh_token, token_hash = generate_refresh_token()
+        expires_at = datetime.now(UTC) + timedelta(days=settings.auth.refresh_token_expire_days)
+        refresh_token = RefreshToken(
+            user_id=subject_id,
+            token_hash=token_hash,
+            expires_at=expires_at,
+        )
+        await self._refresh_repo.create(refresh_token)
+        return access_token, raw_refresh_token
+
     async def login(self, email: str, password: str) -> tuple[str, str, User]:
         """
         Validate credentials.
@@ -36,22 +56,13 @@ class AuthService:
         if user is None or not verify_password(password, user.password):
             raise InvalidCredentialsError()
 
-        if user.id is None:
-            raise RuntimeError("Persisted user has no _id")
+        access_token, raw_refresh_token = await self._issue_tokens_for_user(user)
+        return access_token, raw_refresh_token, user
 
-        access_token = create_access_token_short(
-            subject=str(user.id),
-            email=user.email,
-            name=user.name,
-        )
-        raw_refresh_token, token_hash = generate_refresh_token()
-        expires_at = datetime.now(UTC) + timedelta(days=settings.auth.refresh_token_expire_days)
-        refresh_token = RefreshToken(
-            user_id=user.id,
-            token_hash=token_hash,
-            expires_at=expires_at,
-        )
-        await self._refresh_repo.create(refresh_token)
+    async def register(self, data: UserCreate) -> tuple[str, str, UserResponse]:
+        """Create the user and immediately issue auth tokens for the new session."""
+        user = await self._user_service.create(data)
+        access_token, raw_refresh_token = await self._issue_tokens_for_user(user)
         return access_token, raw_refresh_token, user
 
     async def refresh(self, raw_refresh_token: str) -> tuple[str, str]:
