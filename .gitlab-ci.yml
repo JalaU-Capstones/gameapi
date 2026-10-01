@@ -30,6 +30,7 @@ variables:
 
 stages:
   - quality
+  - contracts
   - test
   - build
 
@@ -49,6 +50,12 @@ lint:mypy:
   stage: quality
   script:
     - uv run mypy src
+
+contracts:check:
+  stage: contracts
+  script:
+    - make openapi-check
+    - make asyncapi-validate
 
 test:python:
   stage: test
