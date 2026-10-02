@@ -1,9 +1,10 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Cookie, HTTPException, Response, status
+from fastapi import APIRouter, Cookie, HTTPException, Request, Response, status
 
 from gameapi.api.deps import AuthServiceDep, CurrentUser
 from gameapi.core.config import settings
+from gameapi.core.rate_limit import rate_limit
 from gameapi.schemas.auth import LoginRequest, LoginResponse, RefreshResponse
 from gameapi.schemas.user import UserCreate, UserResponse
 from gameapi.services.exceptions import (
@@ -59,11 +60,14 @@ def _clear_auth_cookies(response: Response) -> None:
         "herramientas que usan Authorization: Bearer. El refresh token nunca se expone "
         "en el JSON para evitar fuga por XSS."
     ),
+    responses={429: {"description": "Rate limit exceeded"}},
 )
+@rate_limit(settings.rate_limit.login)
 async def login(
+    request: Request,
+    response: Response,
     payload: LoginRequest,
     service: AuthServiceDep,
-    response: Response,
 ) -> LoginResponse:
     try:
         access_token, refresh_token, user = await service.login(payload.email, payload.password)
@@ -87,11 +91,14 @@ async def login(
     response_model=LoginResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Register a new user and log them in",
+    responses={429: {"description": "Rate limit exceeded"}},
 )
+@rate_limit(settings.rate_limit.register_limit)
 async def register(
+    request: Request,
+    response: Response,
     payload: UserCreate,
     service: AuthServiceDep,
-    response: Response,
 ) -> LoginResponse:
     try:
         access_token, refresh_token, user = await service.register(payload)
@@ -111,8 +118,11 @@ async def register(
     response_model=RefreshResponse,
     response_model_by_alias=False,
     summary="Refresh the access token and rotate the refresh token",
+    responses={429: {"description": "Rate limit exceeded"}},
 )
+@rate_limit(settings.rate_limit.refresh)
 async def refresh(
+    request: Request,
     response: Response,
     service: AuthServiceDep,
     refresh_token_cookie: Annotated[
@@ -160,6 +170,14 @@ async def logout(
     return response
 
 
-@router.get("/me", response_model=UserResponse, summary="Get the current authenticated user")
-async def me(current_user: CurrentUser) -> UserResponse:
+@router.get(
+    "/me",
+    response_model=UserResponse,
+    summary="Get the current authenticated user",
+    responses={429: {"description": "Rate limit exceeded"}},
+)
+@rate_limit(settings.rate_limit.auth_me)
+async def me(request: Request, response: Response, current_user: CurrentUser) -> UserResponse:
+    del request
+    del response
     return current_user

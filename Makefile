@@ -63,7 +63,7 @@ test-clean:
 
 test-cov:
 	uv run coverage run -m pytest
-	uv run coverage report --fail-under=85
+	uv run coverage report --fail-under=93
 	uv run coverage html
 	@echo "HTML report: htmlcov/index.html"
 

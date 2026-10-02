@@ -3,6 +3,7 @@ from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
 
 import pytest
+import pytest_asyncio
 from httpx import AsyncClient
 
 from gameapi.api.deps import require_log_admin
@@ -11,7 +12,7 @@ from gameapi.db.models.log_entry import LogEntry
 from gameapi.repositories.log_repository import LogRepository
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def admin_client(
     client: AsyncClient,
     registered_user: dict[str, object],

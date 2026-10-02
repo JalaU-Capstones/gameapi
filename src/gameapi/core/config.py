@@ -94,6 +94,28 @@ class AuthSettings(BaseSettings):
         return self
 
 
+class RateLimitSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="RATE_LIMIT_", env_file=".env", extra="ignore")
+
+    enabled: bool = True
+    storage_uri: str = "memory://"
+
+    anonymous_default: str = "60/minute"
+    login: str = "5/minute"
+    register_limit: str = Field(
+        default="3/minute",
+        validation_alias=AliasChoices("RATE_LIMIT_REGISTER", "register_limit"),
+    )
+    refresh: str = "10/minute"
+
+    authenticated_default: str = "60/minute"
+    auth_me: str = "60/minute"
+    logs_me: str = "30/minute"
+    logs_admin: str = "300/minute"
+
+    ws_handshake: str = "10/minute"
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
@@ -102,6 +124,7 @@ class Settings(BaseSettings):
     app: AppSettings = Field(default_factory=AppSettings)
     log: LogSettings = Field(default_factory=LogSettings)
     auth: AuthSettings = Field(default_factory=AuthSettings)
+    rate_limit: RateLimitSettings = Field(default_factory=RateLimitSettings)
 
 
 @lru_cache

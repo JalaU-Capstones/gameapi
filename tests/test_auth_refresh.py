@@ -147,6 +147,26 @@ async def test_refresh_token_repository_revoke_all_for_user_and_delete_expired(
     )
 
 
+async def test_refresh_token_repository_delete_expired_includes_exact_expiry_cutoff(
+    db_session,
+    registered_user,
+) -> None:
+    repo = RefreshTokenRepository(db_session)
+    now = datetime.now(UTC)
+    db_session.add(
+        RefreshToken(
+            user_id=registered_user["id"],
+            token_hash="hash_at_cutoff",
+            expires_at=now,
+        )
+    )
+    await db_session.commit()
+
+    assert await repo.delete_expired() == 1
+    remaining = (await db_session.execute(select(RefreshToken))).scalars().all()
+    assert remaining == []
+
+
 async def test_auth_service_rejects_invalid_credentials_and_refresh_tokens(db_session) -> None:
     user_service = UserService(db_session)
     auth_service = AuthService(user_service, RefreshTokenRepository(db_session))

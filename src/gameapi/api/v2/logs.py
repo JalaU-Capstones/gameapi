@@ -2,10 +2,12 @@ import uuid
 from datetime import datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from gameapi.api.deps import CurrentUser, LogAdmin, SessionDep
+from gameapi.core.config import settings
+from gameapi.core.rate_limit import rate_limit
 from gameapi.repositories.log_repository import LogRepository
 from gameapi.schemas.log import LogEntryResponse, LogsQueryResponse
 
@@ -46,8 +48,12 @@ async def _query_logs(
     "/me",
     response_model=LogsQueryResponse,
     summary="Query logs belonging to the current user",
+    responses={429: {"description": "Rate limit exceeded"}},
 )
+@rate_limit(settings.rate_limit.logs_me)
 async def query_my_logs(
+    request: Request,
+    response: Response,
     current_user: CurrentUser,
     session: SessionDep,
     level: Annotated[str | None, Query()] = None,
@@ -59,6 +65,7 @@ async def query_my_logs(
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> LogsQueryResponse:
     """Query only the current user's logs; unknown query parameters are ignored."""
+    del request
     return await _query_logs(
         session,
         level=level,
@@ -76,9 +83,15 @@ async def query_my_logs(
     "",
     response_model=LogsQueryResponse,
     summary="Query all logs (admin only)",
-    responses={403: {"description": "Admin access required"}},
+    responses={
+        403: {"description": "Admin access required"},
+        429: {"description": "Rate limit exceeded"},
+    },
 )
+@rate_limit(settings.rate_limit.logs_admin)
 async def query_all_logs(
+    request: Request,
+    response: Response,
     _: LogAdmin,
     session: SessionDep,
     level: Annotated[str | None, Query()] = None,
@@ -90,6 +103,7 @@ async def query_all_logs(
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> LogsQueryResponse:
+    del request
     return await _query_logs(
         session,
         level=level,

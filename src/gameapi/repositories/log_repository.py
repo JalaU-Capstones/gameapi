@@ -59,7 +59,7 @@ class LogRepository:
         return list(result.scalars().all()), int(total_count)
 
     async def delete_older_than(self, cutoff: datetime) -> int:
-        """Delete logs with timestamp < cutoff. Return the count of deleted rows."""
-        result = await self._session.execute(delete(LogEntry).where(LogEntry.timestamp < cutoff))
+        """Delete logs with timestamp <= cutoff. Return the count of deleted rows."""
+        result = await self._session.execute(delete(LogEntry).where(LogEntry.timestamp <= cutoff))
         rowcount = getattr(result, "rowcount", None)
         return int(rowcount or 0)

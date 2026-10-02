@@ -2,16 +2,19 @@ import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, Request, status
+from fastapi import FastAPI, HTTPException, Request, Response, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 from sqlalchemy import text
 
 from gameapi.api.deps import SessionDep
 from gameapi.api.v1.router import api_router as v1_router
 from gameapi.api.v2.router import api_router as v2_router
 from gameapi.core.config import settings
+from gameapi.core.rate_limit import limiter
 from gameapi.db import PostgresDatabase
 from gameapi.services.event_bus import event_bus
 from gameapi.services.log_service import LogService
@@ -53,6 +56,28 @@ app = FastAPI(
     description="REST API for user and gameplay basic management",
     lifespan=lifespan,
 )
+
+
+async def _rate_limit_handler(
+    request: Request,
+    exc: Exception,
+) -> Response:
+    """Return a consistent 429 payload while preserving the rate-limit headers."""
+    del exc
+    response: Response = JSONResponse(
+        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        content={"message": "Too many requests. Please slow down."},
+    )
+    limiter_instance = request.app.state.limiter
+    view_rate_limit = getattr(request.state, "view_rate_limit", None)
+    if view_rate_limit is not None:
+        response = limiter_instance._inject_headers(response, view_rate_limit)
+    return response
+
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_handler)
+app.add_middleware(SlowAPIMiddleware)
 
 # Cookies require credentials and an explicit origin list when browser-based clients are used.
 app.add_middleware(

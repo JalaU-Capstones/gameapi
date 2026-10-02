@@ -46,10 +46,10 @@ class RefreshTokenRepository:
         return len(tokens)
 
     async def delete_expired(self) -> int:
-        """Delete tokens whose expires_at < now(). Return count."""
+        """Delete tokens whose expires_at <= now(). Return count."""
         now = datetime.now(UTC)
         result = await self._session.execute(
-            select(RefreshToken).where(RefreshToken.expires_at < now)
+            select(RefreshToken).where(RefreshToken.expires_at <= now)
         )
         expired_tokens = result.scalars().all()
         for token in expired_tokens:

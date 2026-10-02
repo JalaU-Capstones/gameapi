@@ -2,6 +2,7 @@ import os
 from collections.abc import AsyncIterator, Callable, Iterator
 
 import pytest
+import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -32,7 +33,7 @@ def postgres_uri() -> Iterator[str]:
         yield _to_asyncpg_uri(container.get_connection_url())
 
 
-@pytest.fixture(scope="session")
+@pytest_asyncio.fixture(scope="session")
 async def _run_migrations(postgres_uri: str) -> None:
     import os
     import subprocess
@@ -42,7 +43,7 @@ async def _run_migrations(postgres_uri: str) -> None:
     subprocess.run(["uv", "run", "alembic", "upgrade", "head"], check=True, env=env)
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def db_engine(postgres_uri: str, _run_migrations: None) -> AsyncIterator:
     from sqlalchemy.pool import NullPool
 
@@ -53,7 +54,7 @@ async def db_engine(postgres_uri: str, _run_migrations: None) -> AsyncIterator:
         await engine.dispose()
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def db_session(db_engine) -> AsyncIterator[AsyncSession]:
     factory = async_sessionmaker(db_engine, expire_on_commit=False)
 
@@ -73,7 +74,7 @@ async def db_session(db_engine) -> AsyncIterator[AsyncSession]:
     PostgresDatabase._session_factory = None
 
 
-@pytest.fixture(autouse=True)
+@pytest_asyncio.fixture(autouse=True)
 async def _clean_tables(db_session: AsyncSession) -> AsyncIterator[None]:
     try:
         yield
@@ -85,7 +86,7 @@ async def _clean_tables(db_session: AsyncSession) -> AsyncIterator[None]:
         await db_session.commit()
 
 
-@pytest.fixture(autouse=True)
+@pytest_asyncio.fixture(autouse=True)
 def _override_dependencies(db_session: AsyncSession) -> Iterator[None]:
     from gameapi.api.deps import get_session
     from gameapi.main import app
@@ -99,7 +100,7 @@ def _override_dependencies(db_session: AsyncSession) -> Iterator[None]:
     app.dependency_overrides.clear()
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def client(_override_dependencies: None) -> AsyncIterator[AsyncClient]:
     from gameapi.main import app
 
@@ -108,7 +109,7 @@ async def client(_override_dependencies: None) -> AsyncIterator[AsyncClient]:
         yield ac
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def ws_client_factory(
     _override_dependencies: None,
 ) -> AsyncIterator[Callable[[], AsyncClient]]:
@@ -142,6 +143,24 @@ def _clear_ws_managers() -> Iterator[None]:
 
 
 @pytest.fixture(autouse=True)
+def _reset_rate_limiter() -> Iterator[None]:
+    from gameapi.core.rate_limit import limiter
+
+    limiter.reset()
+    yield
+    limiter.reset()
+
+
+@pytest.fixture(autouse=True)
+def _reset_ws_rate_limit() -> Iterator[None]:
+    from gameapi.api.v2.ws.auth import _ws_attempts
+
+    _ws_attempts.clear()
+    yield
+    _ws_attempts.clear()
+
+
+@pytest_asyncio.fixture(autouse=True)
 async def _reset_event_bus() -> AsyncIterator[None]:
     from gameapi.services.event_bus import event_bus
 
@@ -149,7 +168,7 @@ async def _reset_event_bus() -> AsyncIterator[None]:
     await event_bus.shutdown()
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def registered_user(client: AsyncClient) -> dict[str, object]:
     payload = {
         "name": "Test User",
@@ -161,7 +180,7 @@ async def registered_user(client: AsyncClient) -> dict[str, object]:
     return response.json()
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def auth_token(client: AsyncClient, registered_user: dict[str, object]) -> str:
     response = await client.post(
         "/api/v1/users/login",
@@ -179,7 +198,7 @@ def auth_headers(auth_token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {auth_token}"}
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def authed_client(client: AsyncClient, registered_user: dict[str, object]) -> AsyncClient:
     response = await client.post(
         "/api/v2/auth/login",
@@ -192,7 +211,7 @@ async def authed_client(client: AsyncClient, registered_user: dict[str, object])
     return client
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def authed_client_bearer(
     client: AsyncClient,
     registered_user: dict[str, object],
@@ -208,7 +227,7 @@ async def authed_client_bearer(
     return {"Authorization": f"Bearer {response.json()['token']}"}
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def registered_user_a(client: AsyncClient) -> dict[str, object]:
     payload = {
         "name": "User A",
@@ -220,7 +239,7 @@ async def registered_user_a(client: AsyncClient) -> dict[str, object]:
     return response.json()
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def auth_token_a(client: AsyncClient, registered_user_a: dict[str, object]) -> str:
     response = await client.post(
         "/api/v1/users/login",
@@ -233,7 +252,7 @@ async def auth_token_a(client: AsyncClient, registered_user_a: dict[str, object]
     return str(response.json()["token"])
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def registered_user_b(client: AsyncClient) -> dict[str, object]:
     payload = {
         "name": "User B",
@@ -245,7 +264,7 @@ async def registered_user_b(client: AsyncClient) -> dict[str, object]:
     return response.json()
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def auth_token_b(client: AsyncClient, registered_user_b: dict[str, object]) -> str:
     response = await client.post(
         "/api/v1/users/login",

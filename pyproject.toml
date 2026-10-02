@@ -17,6 +17,7 @@ dependencies = [
     "sqlalchemy[asyncio]>=2.0.36",
     "asyncpg>=0.30.0",
     "alembic>=1.14.0",
+    "slowapi>=0.1.9",
 ]
 
 [dependency-groups]
@@ -54,10 +55,22 @@ python_version = "3.11"
 strict = true
 plugins = ["pydantic.mypy"]
 
+[[tool.mypy.overrides]]
+module = ["slowapi", "slowapi.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["deprecated", "deprecated.*"]
+follow_imports = "skip"
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
 timeout = 30
+filterwarnings = [
+    "ignore:'asyncio\\.iscoroutinefunction' is deprecated:DeprecationWarning:slowapi.*",
+]
 
 [tool.coverage.run]
 source = ["src/gameapi"]

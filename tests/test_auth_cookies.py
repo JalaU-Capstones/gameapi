@@ -1,4 +1,31 @@
 from httpx import AsyncClient
+from starlette.requests import Request
+
+from gameapi.core.config import settings
+from gameapi.core.rate_limit import hierarchical_key
+from gameapi.core.security import create_access_token_short
+
+
+def test_hierarchical_key_uses_configured_access_cookie_name(monkeypatch) -> None:
+    monkeypatch.setattr(settings.auth, "access_cookie_name", "custom_at")
+    token = create_access_token_short(
+        subject="11111111-1111-1111-1111-111111111111",
+        email="test@example.com",
+        name="Test User",
+    )
+    scope = {
+        "type": "http",
+        "method": "GET",
+        "path": "/api/v2/auth/me",
+        "headers": [(b"host", b"example.com"), (b"cookie", f"custom_at={token}".encode())],
+        "query_string": b"",
+        "client": ("127.0.0.1", 1234),
+        "scheme": "http",
+        "server": ("example.com", 80),
+    }
+    request = Request(scope)
+
+    assert hierarchical_key(request) == "user:11111111-1111-1111-1111-111111111111"
 
 
 async def test_login_sets_httponly_access_cookie(client: AsyncClient) -> None:

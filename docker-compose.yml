@@ -27,19 +27,48 @@ services:
     ports:
       - "${APP_PORT:-8080}:8080"
     environment:
-      POSTGRES_URI: ${POSTGRES_URI:-postgresql+asyncpg://gameapi:gameapi@postgres:5432/gameapi}
+      # Do not use ${POSTGRES_URI} here: the .env value points to localhost
+      # for local development and would break inside the container network.
+      POSTGRES_URI: postgresql+asyncpg://${POSTGRES_USER:-gameapi}:${POSTGRES_PASSWORD:-gameapi}@postgres:5432/${POSTGRES_DB:-gameapi}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-Una_Clave_Secreta_Super_Segura_con_Minimo_32_Caracteres_123456789}
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
       JWT_ISSUER: ${JWT_ISSUER:-GameAPI}
       JWT_AUDIENCE: ${JWT_AUDIENCE:-GameAPI}
       JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES:-60}
+      AUTH_ACCESS_COOKIE_NAME: ${AUTH_ACCESS_COOKIE_NAME:-gameapi_at}
+      AUTH_REFRESH_COOKIE_NAME: ${AUTH_REFRESH_COOKIE_NAME:-gameapi_rt}
+      AUTH_ACCESS_TOKEN_EXPIRE_MINUTES: ${AUTH_ACCESS_TOKEN_EXPIRE_MINUTES:-15}
+      AUTH_REFRESH_TOKEN_EXPIRE_DAYS: ${AUTH_REFRESH_TOKEN_EXPIRE_DAYS:-7}
+      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
+      AUTH_COOKIE_SAMESITE: ${AUTH_COOKIE_SAMESITE:-lax}
+      AUTH_COOKIE_DOMAIN: ${AUTH_COOKIE_DOMAIN:-}
+      AUTH_ACCESS_COOKIE_PATH: ${AUTH_ACCESS_COOKIE_PATH:-/}
+      AUTH_REFRESH_COOKIE_PATH: ${AUTH_REFRESH_COOKIE_PATH:-/api/v2/auth}
       APP_ENV: ${APP_ENV:-development}
       APP_HOST: ${APP_HOST:-0.0.0.0}
       APP_PORT: ${APP_PORT:-8080}
-      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+      CORS_ORIGINS: "${CORS_ORIGINS:-*}"
+      LOG_BUFFER_SIZE: ${LOG_BUFFER_SIZE:-100}
+      LOG_FLUSH_INTERVAL_SECONDS: ${LOG_FLUSH_INTERVAL_SECONDS:-5.0}
+      LOG_RETENTION_DAYS: ${LOG_RETENTION_DAYS:-30}
+      LOG_QUEUE_MAXSIZE: ${LOG_QUEUE_MAXSIZE:-1000}
+      LOG_ADMIN_EMAILS: ${LOG_ADMIN_EMAILS:-admin@gameapi.local}
+      RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
+      RATE_LIMIT_STORAGE_URI: ${RATE_LIMIT_STORAGE_URI:-memory://}
+      RATE_LIMIT_LOGIN: ${RATE_LIMIT_LOGIN:-5/minute}
+      RATE_LIMIT_REGISTER: ${RATE_LIMIT_REGISTER:-3/minute}
+      RATE_LIMIT_REFRESH: ${RATE_LIMIT_REFRESH:-10/minute}
+      RATE_LIMIT_ANONYMOUS_DEFAULT: ${RATE_LIMIT_ANONYMOUS_DEFAULT:-60/minute}
+      RATE_LIMIT_AUTHENTICATED_DEFAULT: ${RATE_LIMIT_AUTHENTICATED_DEFAULT:-60/minute}
+      RATE_LIMIT_AUTH_ME: ${RATE_LIMIT_AUTH_ME:-60/minute}
+      RATE_LIMIT_LOGS_ME: ${RATE_LIMIT_LOGS_ME:-30/minute}
+      RATE_LIMIT_LOGS_ADMIN: ${RATE_LIMIT_LOGS_ADMIN:-300/minute}
+      RATE_LIMIT_WS_HANDSHAKE: ${RATE_LIMIT_WS_HANDSHAKE:-10/minute}
     depends_on:
       postgres:
         condition: service_healthy
+    command: >
+      sh -c "alembic upgrade head && uvicorn gameapi.main:app --host 0.0.0.0 --port 8080"
     healthcheck:
       test:
         - CMD

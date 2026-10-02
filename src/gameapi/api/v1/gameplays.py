@@ -5,9 +5,11 @@ allowed evolution is tightening authentication; this is documented as a
 deliberate security hardening.
 """
 
-from fastapi import APIRouter, HTTPException, Response, status
+from fastapi import APIRouter, HTTPException, Request, Response, status
 
 from gameapi.api.deps import CurrentUser, GameplayServiceDep, UserServiceDep
+from gameapi.core.config import settings
+from gameapi.core.rate_limit import rate_limit
 from gameapi.schemas.gameplay import GameplayCreate, GameplayResponse, GameplayUpdate
 from gameapi.services import GameplayNotFoundError
 
@@ -23,10 +25,15 @@ def _to_response(gameplay: GameplayResponse) -> GameplayResponse:
     response_model=list[GameplayResponse],
     summary="List all gameplays",
 )
+@rate_limit(settings.rate_limit.authenticated_default)
 async def list_gameplays(
+    request: Request,
+    response: Response,
     _current_user: CurrentUser,
     service: GameplayServiceDep,
 ) -> list[GameplayResponse]:
+    del request
+    del response
     gameplays = await service.list_all()
     return [_to_response(g) for g in gameplays]
 
@@ -36,10 +43,15 @@ async def list_gameplays(
     response_model=list[GameplayResponse],
     summary="List gameplays of the authenticated user",
 )
+@rate_limit(settings.rate_limit.authenticated_default)
 async def list_my_gameplays(
+    request: Request,
+    response: Response,
     current_user: CurrentUser,
     service: GameplayServiceDep,
 ) -> list[GameplayResponse]:
+    del request
+    del response
     if current_user.id is None:
         raise RuntimeError("Authenticated user has no _id")
     gameplays = await service.list_by_player(str(current_user.id))
@@ -51,11 +63,16 @@ async def list_my_gameplays(
     response_model=list[GameplayResponse],
     summary="List gameplays of a specific player",
 )
+@rate_limit(settings.rate_limit.authenticated_default)
 async def list_gameplays_by_player(
+    request: Request,
+    response: Response,
     player_id: str,
     _current_user: CurrentUser,
     service: GameplayServiceDep,
 ) -> list[GameplayResponse]:
+    del request
+    del response
     gameplays = await service.list_by_player(player_id)
     return [_to_response(g) for g in gameplays]
 
@@ -65,11 +82,16 @@ async def list_gameplays_by_player(
     response_model=GameplayResponse,
     summary="Get a gameplay by id",
 )
+@rate_limit(settings.rate_limit.authenticated_default)
 async def get_gameplay(
+    request: Request,
+    response: Response,
     gameplay_id: str,
     _current_user: CurrentUser,
     service: GameplayServiceDep,
 ) -> GameplayResponse:
+    del request
+    del response
     gameplay = await service.get_by_id(gameplay_id)
     if gameplay is None:
         raise HTTPException(
@@ -85,13 +107,16 @@ async def get_gameplay(
     status_code=status.HTTP_201_CREATED,
     summary="Create a new gameplay",
 )
+@rate_limit(settings.rate_limit.authenticated_default)
 async def create_gameplay(
+    request: Request,
     payload: GameplayCreate,
     current_user: CurrentUser,
     service: GameplayServiceDep,
     user_service: UserServiceDep,
     response: Response,
 ) -> GameplayResponse:
+    del request
     if current_user.id is None:
         raise RuntimeError("Authenticated user has no _id")
     if payload.host_player != str(current_user.id):
@@ -125,13 +150,18 @@ async def create_gameplay(
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Update a gameplay",
 )
+@rate_limit(settings.rate_limit.authenticated_default)
 async def update_gameplay(
+    request: Request,
+    response: Response,
     gameplay_id: str,
     payload: GameplayUpdate,
     current_user: CurrentUser,
     service: GameplayServiceDep,
     user_service: UserServiceDep,
 ) -> Response:
+    del request
+    del response
     if current_user.id is None:
         raise RuntimeError("Authenticated user has no _id")
 
@@ -172,11 +202,16 @@ async def update_gameplay(
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Delete a gameplay",
 )
+@rate_limit(settings.rate_limit.authenticated_default)
 async def delete_gameplay(
+    request: Request,
+    response: Response,
     gameplay_id: str,
     current_user: CurrentUser,
     service: GameplayServiceDep,
 ) -> Response:
+    del request
+    del response
     if current_user.id is None:
         raise RuntimeError("Authenticated user has no _id")
 
