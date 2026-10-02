@@ -102,6 +102,34 @@ async def test_log_repository_delete_older_than_returns_zero_when_no_rows_match(
     assert deleted == 0
 
 
+async def test_log_repository_delete_older_than_includes_exact_cutoff(db_session) -> None:
+    cutoff = datetime.now(UTC)
+    repo = LogRepository(db_session)
+    await repo.bulk_insert(
+        [
+            LogEntry(
+                level="INFO",
+                event_type="old_event",
+                message="at_cutoff",
+                metadata_={},
+                timestamp=cutoff,
+            ),
+            LogEntry(
+                level="INFO",
+                event_type="new_event",
+                message="new",
+                metadata_={},
+                timestamp=cutoff + timedelta(minutes=1),
+            ),
+        ]
+    )
+    await db_session.commit()
+
+    deleted = await repo.delete_older_than(cutoff)
+
+    assert deleted == 1
+
+
 async def test_log_repository_query_filters_by_event_type(db_session) -> None:
     repository = LogRepository(db_session)
     await repository.bulk_insert(
