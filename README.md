@@ -6,7 +6,7 @@ REST API para gestión de usuarios y partidas de Tic-Tac-Toe.
 [![codecov](https://codecov.io/gh/JalaU-Capstones/gameapi/branch/main/graph/badge.svg)](https://codecov.io/gh/JalaU-Capstones/gameapi)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg)](https://fastapi.tiangolo.com/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![Tests](https://img.shields.io/badge/tests-244%20passed-success.svg)](#pruebas)
+[![Tests](https://img.shields.io/badge/tests-247%20passed-success.svg)](#pruebas)
 
 **Stack:** Python 3.11+ · FastAPI · PostgreSQL 16 · SQLAlchemy 2.0 async · Pydantic v2 · JWT · WebSocket · uv · Docker
 
@@ -18,6 +18,7 @@ REST API para gestión de usuarios y partidas de Tic-Tac-Toe.
 - [Requisitos](#requisitos)
 - [Clonación](#clonación)
 - [Instalación](#instalación)
+- [Guía del Makefile](#guía-del-makefile)
 - [Configuración](#configuración)
 - [Ejecución](#ejecución)
 - [Endpoints](#endpoints)
@@ -87,6 +88,91 @@ cp .env.example .env
 ```
 
 **3. Editar `.env`** si necesitas cambiar la URI de PostgreSQL, el `JWT_SECRET_KEY` o los orígenes CORS.
+
+---
+
+## Guía del Makefile
+
+El proyecto incluye un `Makefile` que envuelve los comandos más comunes.
+Ejecuta `make help` para ver la lista completa.
+
+### Desarrollo
+
+| Comando             | Descripción                                              |
+|---------------------|----------------------------------------------------------|
+| `make install`      | Instala dependencias con `uv sync`                       |
+| `make dev`          | Arranca el servidor con recarga en caliente              |
+| `make run`          | Arranca el servidor en modo producción                   |
+
+### Calidad de código
+
+| Comando                   | Descripción                                  |
+|---------------------------|----------------------------------------------|
+| `make lint`               | Ejecuta `ruff check .`                       |
+| `make format`             | Ejecuta `ruff format .`                      |
+| `make typecheck`          | Ejecuta `mypy src` con `strict`              |
+| `make pre-commit`         | Ejecuta todos los hooks de pre-commit        |
+| `make pre-commit-install` | Instala los hooks de pre-commit una sola vez |
+
+### Pruebas
+
+| Comando             | Descripción                                              |
+|---------------------|----------------------------------------------------------|
+| `make test`         | Ejecuta pytest                                           |
+| `make test-cov`     | Ejecuta pytest con cobertura y umbral del 93%            |
+| `make test-clean`   | Elimina contenedores residuales de testcontainers        |
+
+### Migraciones
+
+| Comando               | Descripción                                 |
+|-----------------------|---------------------------------------------|
+| `make migrate`        | Aplica migraciones Alembic (`upgrade head`) |
+| `make migrate-create` | Crea una migración autogenerada             |
+
+### Contratos de API
+
+| Comando                  | Descripción                                           |
+|--------------------------|-------------------------------------------------------|
+| `make openapi-export`    | Regenera `.docs/contracts/openapi/openapi.json`       |
+| `make openapi-check`     | Verifica que el contrato commiteado esté sincronizado |
+| `make asyncapi-validate` | Valida el contrato AsyncAPI contra el spec            |
+| `make contracts-check`   | Ejecuta ambas validaciones                            |
+
+### Docker
+
+| Comando             | Descripción                                              |
+|---------------------|----------------------------------------------------------|
+| `make docker-up`    | Levanta PostgreSQL y la API con `docker compose up -d`   |
+| `make docker-down`  | Detiene los contenedores (conserva volúmenes)            |
+| `make docker-logs`  | Muestra logs en vivo del contenedor `api`                |
+| `make docker-reset` | Detiene contenedores y borra volúmenes (`-v`)            |
+
+### Limpieza
+
+| Comando             | Descripción                                              |
+|---------------------|----------------------------------------------------------|
+| `make clean`        | Borra cachés (`__pycache__`, `.pytest_cache`, etc.)      |
+
+### Flujo típico de un desarrollador
+
+```bash
+make install              # Primera vez: instalar dependencias
+cp .env.example .env      # Primera vez: crear el archivo de entorno
+make dev                  # Arrancar el servidor en local
+
+# Antes de commitear
+make format
+make lint
+make typecheck
+make test
+make test-cov
+
+# Para probar todo el stack con Docker
+make docker-up
+make migrate              # Si no se aplicó automáticamente
+curl http://localhost:8080/health
+make docker-down
+```
 
 ---
 
@@ -368,36 +454,79 @@ Eventos soportados:
 - `list_online_users` (presencia) → devuelve usuarios conectados
 - Cualquier otro evento sin implementar devuelve `error`
 
-### Ejemplos
+### Ejemplos con `curl`
 
-**Registrar usuario:**
+Todos los ejemplos usan `localhost:8080`. La API está versionada; el prefijo
+`/api/v1` corresponde al contrato congelado y `/api/v2` a la versión activa.
+
+#### Registro de usuario (v2, recomendado)
+
+Crea el usuario y lo autentica en una sola llamada (auto-login con cookies
+HttpOnly).
 
 ```bash
-curl -X POST http://localhost:8080/api/users \
+curl -i -c cookies.txt -X POST http://localhost:8080/api/v2/auth/register \
   -H "Content-Type: application/json" \
   -d '{"name":"Sandra Dee","email":"sandra@mail.com","password":"password123"}'
 ```
 
-**Login y guardar token (bash):**
+Respuesta `201 Created` con `Set-Cookie: gameapi_at` y
+`Set-Cookie: gameapi_rt`. También incluye un `access_token` en el body para
+clientes basados en header.
+
+#### Login (v2)
 
 ```bash
-TOKEN=$(curl -s -X POST http://localhost:8080/api/users/login \
+curl -i -c cookies.txt -X POST http://localhost:8080/api/v2/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"sandra@mail.com","password":"password123"}'
+```
+
+#### Login (v1, contrato legacy)
+
+El login de v1 sigue disponible y devuelve el token en el body. Es útil para
+herramientas que usan `Authorization: Bearer`.
+
+Bash:
+
+```bash
+TOKEN=$(curl -s -X POST http://localhost:8080/api/v1/users/login \
   -H "Content-Type: application/json" \
   -d '{"email":"sandra@mail.com","password":"password123"}' | jq -r .token)
 ```
 
-**Login (fish shell):**
+Fish shell:
 
 ```fish
-set TOKEN (curl -s -X POST http://localhost:8080/api/users/login \
+set TOKEN (curl -s -X POST http://localhost:8080/api/v1/users/login \
   -H "Content-Type: application/json" \
   -d '{"email":"sandra@mail.com","password":"password123"}' | jq -r .token)
 ```
 
-**Crear partida:**
+#### Consultar el usuario autenticado
+
+Con cookies (frontend):
 
 ```bash
-curl -X POST http://localhost:8080/api/gameplays \
+curl -b cookies.txt http://localhost:8080/api/v2/auth/me | jq
+```
+
+Con header `Authorization`:
+
+```bash
+curl -H "Authorization: ******" http://localhost:8080/api/v2/auth/me | jq
+```
+
+#### Listar usuarios (v1, requiere autenticación)
+
+```bash
+curl -H "Authorization: ******" http://localhost:8080/api/v1/users | jq
+```
+
+#### Crear una partida vía REST (v1, requiere autenticación)
+
+```bash
+curl -X POST http://localhost:8080/api/v1/gameplays \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $TOKEN" \
   -d '{
@@ -407,7 +536,33 @@ curl -X POST http://localhost:8080/api/gameplays \
   }'
 ```
 
-**Colecciones de cliente:** ver [`.docs/collections/`](./.docs/collections/README.md) para instrucciones detalladas.
+> **Nota:** la creación de partidas en v2 se realiza por WebSocket
+> (`create_game`). El endpoint REST de v1 se mantiene por compatibilidad con
+> el contrato congelado.
+
+#### Consultar mis partidas (v2, requiere autenticación)
+
+```bash
+curl -b cookies.txt http://localhost:8080/api/v2/gameplays/my-gameplays | jq
+```
+
+#### Consultar mis logs (v2, requiere autenticación)
+
+```bash
+curl -b cookies.txt "http://localhost:8080/api/v2/logs/me?limit=10" | jq
+```
+
+#### Health check
+
+```bash
+curl http://localhost:8080/health
+# {"status":"ok"}
+```
+
+#### Colecciones de cliente
+
+Ver [`.docs/collections/`](./.docs/collections/README.md) para instrucciones
+detalladas sobre Postman e Insomnia.
 
 ---
 
@@ -451,7 +606,7 @@ make test
 Salida esperada:
 
 ```
-244 passed in ~180s
+247 passed in ~163s
 Required test coverage of 93.0% reached. Total coverage: 94%
 ```
 
@@ -509,7 +664,7 @@ se orquesta desde `services/game_engine_service.py` (persistencia + broadcast).
 
 **Umbral mínimo:** 93% (configurado en `pyproject.toml` → `[tool.coverage.report] fail_under`).
 
-**Cobertura actual:** 93.85% (reporte medido con `coverage report --precision=2`).
+**Cobertura actual:** 93.87% (reporte medido con `coverage report --precision=2`).
 
 | Archivo                                  | Tests | Qué cubre                                                                   |
 |------------------------------------------|-------|-----------------------------------------------------------------------------|
@@ -595,6 +750,31 @@ Detalles:
 - Usuario no-root en el contenedor.
 - Healthchecks reales para PostgreSQL y la API.
 - La API espera a que PostgreSQL esté `healthy` antes de arrancar.
+
+### Flujo completo con Docker
+
+```bash
+# 1. Levantar la pila (PostgreSQL + API)
+make docker-up
+
+# 2. Esperar a que los contenedores estén healthy
+docker compose ps
+
+# 3. Aplicar migraciones (si el container no las aplica automáticamente)
+make migrate
+
+# 4. Verificar que todo funciona
+curl http://localhost:8080/health
+# → {"status":"ok"}
+
+# 5. Detener
+make docker-down
+```
+
+> Si el contenedor de la API no puede conectarse a PostgreSQL, revisa el
+> log con `docker compose logs api`. La causa más común es un valor
+> incorrecto de `POSTGRES_URI` en `.env` — dentro de la red de Docker debe
+> apuntar al servicio `postgres`, no a `localhost`.
 
 ---
 
