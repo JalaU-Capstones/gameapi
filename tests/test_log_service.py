@@ -5,7 +5,7 @@ import threading
 from contextlib import redirect_stderr
 from datetime import UTC, datetime, timedelta
 
-import pytest
+import pytest_asyncio
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
@@ -14,7 +14,7 @@ from gameapi.repositories.log_repository import LogRepository
 from gameapi.services.log_service import LogService
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def log_service_factory(db_session):
     async def _factory(
         *,
