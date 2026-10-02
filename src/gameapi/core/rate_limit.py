@@ -73,7 +73,7 @@ def hierarchical_key(request: Request) -> str:
         if user_id:
             return f"user:{user_id}"
 
-    cookie_token = request.cookies.get("gameapi_at")
+    cookie_token = request.cookies.get(settings.auth.access_cookie_name)
     if cookie_token:
         user_id = _try_decode(cookie_token)
         if user_id:
