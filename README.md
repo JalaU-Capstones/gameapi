@@ -6,7 +6,7 @@ REST API para gestión de usuarios y partidas de Tic-Tac-Toe.
 [![codecov](https://codecov.io/gh/JalaU-Capstones/gameapi/branch/main/graph/badge.svg)](https://codecov.io/gh/JalaU-Capstones/gameapi)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg)](https://fastapi.tiangolo.com/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![Tests](https://img.shields.io/badge/tests-231%20passed-success.svg)](#pruebas)
+[![Tests](https://img.shields.io/badge/tests-244%20passed-success.svg)](#pruebas)
 
 **Stack:** Python 3.11+ · FastAPI · PostgreSQL 16 · SQLAlchemy 2.0 async · Pydantic v2 · JWT · WebSocket · uv · Docker
 
@@ -451,8 +451,8 @@ make test
 Salida esperada:
 
 ```
-231 passed in ~130s
-Required test coverage of 93.0% reached. Total coverage: 93.85%
+244 passed in ~180s
+Required test coverage of 93.0% reached. Total coverage: 94%
 ```
 
 Los tests usan **PostgreSQL** de dos formas según el entorno:
@@ -693,6 +693,7 @@ La conversión es **automática** vía `pydantic.alias_generators.to_camel` en `
 - Ownership check: un usuario solo puede modificar/eliminar sus propios recursos.
 - CORS configurable por entorno.
 - `JWT_SECRET_KEY` mínimo 32 caracteres (validado en el arranque).
+- Límite de tasa por cliente y ruta con SlowAPI para mitigar fuerza bruta e intentos de abuso; ver [Rate limiting](./.docs/rate-limiting/README.md).
 
 ---
 
