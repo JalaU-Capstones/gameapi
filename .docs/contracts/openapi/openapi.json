@@ -805,6 +805,9 @@
               }
             }
           },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -845,6 +848,9 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limit exceeded"
           },
           "422": {
             "description": "Validation Error",
@@ -894,6 +900,9 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limit exceeded"
           },
           "422": {
             "description": "Validation Error",
@@ -990,6 +999,9 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limit exceeded"
           },
           "422": {
             "description": "Validation Error",
@@ -1454,6 +1466,9 @@
               }
             }
           },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -1633,6 +1648,9 @@
           },
           "403": {
             "description": "Admin access required"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
           },
           "422": {
             "description": "Validation Error",
