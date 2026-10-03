@@ -21,10 +21,10 @@
       "description": "Local development server (Vite proxy or direct Uvicorn)."
     },
     "production": {
-      "host": "gameapi.onrender.com",
+      "host": "gameapi-9vos.onrender.com",
       "pathname": "/api/v2/ws",
       "protocol": "wss",
-      "description": "Production deployment on Render. TLS provided by the platform."
+      "description": "Production deployment on Render. TLS provided by the platform. Free tier: the service sleeps after 15 minutes of inactivity; the first request after a cold start may take 30-60 seconds."
     }
   },
   "channels": {
