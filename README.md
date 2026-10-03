@@ -4,9 +4,11 @@ REST API para gestión de usuarios y partidas de Tic-Tac-Toe.
 
 [![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![codecov](https://codecov.io/gh/JalaU-Capstones/gameapi/branch/main/graph/badge.svg)](https://codecov.io/gh/JalaU-Capstones/gameapi)
+[![Render](https://img.shields.io/badge/Render-production-46E3B7?logo=render&logoColor=white)](https://gameapi-9vos.onrender.com/health)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg)](https://fastapi.tiangolo.com/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![Tests](https://img.shields.io/badge/tests-247%20passed-success.svg)](#pruebas)
+[![Tests](https://img.shields.io/badge/tests-271%20passed-success.svg)](#pruebas)
+[![Coverage](https://img.shields.io/badge/coverage-93.91%25-brightgreen.svg)](#cobertura)
 
 **Stack:** Python 3.11+ · FastAPI · PostgreSQL 16 · SQLAlchemy 2.0 async · Pydantic v2 · JWT · WebSocket · uv · Docker
 
@@ -606,8 +608,8 @@ make test
 Salida esperada:
 
 ```
-247 passed in ~163s
-Required test coverage of 93.0% reached. Total coverage: 94%
+271 passed
+Required test coverage of 93.0% reached. Total coverage: 93.91%
 ```
 
 Los tests usan **PostgreSQL** de dos formas según el entorno:
@@ -664,7 +666,7 @@ se orquesta desde `services/game_engine_service.py` (persistencia + broadcast).
 
 **Umbral mínimo:** 93% (configurado en `pyproject.toml` → `[tool.coverage.report] fail_under`).
 
-**Cobertura actual:** 93.87% (reporte medido con `coverage report --precision=2`).
+**Cobertura actual:** 93.91% (reporte medido con `coverage report --precision=2`).
 
 | Archivo                                  | Tests | Qué cubre                                                                   |
 |------------------------------------------|-------|-----------------------------------------------------------------------------|
