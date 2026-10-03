@@ -4,6 +4,25 @@ Esta guía describe cómo desplegar el backend `GameAPI` en Render desde cero.
 Está pensada para que cualquier persona pueda levantar su propia instancia y
 para que el equipo tenga una referencia clara del flujo de despliegue.
 
+## Instancia de referencia
+
+La instancia de producción del equipo está disponible en
+<https://gameapi-9vos.onrender.com>.
+
+| Recurso | URL |
+|---|---|
+| API | <https://gameapi-9vos.onrender.com> |
+| Swagger UI | <https://gameapi-9vos.onrender.com/docs> |
+| ReDoc | <https://gameapi-9vos.onrender.com/redoc> |
+| OpenAPI JSON | <https://gameapi-9vos.onrender.com/openapi.json> |
+| Health check | <https://gameapi-9vos.onrender.com/health> |
+| WebSocket gameplays | `wss://gameapi-9vos.onrender.com/api/v2/ws/gameplays` |
+| WebSocket presence | `wss://gameapi-9vos.onrender.com/api/v2/ws/presence` |
+
+La instancia usa el plan gratuito de Render: se suspende tras 15 minutos de
+inactividad y la primera petición después de un arranque en frío puede tardar
+entre 30 y 60 segundos.
+
 ## Arquitectura de despliegue
 
 ```mermaid
