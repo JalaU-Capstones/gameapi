@@ -9,9 +9,23 @@ class PostgresSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="POSTGRES_", env_file=".env", extra="ignore")
 
     uri: str = Field(
-        default="postgresql+asyncpg://gameapi:gameapi@localhost:5432/gameapi",
+        default="******localhost:5432/gameapi",
         min_length=1,
     )
+
+    @field_validator("uri")
+    @classmethod
+    def _normalize_asyncpg_driver(cls, value: str) -> str:
+        """
+        Render's `fromDatabase.connectionString` returns a URI without the
+        async driver suffix. SQLAlchemy async requires it explicitly.
+        Normalize on load so the rest of the codebase never has to care.
+        """
+        if value.startswith("postgresql://"):
+            return value.replace("postgresql://", "postgresql+asyncpg://", 1)
+        if value.startswith("postgres://"):
+            return value.replace("postgres://", "postgresql+asyncpg://", 1)
+        return value
 
 
 class JWTSettings(BaseSettings):
@@ -25,6 +39,21 @@ class JWTSettings(BaseSettings):
     issuer: str = "GameAPI"
     audience: str = "GameAPI"
     expire_minutes: int = Field(default=60, gt=0)
+
+    @model_validator(mode="after")
+    def _require_explicit_secret_in_production(self) -> "JWTSettings":
+        import os
+
+        if (
+            os.getenv("APP_ENV", "development") == "production"
+            and self.secret_key
+            == "Una_Clave_Secreta_Super_Segura_con_Minimo_32_Caracteres_123456789"
+        ):
+            raise ValueError(
+                "JWT_SECRET_KEY must be overridden in production. "
+                "Generate one with: openssl rand -base64 48"
+            )
+        return self
 
 
 class AppSettings(BaseSettings):
@@ -52,6 +81,18 @@ class AppSettings(BaseSettings):
     def _split_origins(cls, value: object) -> object:
         if isinstance(value, str):
             return [origin.strip() for origin in value.split(",") if origin.strip()]
+        return value
+
+    @field_validator("cors_origins")
+    @classmethod
+    def _require_explicit_origins_in_production(cls, value: list[str]) -> list[str]:
+        import os
+
+        if os.getenv("APP_ENV") == "production" and value == ["*"]:
+            raise ValueError(
+                "CORS_ORIGINS must be an explicit list in production. "
+                "Wildcard '*' is not allowed with credentials."
+            )
         return value
 
 
@@ -93,6 +134,14 @@ class AuthSettings(BaseSettings):
             raise ValueError("cookie_samesite='none' requires cookie_secure=True")
         return self
 
+    @model_validator(mode="after")
+    def _require_secure_cookies_in_production(self) -> "AuthSettings":
+        import os
+
+        if os.getenv("APP_ENV", "development") == "production" and not self.cookie_secure:
+            raise ValueError("AUTH_COOKIE_SECURE must be True in production (HTTPS-only cookies)")
+        return self
+
 
 class RateLimitSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="RATE_LIMIT_", env_file=".env", extra="ignore")
@@ -125,6 +174,25 @@ class Settings(BaseSettings):
     log: LogSettings = Field(default_factory=LogSettings)
     auth: AuthSettings = Field(default_factory=AuthSettings)
     rate_limit: RateLimitSettings = Field(default_factory=RateLimitSettings)
+
+    @model_validator(mode="after")
+    def _normalize_nested_uris(self) -> "Settings":
+        """
+        Normalize nested URIs that may not have been processed by their
+        own validators.
+
+        pydantic-settings does not always run field_validator on nested
+        BaseSettings models when the value comes from an environment
+        variable. Normalizing here guarantees the correction runs
+        regardless of the source.
+        """
+        if self.postgres.uri.startswith("postgresql://"):
+            self.postgres.uri = self.postgres.uri.replace(
+                "postgresql://", "postgresql+asyncpg://", 1
+            )
+        elif self.postgres.uri.startswith("postgres://"):
+            self.postgres.uri = self.postgres.uri.replace("postgres://", "postgresql+asyncpg://", 1)
+        return self
 
 
 @lru_cache
