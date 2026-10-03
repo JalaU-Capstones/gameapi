@@ -182,7 +182,7 @@ Todas las variables se leen desde `.env` (ver `.env.example`):
 
 | Variable                           | Descripción                                         | Default                                                       |
 |------------------------------------|-----------------------------------------------------|---------------------------------------------------------------|
-| `POSTGRES_URI`                     | URI de PostgreSQL para SQLAlchemy async             | `postgresql+asyncpg://gameapi:gameapi@localhost:5432/gameapi` |
+| `POSTGRES_URI` | URI de PostgreSQL. Acepta `postgres://`, `postgresql://` o `postgresql+asyncpg://` y normaliza al driver async automáticamente. | `postgresql+asyncpg://gameapi:gameapi@localhost:5432/gameapi` |
 | `POSTGRES_USER`                    | Usuario de PostgreSQL (para Docker Compose)         | `gameapi`                                                     |
 | `POSTGRES_PASSWORD`                | Contraseña de PostgreSQL (para Docker Compose)      | `gameapi`                                                     |
 | `POSTGRES_DB`                      | Nombre de la base de datos PostgreSQL               | `gameapi`                                                     |
@@ -875,7 +875,32 @@ La conversión es **automática** vía `pydantic.alias_generators.to_camel` en `
 - `JWT_SECRET_KEY` mínimo 32 caracteres (validado en el arranque).
 - Límite de tasa por cliente y ruta con SlowAPI para mitigar fuerza bruta e intentos de abuso; ver [Rate limiting](./.docs/rate-limiting/README.md).
 
+### Endurecimiento en producción
+
+Cuando `APP_ENV=production`, el backend valida en el arranque que:
+
+- `JWT_SECRET_KEY` no sea el valor por defecto.
+- `AUTH_COOKIE_SECURE` sea `true` (cookies solo sobre HTTPS).
+- `CORS_ORIGINS` no sea `*` (browsers rechazan cookies con wildcard).
+
+Si alguna condición falla, la aplicación no arranca y el error aparece en los logs del contenedor. Esto previene despliegues accidentales con configuración de desarrollo.
+
 ---
+
+## Despliegue
+
+El backend se despliega en **Render** con PostgreSQL gestionado. El deploy es automático: cada push a `main` con CI en verde dispara un deploy en Render vía GitHub Actions.
+
+- **Guía completa:** [`.docs/deployment/README.md`](./.docs/deployment/README.md)
+- **Blueprint declarativo:** [`render.yaml`](./render.yaml)
+- **Workflow de deploy:** [`.github/workflows/deploy.yml`](./.github/workflows/deploy.yml)
+
+**Resumen rápido:**
+
+1. La base de datos PostgreSQL se crea primero en Render.
+2. El Web Service consume la URI interna vía `POSTGRES_URI`.
+3. Los secretos viven en Render (dashboard), no en el repositorio.
+4. GitHub Actions dispara el deploy con un POST al deploy hook.
 
 ## Licencia
 
