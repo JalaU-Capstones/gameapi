@@ -1,0 +1,59 @@
+databases:
+  - name: gameapi-db
+    databaseName: gameapi
+    user: gameapi
+    plan: free
+    region: oregon
+    postgresMajorVersion: "16"
+
+services:
+  - type: web
+    name: gameapi
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    autoDeploy: false
+    envVars:
+      - key: POSTGRES_URI
+        fromDatabase:
+          name: gameapi-db
+          property: connectionString
+          # Render returns postgres:// or postgresql://.
+          # The app normalizes it to postgresql+asyncpg:// at startup.
+      - key: JWT_SECRET_KEY
+        sync: false
+      - key: JWT_ALGORITHM
+        value: HS256
+      - key: JWT_ISSUER
+        value: GameAPI
+      - key: JWT_AUDIENCE
+        value: GameAPI
+      - key: JWT_EXPIRE_MINUTES
+        value: "60"
+      - key: AUTH_COOKIE_SECURE
+        value: "true"
+      - key: AUTH_COOKIE_SAMESITE
+        value: lax
+      - key: AUTH_COOKIE_DOMAIN
+        sync: false
+      - key: LOG_ADMIN_EMAILS
+        sync: false
+      - key: APP_ENV
+        value: production
+      - key: APP_HOST
+        value: 0.0.0.0
+      - key: CORS_ORIGINS
+        sync: false
+      - key: RATE_LIMIT_ENABLED
+        value: "true"
+      - key: RATE_LIMIT_STORAGE_URI
+        value: memory://
+      - key: LOG_BUFFER_SIZE
+        value: "100"
+      - key: LOG_FLUSH_INTERVAL_SECONDS
+        value: "5.0"
+      - key: LOG_RETENTION_DAYS
+        value: "30"
