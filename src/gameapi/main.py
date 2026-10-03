@@ -55,6 +55,13 @@ app = FastAPI(
     version="v1",
     description="REST API for user and gameplay basic management",
     lifespan=lifespan,
+    servers=[
+        {"url": "http://localhost:8080", "description": "Local development"},
+        {
+            "url": "https://gameapi-9vos.onrender.com",
+            "description": "Production (Render free tier)",
+        },
+    ],
 )
 
 
