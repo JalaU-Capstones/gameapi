@@ -1,0 +1,75 @@
+name: Deploy to Render
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types:
+      - completed
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-main
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Trigger Render deploy
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify secrets are present
+        run: |
+          if [ -z "${{ secrets.RENDER_DEPLOY_HOOK_API }}" ]; then
+            echo "ERROR: RENDER_DEPLOY_HOOK_API secret is not configured."
+            exit 1
+          fi
+
+      - name: Trigger deploy on Render
+        id: trigger
+        run: |
+          response=$(curl -s -X POST "${{ secrets.RENDER_DEPLOY_HOOK_API }}")
+          echo "Render response: $response"
+
+      - name: Poll deploy status (optional)
+        if: ${{ secrets.RENDER_API_KEY != '' && secrets.RENDER_SERVICE_ID_API != '' }}
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID_API }}
+        run: |
+          echo "Waiting for the new deploy to appear..."
+          sleep 15
+
+          for attempt in $(seq 1 30); do
+            status=$(curl -s \
+              -H "Authorization: Bearer $RENDER_API_KEY" \
+              "https://api.render.com/v1/services/$SERVICE_ID/deploys?limit=1" \
+              | jq -r '.[0].deploy.status')
+
+            echo "Attempt $attempt: status=$status"
+
+            case "$status" in
+              "live")
+                echo "Deploy is live."
+                exit 0
+                ;;
+              "build_failed"|"update_failed"|"canceled"|"pre_deploy_failed")
+                echo "Deploy failed with status: $status"
+                exit 1
+                ;;
+            esac
+
+            sleep 20
+          done
+
+          echo "Timed out waiting for deploy."
+          exit 1
+
+      - name: Deployment summary
+        if: always()
+        run: |
+          echo "## Deploy to Render" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Trigger: \`${{ github.event_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Workflow run: [${{ github.event.workflow_run.id }}](${{ github.event.workflow_run.html_url }})" >> $GITHUB_STEP_SUMMARY
