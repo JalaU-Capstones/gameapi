@@ -2,6 +2,18 @@
 
 Este directorio contiene los contratos formales de la API en formato legible por máquinas. Son la fuente de verdad para todos los clientes (frontend, herramientas de testing, scripts).
 
+## Reference instance
+
+The production API is available at <https://gameapi-9vos.onrender.com>. Its
+interactive REST documentation is at <https://gameapi-9vos.onrender.com/docs>,
+and its health check is at <https://gameapi-9vos.onrender.com/health>.
+
+The production WebSocket base URL is
+`wss://gameapi-9vos.onrender.com/api/v2/ws`, with the `gameplays` and `presence`
+channels documented in the AsyncAPI contract below. This Render free-tier
+service sleeps after 15 minutes of inactivity; the first request after a cold
+start may take 30–60 seconds.
+
 ## Contenido
 
 ```text
