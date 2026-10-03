@@ -33,11 +33,15 @@ jobs:
           echo "Render response: $response"
 
       - name: Poll deploy status (optional)
-        if: ${{ secrets.RENDER_API_KEY != '' && secrets.RENDER_SERVICE_ID_API != '' }}
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
           SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID_API }}
         run: |
+          if [ -z "$RENDER_API_KEY" ] || [ -z "$SERVICE_ID" ]; then
+            echo "Render API polling skipped: secrets not configured."
+            exit 0
+          fi
+
           echo "Waiting for the new deploy to appear..."
           sleep 15
 
@@ -68,8 +72,16 @@ jobs:
 
       - name: Deployment summary
         if: always()
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
         run: |
-          echo "## Deploy to Render" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- Trigger: \`${{ github.event_name }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- Workflow run: [${{ github.event.workflow_run.id }}](${{ github.event.workflow_run.html_url }})" >> $GITHUB_STEP_SUMMARY
+          {
+            echo "## Deploy to Render"
+            echo ""
+            echo "- Trigger: \`$EVENT_NAME\`"
+            if [ -n "$RUN_ID" ]; then
+              echo "- Upstream CI: [$RUN_ID]($RUN_URL)"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
