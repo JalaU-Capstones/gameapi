@@ -7,8 +7,8 @@ REST API para gestión de usuarios y partidas de Tic-Tac-Toe.
 [![Render](https://img.shields.io/badge/Render-production-46E3B7?logo=render&logoColor=white)](https://gameapi-9vos.onrender.com/health)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg)](https://fastapi.tiangolo.com/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![Tests](https://img.shields.io/badge/tests-271%20passed-success.svg)](#pruebas)
-[![Coverage](https://img.shields.io/badge/coverage-93.91%25-brightgreen.svg)](#cobertura)
+[![Tests](https://img.shields.io/badge/tests-286%20passed-success.svg)](#pruebas)
+[![Coverage](https://img.shields.io/badge/coverage-94.75%25-brightgreen.svg)](#cobertura)
 
 **Stack:** Python 3.11+ · FastAPI · PostgreSQL 16 · SQLAlchemy 2.0 async · Pydantic v2 · JWT · WebSocket · uv · Docker
 
@@ -422,7 +422,7 @@ Los endpoints WebSocket operan bajo `/api/v2/ws` y requieren autenticación JWT 
 - `invitation_accepted` — el guest aceptó; partida comienza (a ambos).
 - `invitation_rejected` — el guest rechazó (al host).
 - `board_updated` — jugada realizada. Incluye `board`, `turn` y `last_move`.
-- `game_ended` — partida terminada. Incluye `winner` y `reason` (`"line"`, `"draw"`, `"abandon"`, `"rejected"`).
+- `game_ended` — partida terminada. Incluye `game_id`, `board`, `winner`, `reason`, y `winner_line` (`null` para empate/abandono, una lista de coordenadas para victoria).
 - `subscribed` / `unsubscribed` — confirmación de suscripción al canal.
 - `error` — error de validación. Incluye `code` y `message`.
 
@@ -608,8 +608,8 @@ make test
 Salida esperada:
 
 ```
-271 passed
-Required test coverage of 93.0% reached. Total coverage: 93.91%
+286 passed in ~3s
+Required test coverage of 93.0% reached. Total coverage: 94.75%
 ```
 
 Los tests usan **PostgreSQL** de dos formas según el entorno:
@@ -666,7 +666,7 @@ se orquesta desde `services/game_engine_service.py` (persistencia + broadcast).
 
 **Umbral mínimo:** 93% (configurado en `pyproject.toml` → `[tool.coverage.report] fail_under`).
 
-**Cobertura actual:** 93.91% (reporte medido con `coverage report --precision=2`).
+**Cobertura actual:** 94.75% (reporte medido con `coverage report --precision=2`).
 
 | Archivo                                  | Tests | Qué cubre                                                                   |
 |------------------------------------------|-------|-----------------------------------------------------------------------------|
@@ -676,14 +676,14 @@ se orquesta desde `services/game_engine_service.py` (persistencia + broadcast).
 | `tests/test_gameplays.py`                | 23    | CRUD de gameplays + validación JSON + permisos + UUID válido inexistente.   |
 | `tests/test_edge_cases.py`               | 16    | UUIDs inválidos, errores de auth, validaciones.                             |
 | `tests/test_services_unit.py`            | 16    | Servicios, configuración, entrypoint y repositorio de logs.                 |
-| `tests/test_game_engine_service_unit.py` | 14    | Excepciones y transiciones de partidas.                                     |
+| `tests/test_game_engine_service_unit.py` | 18    | Excepciones, turnos, victoria, empate, abandono y rechazo.                 |
 | `tests/test_api_deps.py`                 | 2     | Sesión de base de datos y autenticación de cuentas eliminadas.              |
 | `tests/test_ws_manager.py`               | 2     | Envío a usuarios desconectados y limpieza de sockets fallidos.              |
 | `tests/test_event_bus.py`                | 9     | Pub/sub del bus, multi-suscriptor, shutdown.                                |
-| `tests/test_game_engine.py`              | 15    | Reglas puras de Tic-Tac-Toe.                                                |
+| `tests/test_game_engine.py`              | 25    | Reglas puras de Tic-Tac-Toe, líneas ganadoras y casos de empate.           |
 | `tests/test_ws_gameplays.py`             | 11    | Auth WS, ping/pong, subscribe/unsubscribe, cleanup.                         |
-| `tests/test_ws_presence.py`              | 10    | Presencia online/offline, listado, mensajes inválidos y autenticación.      |
-| `tests/test_ws_game_flow.py`             | 11    | Flujo completo de partida (happy path, rechazo, abandono, empate, errores). |
+| `tests/test_ws_game_flow.py`             | 12    | Flujo completo de partida, rechazo, abandono, empate y errores WS.         |
+| `tests/test_ws_presence.py`             | 10    | Presencia en línea y eventos de conexión/desconexión.                      |              | 10    | Presencia online/offline, listado, mensajes inválidos y autenticación.      || `tests/test_ws_game_flow.py`             | 11    | Flujo completo de partida (happy path, rechazo, abandono, empate, errores). |
 
 **Reporte HTML** (local, tras `make test-cov`):
 
