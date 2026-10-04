@@ -16,6 +16,7 @@ from gameapi.services.game_engine import (
     apply_move,
     empty_board,
     evaluate_result,
+    find_winner_line,
     is_valid_move,
 )
 from gameapi.services.gameplay_service import GameplayService
@@ -136,15 +137,27 @@ class GameEngineService:
         await self.gameplay_service.update(game_id, update_data)
 
         if result:
-            winner_id = None
+            winner_id: str | None = None
             if result["winner"] == "host":
                 winner_id = gameplay.host_player
             elif result["winner"] == "guest":
                 winner_id = gameplay.guest_player
 
+            winner_line: list[list[int]] | None = None
+            if result["reason"] == "line":
+                raw_line = find_winner_line(new_board)
+                if raw_line is not None:
+                    winner_line = [[r, c] for r, c in raw_line]
+
             return {
                 "event": "game_ended",
-                "payload": {"winner": winner_id, "reason": result["reason"]},
+                "payload": {
+                    "game_id": game_id,
+                    "board": new_board,
+                    "winner": winner_id,
+                    "reason": result["reason"],
+                    "winner_line": winner_line,
+                },
             }
         else:
             return {

@@ -163,6 +163,8 @@ async def test_play_move_guest_wins_returns_guest_winner(
     assert result["event"] == "game_ended"
     assert result["payload"]["winner"] == guest_id
     assert result["payload"]["reason"] == "line"
+    assert result["payload"]["board"][1] == [2, 2, 2]
+    assert result["payload"]["winner_line"] == [[1, 0], [1, 1], [1, 2]]
 
 
 async def test_leave_game_by_guest_opponent_is_host(

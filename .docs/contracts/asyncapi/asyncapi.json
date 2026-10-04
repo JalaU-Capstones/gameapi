@@ -274,7 +274,7 @@
       "game_ended": {
         "name": "game_ended",
         "title": "Game ended",
-        "summary": "The gameplay ended due to a line, draw, abandon, or rejection.",
+        "summary": "The gameplay ended. The payload contains the final board and the winning line when applicable.",
         "payload": { "$ref": "#/components/schemas/GameEndedPayload" }
       },
       "subscribed": {
@@ -547,8 +547,17 @@
       },
       "GameEndedPayload": {
         "type": "object",
-        "required": ["winner", "reason"],
+        "required": ["game_id", "board", "winner", "reason"],
         "properties": {
+          "game_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Identifier of the finished gameplay."
+          },
+          "board": {
+            "$ref": "#/components/schemas/Board",
+            "description": "Final board state after the game ended. When the reason is abandon or rejected, this still reflects the current board state known by the server."
+          },
           "winner": {
             "oneOf": [
               { "type": "string", "format": "uuid", "description": "User ID of the winner of the gameplay." },
@@ -560,6 +569,16 @@
             "type": "string",
             "enum": ["line", "draw", "abandon", "rejected"],
             "description": "Why the game ended: line, draw, abandon, or rejected invitation."
+          },
+          "winner_line": {
+            "type": ["array", "null"],
+            "description": "Three coordinates in row/column format for the winning line, or null when no line exists.",
+            "items": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": { "type": "integer", "minimum": 0, "maximum": 2 }
+            }
           }
         }
       },

@@ -73,6 +73,31 @@ def is_board_full(board: Board) -> bool:
     return True
 
 
+def find_winner_line(board: Board) -> list[tuple[int, int]] | None:
+    """
+    Return the three (row, col) coordinates of the winning line, or None
+    if there is no line (ongoing game or draw).
+    """
+    lines: list[list[tuple[int, int]]] = [
+        [(0, 0), (0, 1), (0, 2)],
+        [(1, 0), (1, 1), (1, 2)],
+        [(2, 0), (2, 1), (2, 2)],
+        [(0, 0), (1, 0), (2, 0)],
+        [(0, 1), (1, 1), (2, 1)],
+        [(0, 2), (1, 2), (2, 2)],
+        [(0, 0), (1, 1), (2, 2)],
+        [(0, 2), (1, 1), (2, 0)],
+    ]
+
+    for line in lines:
+        first = board[line[0][0]][line[0][1]]
+        if first == 0:
+            continue
+        if all(board[r][c] == first for r, c in line):
+            return line
+    return None
+
+
 def evaluate_result(board: Board) -> GameResult | None:
     """
     Return None if the game is still ongoing.

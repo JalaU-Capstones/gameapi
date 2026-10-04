@@ -93,10 +93,14 @@ async def test_full_happy_path(
         res_a_win = await wsa.receive_json()
         assert res_a_win["event"] == "game_ended"
         assert res_a_win["payload"]["winner"] == user_a_id
+        assert res_a_win["payload"]["board"][0] == [1, 1, 1]
+        assert res_a_win["payload"]["winner_line"] == [[0, 0], [0, 1], [0, 2]]
 
         res_b_win = await wsb.receive_json()
         assert res_b_win["event"] == "game_ended"
         assert res_b_win["payload"]["winner"] == user_a_id
+        assert res_b_win["payload"]["board"][0] == [1, 1, 1]
+        assert res_b_win["payload"]["winner_line"] == [[0, 0], [0, 1], [0, 2]]
 
 
 # ---------------------------------------------------------------------------

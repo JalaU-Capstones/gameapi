@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import json
 import logging
 from typing import Any
 
@@ -341,12 +342,14 @@ async def _handle_message(
 
             gameplay = await engine_service.gameplay_service.get_by_id(game_id)
             opponent_id = None
+            board = [[0, 0, 0], [0, 0, 0], [0, 0, 0]]
             if gameplay:
                 opponent_id = (
                     gameplay.guest_player
                     if user_id == gameplay.host_player
                     else gameplay.host_player
                 )
+                board = json.loads(gameplay.current_positions)["board"]
 
             logger.warning(
                 "Game abandoned",
@@ -359,7 +362,16 @@ async def _handle_message(
             )
             await event_bus.publish(
                 game_id,
-                {"event": "game_ended", "payload": {"winner": opponent_id, "reason": "abandon"}},
+                {
+                    "event": "game_ended",
+                    "payload": {
+                        "game_id": game_id,
+                        "board": board,
+                        "winner": opponent_id,
+                        "reason": "abandon",
+                        "winner_line": None,
+                    },
+                },
             )
             event_bus.unsubscribe(game_id, user_id)
             if current_game_id == game_id:
@@ -423,6 +435,7 @@ async def gameplays_websocket(websocket: WebSocket) -> None:
                             if user_id == gameplay.host_player
                             else gameplay.host_player
                         )
+                        board = json.loads(gameplay.current_positions)["board"]
                         logger.info(
                             "Game ended",
                             extra={
@@ -440,7 +453,13 @@ async def gameplays_websocket(websocket: WebSocket) -> None:
                             current_game_id,
                             {
                                 "event": "game_ended",
-                                "payload": {"winner": opponent_id, "reason": "abandon"},
+                                "payload": {
+                                    "game_id": current_game_id,
+                                    "board": board,
+                                    "winner": opponent_id,
+                                    "reason": "abandon",
+                                    "winner_line": None,
+                                },
                             },
                         )
                         event_bus.unsubscribe(current_game_id, user_id)
