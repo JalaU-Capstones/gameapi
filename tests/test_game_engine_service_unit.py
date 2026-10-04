@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from typing import Any
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -167,6 +168,59 @@ async def test_play_move_guest_wins_returns_guest_winner(
     assert result["payload"]["winner_line"] == [[1, 0], [1, 1], [1, 2]]
 
 
+async def test_play_move_returns_board_and_winner_line_on_win(
+    engine_service: GameEngineService, db_session: AsyncSession
+) -> None:
+    host_id, guest_id = await _create_users(db_session)
+    game_id = await engine_service.create_game(host_id, guest_id)
+    await engine_service.accept_invitation(game_id, guest_id)
+
+    await engine_service.play_move(game_id, host_id, 0, 0)
+    await engine_service.play_move(game_id, guest_id, 1, 1)
+    await engine_service.play_move(game_id, host_id, 0, 1)
+    await engine_service.play_move(game_id, guest_id, 1, 0)
+
+    result = await engine_service.play_move(game_id, host_id, 0, 2)
+
+    assert result["event"] == "game_ended"
+    payload = result["payload"]
+    assert payload["reason"] == "line"
+    assert payload["winner"] == host_id
+    assert payload["board"] == [[1, 1, 1], [2, 2, 0], [0, 0, 0]]
+    assert payload["winner_line"] == [[0, 0], [0, 1], [0, 2]]
+
+
+async def test_play_move_returns_board_and_no_winner_line_on_draw(
+    engine_service: GameEngineService, db_session: AsyncSession
+) -> None:
+    host_id, guest_id = await _create_users(db_session)
+    game_id = await engine_service.create_game(host_id, guest_id)
+    await engine_service.accept_invitation(game_id, guest_id)
+
+    moves = [
+        (host_id, 0, 0),
+        (guest_id, 0, 1),
+        (host_id, 1, 2),
+        (guest_id, 1, 0),
+        (host_id, 1, 1),
+        (guest_id, 2, 2),
+        (host_id, 2, 1),
+        (guest_id, 0, 2),
+        (host_id, 2, 0),
+    ]
+
+    result: dict[str, Any] = {}
+    for player_id, row, col in moves:
+        result = await engine_service.play_move(game_id, player_id, row, col)
+
+    assert result["event"] == "game_ended"
+    payload = result["payload"]
+    assert payload["reason"] == "draw"
+    assert payload["winner"] is None
+    assert payload["winner_line"] is None
+    assert payload["board"] == [[1, 2, 2], [2, 1, 1], [1, 1, 2]]
+
+
 async def test_leave_game_by_guest_opponent_is_host(
     engine_service: GameEngineService, db_session: AsyncSession
 ) -> None:
@@ -179,6 +233,35 @@ async def test_leave_game_by_guest_opponent_is_host(
 
     assert gameplay is not None
     assert json.loads(gameplay.match_result) == {"winner": host_id, "reason": "abandon"}
+
+
+async def test_leave_game_payload_includes_current_board(
+    engine_service: GameEngineService, db_session: AsyncSession
+) -> None:
+    host_id, guest_id = await _create_users(db_session)
+    game_id = await engine_service.create_game(host_id, guest_id)
+    await engine_service.accept_invitation(game_id, guest_id)
+    await engine_service.play_move(game_id, host_id, 0, 0)
+
+    await engine_service.leave_game(game_id, host_id)
+    gameplay = await engine_service.gameplay_service.get_by_id(game_id)
+
+    assert gameplay is not None
+    assert json.loads(gameplay.match_result) == {"winner": guest_id, "reason": "abandon"}
+    assert json.loads(gameplay.current_positions)["board"] == [[1, 0, 0], [0, 0, 0], [0, 0, 0]]
+
+
+async def test_reject_invitation_persists_rejection(
+    engine_service: GameEngineService, db_session: AsyncSession
+) -> None:
+    host_id, guest_id = await _create_users(db_session)
+    game_id = await engine_service.create_game(host_id, guest_id)
+
+    await engine_service.reject_invitation(game_id, guest_id)
+    gameplay = await engine_service.gameplay_service.get_by_id(game_id)
+
+    assert gameplay is not None
+    assert json.loads(gameplay.match_result) == {"winner": None, "reason": "rejected"}
 
 
 async def test_leave_game_on_finished_game_is_noop(
