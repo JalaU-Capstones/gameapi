@@ -1,5 +1,7 @@
 """Typed schemas for WebSocket events. One class per event payload."""
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 
@@ -23,3 +25,11 @@ class PlayMovePayload(BaseModel):
 
 class LeaveGamePayload(BaseModel):
     game_id: str
+
+
+class GameEndedPayload(BaseModel):
+    game_id: str
+    board: list[list[int]]
+    winner: str | None
+    reason: Literal["line", "draw", "abandon", "rejected"]
+    winner_line: list[list[int]] | None = None
