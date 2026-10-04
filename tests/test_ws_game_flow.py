@@ -354,9 +354,52 @@ async def test_abandonment(
             res_end = await wsa.receive_json()
             assert res_end["event"] == "game_ended"
             assert res_end["payload"]["reason"] == "abandon"
+            assert res_end["payload"]["board"] == [[0, 0, 0], [0, 0, 0], [0, 0, 0]]
     except BaseExceptionGroup as exc:
         if not _contains_end_of_stream(exc):
             raise
+
+
+@pytest.mark.asyncio
+async def test_leave_game_ws_emits_game_ended_with_board(
+    ws_client_factory: Callable[[], AsyncClient],
+    registered_user_b: dict,
+    auth_token_a: str,
+    auth_token_b: str,
+) -> None:
+    async with (
+        ws_client_factory() as ca,
+        aconnect_ws("ws://test/api/v2/ws/gameplays", client=ca) as wsa,
+        ws_client_factory() as cb,
+        aconnect_ws("ws://test/api/v2/ws/gameplays", client=cb) as wsb,
+    ):
+        await _send_recv(wsa, {"event": "auth", "payload": {"token": auth_token_a}})
+        await _send_recv(wsb, {"event": "auth", "payload": {"token": auth_token_b}})
+
+        res_created = await _send_recv(
+            wsa,
+            {"event": "create_game", "payload": {"guest_id": registered_user_b["id"]}},
+        )
+        game_id = res_created["payload"]["game_id"]
+        await wsb.receive_json()
+
+        await wsb.send_json({"event": "accept_invitation", "payload": {"game_id": game_id}})
+        await wsb.receive_json()
+        await wsa.receive_json()
+
+        await wsa.send_json(
+            {"event": "play_move", "payload": {"game_id": game_id, "row": 0, "col": 0}}
+        )
+        await wsa.receive_json()
+        await wsb.receive_json()
+
+        await wsa.send_json({"event": "leave_game", "payload": {"game_id": game_id}})
+        res_b = await wsb.receive_json()
+
+        assert res_b["event"] == "game_ended"
+        assert res_b["payload"]["reason"] == "abandon"
+        assert res_b["payload"]["winner"] == registered_user_b["id"]
+        assert res_b["payload"]["board"] == [[1, 0, 0], [0, 0, 0], [0, 0, 0]]
 
 
 # ---------------------------------------------------------------------------
