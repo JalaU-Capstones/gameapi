@@ -63,7 +63,7 @@ async def presence_websocket(websocket: WebSocket) -> None:
     except WebSocketDisconnect:
         pass
     finally:
-        presence_manager.disconnect(user_id)
+        presence_manager.disconnect(user_id, websocket)
         await presence_manager.broadcast(
             {"event": "user_offline", "payload": {"user_id": user_id}},
             exclude={user_id},

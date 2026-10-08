@@ -12,6 +12,7 @@ from gameapi.core.security import TokenDecodeError, decode_access_token
 WS_CLOSE_AUTH_TIMEOUT = 4408
 WS_CLOSE_UNAUTHORIZED = 4401
 WS_CLOSE_RATE_LIMITED = 4429
+WS_CLOSE_SESSION_CONFLICT = 4409
 
 _ws_attempts: dict[str, deque[float]] = defaultdict(deque)
 

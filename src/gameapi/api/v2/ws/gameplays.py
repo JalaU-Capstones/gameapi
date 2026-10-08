@@ -469,4 +469,4 @@ async def gameplays_websocket(websocket: WebSocket) -> None:
 
             with contextlib.suppress(Exception):
                 await session.rollback()
-            gameplays_manager.disconnect(user_id)
+            gameplays_manager.disconnect(user_id, websocket)
