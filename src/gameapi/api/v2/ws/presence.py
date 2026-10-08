@@ -49,6 +49,10 @@ async def presence_websocket(websocket: WebSocket) -> None:
     if user_id is None:
         return
 
+    if presence_manager.get_user_socket(user_id) is not None:
+        await websocket.close(code=4409, reason="session_already_active")
+        return
+
     await presence_manager.connect(user_id, websocket)
     await websocket.send_json({"event": "auth_ok", "payload": {"user_id": user_id}})
     await presence_manager.broadcast(

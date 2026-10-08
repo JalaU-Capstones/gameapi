@@ -36,6 +36,30 @@ async def test_ws_presence_valid_auth(
         }
 
 
+async def test_ws_presence_rejects_duplicate_user_session(
+    ws_client_factory: Callable[[], AsyncClient],
+    auth_token: str,
+) -> None:
+    async with (
+        ws_client_factory() as client_a,
+        aconnect_ws("ws://test/api/v2/ws/presence", client=client_a) as ws_a,
+    ):
+        await ws_a.send_json({"event": "auth", "payload": {"token": auth_token}})
+        assert (await ws_a.receive_json())["event"] == "auth_ok"
+
+        async with (
+            ws_client_factory() as client_b,
+            aconnect_ws("ws://test/api/v2/ws/presence", client=client_b) as ws_b,
+        ):
+            await ws_b.send_json({"event": "auth", "payload": {"token": auth_token}})
+            with pytest.raises(WebSocketDisconnect) as exc:
+                await ws_b.receive_json()
+            assert exc.value.code == 4409
+
+        await ws_a.send_json({"event": "ping"})
+        assert await ws_a.receive_json() == {"event": "pong", "payload": {}}
+
+
 async def test_presence_auth_timeout(
     ws_client_factory: Callable[[], AsyncClient],
 ) -> None:
