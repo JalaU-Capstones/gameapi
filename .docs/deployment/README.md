@@ -44,6 +44,29 @@ flowchart LR
 3. **La base de datos se crea antes que el Web Service.** El Web Service consume la URI interna de la base.
 4. **Los secretos viven en Render.** Nunca en el repositorio ni en GitHub Secrets (excepto los deploy hooks).
 
+## Rol de ejecución de PostgreSQL en local
+
+En Docker Compose, la aplicación se conecta con el rol `gameapi_app`, que solo
+recibe permisos DML sobre las tablas de la API. El rol y sus permisos iniciales
+se configuran mediante un script de inicialización de PostgreSQL.
+
+Los scripts de `docker/initdb` se ejecutan únicamente cuando PostgreSQL crea un
+volumen de datos nuevo. Para volver a ejecutarlos en local, elimina el volumen
+y levanta los servicios de nuevo:
+
+```bash
+docker compose down -v && docker compose up -d
+```
+
+> Este comando elimina los datos locales de PostgreSQL.
+
+Comprueba que el rol existe y revisa los permisos de una tabla con:
+
+```bash
+docker compose exec postgres psql -U gameapi -d gameapi -c '\du gameapi_app'
+docker compose exec postgres psql -U gameapi -d gameapi -c '\dp public.users'
+```
+
 ## Requisitos previos
 
 - Cuenta en [Render](https://render.com).
