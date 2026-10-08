@@ -169,6 +169,10 @@ class RateLimitSettings(BaseSettings):
     logs_admin: str = "300/minute"
 
     ws_handshake: str = "10/minute"
+    session_takeover: str = Field(
+        default="3/minute",
+        validation_alias=AliasChoices("RATE_LIMIT_SESSION_TAKEOVER", "session_takeover"),
+    )
 
 
 class Settings(BaseSettings):

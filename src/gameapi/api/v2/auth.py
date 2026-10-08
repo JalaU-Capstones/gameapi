@@ -3,6 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Cookie, HTTPException, Request, Response, status
 
 from gameapi.api.deps import AuthServiceDep, CurrentUser
+from gameapi.api.v2.ws.manager import gameplays_manager, presence_manager
 from gameapi.core.config import settings
 from gameapi.core.rate_limit import rate_limit
 from gameapi.schemas.auth import LoginRequest, LoginResponse, RefreshResponse
@@ -166,6 +167,40 @@ async def logout(
     if refresh_token_cookie:
         await service.logout(refresh_token_cookie)
     _clear_auth_cookies(response)
+    response.status_code = status.HTTP_204_NO_CONTENT
+    return response
+
+
+@router.post(
+    "/session/takeover",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Force a takeover of all active websocket sessions for the current user",
+    responses={
+        401: {"description": "Not authenticated"},
+        429: {"description": "Rate limit exceeded"},
+    },
+)
+@rate_limit(settings.rate_limit.session_takeover)
+async def takeover_session(
+    request: Request,
+    response: Response,
+    current_user: CurrentUser,
+) -> Response:
+    del request
+    revoked = 0
+    for manager in (gameplays_manager, presence_manager):
+        revoked += int(await manager.revoke_all_user_sockets(current_user.id))
+
+    logger = __import__("logging").getLogger(__name__)
+    logger.info(
+        "Session takeover requested",
+        extra={
+            "event_type": "session_takeover",
+            "user_id": current_user.id,
+            "metadata": {"revoked_sessions": revoked},
+        },
+    )
+
     response.status_code = status.HTTP_204_NO_CONTENT
     return response
 
