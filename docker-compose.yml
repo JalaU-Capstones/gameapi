@@ -7,8 +7,10 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-gameapi}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gameapi}
       POSTGRES_DB: ${POSTGRES_DB:-gameapi}
+      GAMEAPI_APP_PASSWORD: ${GAMEAPI_APP_PASSWORD:-gameapi_app_dev}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./docker/initdb:/docker-entrypoint-initdb.d:ro
     networks:
       - backend
     security_opt:
@@ -44,7 +46,8 @@ services:
     environment:
       # Do not use ${POSTGRES_URI} here: the .env value points to localhost
       # for local development and would break inside the container network.
-      POSTGRES_URI: postgresql+asyncpg://${POSTGRES_USER:-gameapi}:${POSTGRES_PASSWORD:-gameapi}@postgres:5432/${POSTGRES_DB:-gameapi}
+      POSTGRES_URI: postgresql+asyncpg://gameapi_app:${GAMEAPI_APP_PASSWORD:-gameapi_app_dev}@postgres:5432/${POSTGRES_DB:-gameapi}
+      POSTGRES_MIGRATOR_URI: postgresql+asyncpg://${POSTGRES_USER:-gameapi}:${POSTGRES_PASSWORD:-gameapi}@postgres:5432/${POSTGRES_DB:-gameapi}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-Una_Clave_Secreta_Super_Segura_con_Minimo_32_Caracteres_123456789}
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
       JWT_ISSUER: ${JWT_ISSUER:-GameAPI}
