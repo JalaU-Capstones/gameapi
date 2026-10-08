@@ -753,6 +753,26 @@ Detalles:
 - Healthchecks reales para PostgreSQL y la API.
 - La API espera a que PostgreSQL esté `healthy` antes de arrancar.
 
+### Redes y permisos locales
+
+Compose conecta la API a `frontend` (bridge, con el puerto 8080 publicado en el host) y a
+`backend`. Esta última red es `internal: true`: permite la comunicación entre la API y
+PostgreSQL sin exponer el servicio mediante un puerto publicado ni proporcionar salida a
+redes externas. PostgreSQL no publica el puerto 5432. Para administrarlo, ejecuta:
+
+```bash
+docker compose exec postgres psql -U gameapi -d gameapi
+```
+
+En el host, `localhost:5432` no está publicado. En Linux, el host Docker todavía puede
+tener conectividad directa a la IP interna del contenedor; `internal: true` no sustituye
+una regla de firewall del host si también se necesita bloquear ese acceso directo.
+
+El sistema de archivos raíz de la API es de solo lectura. Los archivos temporales deben
+escribirse en `/tmp` o `/run`, que son montajes temporales en memoria y no persisten.
+Este endurecimiento corresponde únicamente al entorno local de Compose; Render gestiona
+su propio runtime y no utiliza esta configuración.
+
 ### Flujo completo con Docker
 
 ```bash
