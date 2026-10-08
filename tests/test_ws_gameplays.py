@@ -104,6 +104,30 @@ async def test_ws_gameplays_valid_auth(
         }
 
 
+async def test_ws_gameplays_rejects_duplicate_user_session(
+    ws_client_factory: Callable[[], AsyncClient],
+    auth_token: str,
+) -> None:
+    async with (
+        ws_client_factory() as client_a,
+        aconnect_ws("ws://test/api/v2/ws/gameplays", client=client_a) as ws_a,
+    ):
+        await ws_a.send_json({"event": "auth", "payload": {"token": auth_token}})
+        assert (await ws_a.receive_json())["event"] == "auth_ok"
+
+        async with (
+            ws_client_factory() as client_b,
+            aconnect_ws("ws://test/api/v2/ws/gameplays", client=client_b) as ws_b,
+        ):
+            await ws_b.send_json({"event": "auth", "payload": {"token": auth_token}})
+            with pytest.raises(WebSocketDisconnect) as exc:
+                await ws_b.receive_json()
+            assert exc.value.code == 4409
+
+        await ws_a.send_json({"event": "ping"})
+        assert await ws_a.receive_json() == {"event": "pong", "payload": {}}
+
+
 async def test_ws_gameplays_ping_pong(
     ws_client_factory: Callable[[], AsyncClient],
     auth_token: str,
@@ -171,10 +195,28 @@ async def test_ws_gameplays_missing_event_field(
 
 async def test_ws_gameplays_subscribe_game_and_broadcast(
     ws_client_factory: Callable[[], AsyncClient],
+    client: AsyncClient,
     auth_token: str,
     registered_user: dict[str, object],
 ) -> None:
     from gameapi.services.event_bus import event_bus
+
+    other_payload = {
+        "name": "Gameplay User B",
+        "email": "gameplay-b@example.com",
+        "password": "password123",
+    }
+    response = await client.post("/api/v1/users", json=other_payload)
+    assert response.status_code == 201, response.text
+    other_user_id = str(response.json()["id"])
+    other_token = str(
+        (
+            await client.post(
+                "/api/v1/users/login",
+                json={"email": other_payload["email"], "password": other_payload["password"]},
+            )
+        ).json()["token"]
+    )
 
     async with (
         ws_client_factory() as client,
@@ -203,10 +245,10 @@ async def test_ws_gameplays_subscribe_game_and_broadcast(
                 client=client_2,
             ) as ws_2,
         ):
-            await ws_2.send_json({"event": "auth", "payload": {"token": auth_token}})
+            await ws_2.send_json({"event": "auth", "payload": {"token": other_token}})
             assert await ws_2.receive_json() == {
                 "event": "auth_ok",
-                "payload": {"user_id": str(registered_user["id"])},
+                "payload": {"user_id": other_user_id},
             }
             await ws_2.send_json(
                 {
@@ -220,7 +262,7 @@ async def test_ws_gameplays_subscribe_game_and_broadcast(
             }
             assert await ws.receive_json() == {
                 "event": "game_message",
-                "payload": {"from": str(registered_user["id"]), "message": "hello"},
+                "payload": {"from": other_user_id, "message": "hello"},
             }
 
 
