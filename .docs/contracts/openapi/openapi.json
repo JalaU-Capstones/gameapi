@@ -969,6 +969,59 @@
         }
       }
     },
+    "/api/v2/auth/session/takeover": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Force a takeover of all active websocket sessions for the current user",
+        "operationId": "takeover_session_api_v2_auth_session_takeover_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "gameapi_at",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Gameapi At"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Not authenticated"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v2/auth/me": {
       "get": {
         "tags": [
