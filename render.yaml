@@ -23,6 +23,8 @@ services:
           property: connectionString
           # Render returns postgres:// or postgresql://.
           # The app normalizes it to postgresql+asyncpg:// at startup.
+      - key: POSTGRES_MIGRATOR_URI
+        sync: false
       - key: JWT_SECRET_KEY
         sync: false
       - key: JWT_ALGORITHM
