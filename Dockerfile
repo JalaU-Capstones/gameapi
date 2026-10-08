@@ -41,4 +41,7 @@ USER nonroot
 
 EXPOSE 8080
 
+HEALTHCHECK --interval=15s --timeout=5s --retries=5 --start-period=20s \
+    CMD ["python", "-c", "import urllib.request, sys; sys.exit(0) if urllib.request.urlopen('http://localhost:8080/health', timeout=3).status == 200 else sys.exit(1)"]
+
 CMD ["uvicorn", "gameapi.main:app", "--host", "0.0.0.0", "--port", "8080"]
