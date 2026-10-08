@@ -7,8 +7,8 @@ REST API para gestión de usuarios y partidas de Tic-Tac-Toe.
 [![Render](https://img.shields.io/badge/Render-production-46E3B7?logo=render&logoColor=white)](https://gameapi-9vos.onrender.com/health)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg)](https://fastapi.tiangolo.com/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![Tests](https://img.shields.io/badge/tests-290%20passed-success.svg)](#pruebas)
-[![Coverage](https://img.shields.io/badge/coverage-94.64%25-brightgreen.svg)](#cobertura)
+[![Tests](https://img.shields.io/badge/tests-295%20passed-success.svg)](#pruebas)
+[![Coverage](https://img.shields.io/badge/coverage-94.89%25-brightgreen.svg)](#cobertura)
 
 **Stack:** Python 3.11+ · FastAPI · PostgreSQL 16 · SQLAlchemy 2.0 async · Pydantic v2 · JWT · WebSocket · uv · Docker
 
@@ -608,8 +608,8 @@ make test
 Salida esperada:
 
 ```
-290 passed in ~3m 30s
-Required test coverage of 93.0% reached. Total coverage: 94.64%
+295 passed in ~3m 30s
+Required test coverage of 93.0% reached. Total coverage: 94.89%
 ```
 
 Los tests usan **PostgreSQL** de dos formas según el entorno:
