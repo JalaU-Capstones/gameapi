@@ -82,6 +82,7 @@ services:
       RATE_LIMIT_LOGS_ME: ${RATE_LIMIT_LOGS_ME:-30/minute}
       RATE_LIMIT_LOGS_ADMIN: ${RATE_LIMIT_LOGS_ADMIN:-300/minute}
       RATE_LIMIT_WS_HANDSHAKE: ${RATE_LIMIT_WS_HANDSHAKE:-10/minute}
+      RATE_LIMIT_SESSION_TAKEOVER: ${RATE_LIMIT_SESSION_TAKEOVER:-3/minute}
     depends_on:
       postgres:
         condition: service_healthy
