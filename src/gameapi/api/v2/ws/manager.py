@@ -53,7 +53,7 @@ class ConnectionManager:
         return closed > 0
 
     async def revoke_all_user_sockets(self, user_id: str) -> int:
-        sockets = self._connections.pop(user_id, None)
+        sockets = self._connections.get(user_id)
         if not sockets:
             return 0
 
@@ -62,8 +62,10 @@ class ConnectionManager:
             try:
                 await websocket.close(code=4409, reason="session_replaced")
                 closed += 1
-            except Exception:
+            except (WebSocketDisconnect, RuntimeError):
                 pass
+            finally:
+                self.disconnect(user_id, websocket)
         return closed
 
     async def send_to(self, user_id: str, message: dict[str, Any]) -> bool:

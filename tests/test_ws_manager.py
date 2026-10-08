@@ -1,3 +1,4 @@
+import asyncio
 from unittest.mock import AsyncMock
 
 import pytest
@@ -57,6 +58,31 @@ async def test_manager_revoke_methods_close_every_socket_for_user() -> None:
     first.close.assert_awaited_with(code=4409, reason="session_replaced")
     second.close.assert_awaited_with(code=4409, reason="session_replaced")
     assert await manager.revoke_all_user_sockets("missing") == 0
+
+
+@pytest.mark.asyncio
+async def test_revoke_all_keeps_socket_registered_until_close_finishes() -> None:
+    manager = ConnectionManager()
+    websocket = AsyncMock()
+    finish_close = asyncio.Event()
+
+    async def delayed_close(*, code: int, reason: str) -> None:
+        assert code == 4409
+        assert reason == "session_replaced"
+        await finish_close.wait()
+
+    websocket.close.side_effect = delayed_close
+    await manager.connect("user", websocket)
+
+    revoke = asyncio.create_task(manager.revoke_all_user_sockets("user"))
+    await asyncio.sleep(0)
+
+    assert manager.get_user_socket("user") is websocket
+    assert revoke.done() is False
+
+    finish_close.set()
+    assert await revoke == 1
+    assert manager.get_user_socket("user") is None
 
 
 @pytest.mark.asyncio
