@@ -5,6 +5,16 @@ from pydantic import AliasChoices, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
+def _normalize_asyncpg_uri(value: str | None) -> str | None:
+    if value is None:
+        return None
+    if value.startswith("postgresql://"):
+        return value.replace("postgresql://", "postgresql+asyncpg://", 1)
+    if value.startswith("postgres://"):
+        return value.replace("postgres://", "postgresql+asyncpg://", 1)
+    return value
+
+
 class PostgresSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="POSTGRES_", env_file=".env", extra="ignore")
 
@@ -21,11 +31,7 @@ class PostgresSettings(BaseSettings):
         async driver suffix. SQLAlchemy async requires it explicitly.
         Normalize on load so the rest of the codebase never has to care.
         """
-        if value.startswith("postgresql://"):
-            return value.replace("postgresql://", "postgresql+asyncpg://", 1)
-        if value.startswith("postgres://"):
-            return value.replace("postgres://", "postgresql+asyncpg://", 1)
-        return value
+        return _normalize_asyncpg_uri(value) or value
 
 
 class JWTSettings(BaseSettings):
@@ -169,11 +175,24 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     postgres: PostgresSettings = Field(default_factory=PostgresSettings)
+    postgres_migrator_uri: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("POSTGRES_MIGRATOR_URI", "postgres_migrator_uri"),
+    )
     jwt: JWTSettings = Field(default_factory=JWTSettings)
     app: AppSettings = Field(default_factory=AppSettings)
     log: LogSettings = Field(default_factory=LogSettings)
     auth: AuthSettings = Field(default_factory=AuthSettings)
     rate_limit: RateLimitSettings = Field(default_factory=RateLimitSettings)
+
+    @property
+    def postgres_uri(self) -> str:
+        return self.postgres.uri
+
+    @field_validator("postgres_migrator_uri")
+    @classmethod
+    def _normalize_migrator_uri(cls, value: str | None) -> str | None:
+        return _normalize_asyncpg_uri(value)
 
     @model_validator(mode="after")
     def _normalize_nested_uris(self) -> "Settings":
@@ -186,12 +205,9 @@ class Settings(BaseSettings):
         variable. Normalizing here guarantees the correction runs
         regardless of the source.
         """
-        if self.postgres.uri.startswith("postgresql://"):
-            self.postgres.uri = self.postgres.uri.replace(
-                "postgresql://", "postgresql+asyncpg://", 1
-            )
-        elif self.postgres.uri.startswith("postgres://"):
-            self.postgres.uri = self.postgres.uri.replace("postgres://", "postgresql+asyncpg://", 1)
+        self.postgres.uri = _normalize_asyncpg_uri(self.postgres.uri) or self.postgres.uri
+        if self.postgres_migrator_uri is not None:
+            self.postgres_migrator_uri = _normalize_asyncpg_uri(self.postgres_migrator_uri)
         return self
 
 
