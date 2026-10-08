@@ -2,6 +2,7 @@ import asyncio
 from unittest.mock import AsyncMock
 
 import pytest
+from fastapi.websockets import WebSocketDisconnect
 from httpx import AsyncClient
 
 from gameapi.api.v2.ws.manager import ConnectionManager
@@ -195,6 +196,26 @@ async def test_revoke_methods_handle_close_failures_and_broadcast_excludes_users
     await manager.broadcast({"event": "ping"}, exclude={"user"})
     left.send_json.assert_not_awaited()
     right.send_json.assert_not_awaited()
+
+
+@pytest.mark.parametrize(
+    "close_error",
+    [RuntimeError("close failed"), WebSocketDisconnect(code=1000, reason="already closed")],
+)
+@pytest.mark.asyncio
+async def test_revoke_all_disconnects_sockets_when_close_fails(
+    close_error: Exception,
+) -> None:
+    manager = ConnectionManager()
+    websocket = AsyncMock()
+    websocket.close.side_effect = close_error
+    await manager.connect("user", websocket)
+
+    assert await manager.revoke_all_user_sockets("user") == 0
+
+    websocket.close.assert_awaited_once_with(code=4409, reason="session_replaced")
+    assert manager.get_user_socket("user") is None
+    assert manager.online_user_ids() == []
 
 
 async def test_session_takeover_revokes_every_active_socket_for_current_user(
