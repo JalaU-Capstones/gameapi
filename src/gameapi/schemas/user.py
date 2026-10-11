@@ -27,8 +27,15 @@ class UserUpdate(ApiModel):
         return value.lower() if value is not None else None
 
 
-class UserResponse(ApiModel):
+class PublicUserResponse(ApiModel):
+    """Minimal user information exposed to other authenticated users."""
+
     id: ObjectIdStr
     name: str
+
+
+class UserResponse(PublicUserResponse):
+    """Full user information exposed only to the authenticated user."""
+
     email: EmailStr
     register_date: datetime
