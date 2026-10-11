@@ -1,13 +1,13 @@
-"""v1 API — Frozen contract.
+"""v1 API — Frozen legacy contract.
 
-Paths, request/response shapes, and status codes are stable. The only
-allowed evolution is tightening authentication; this is documented as a
-deliberate security hardening.
+Paths, request/response shapes, and status codes are stable except for
+security patches that reduce data disclosure or tighten authentication.
 """
 
 import logging
 
 from fastapi import APIRouter, HTTPException, Request, Response, status
+from fastapi.responses import JSONResponse
 
 from gameapi.api.deps import CurrentUser, UserServiceDep
 from gameapi.core.config import settings
@@ -15,7 +15,7 @@ from gameapi.core.rate_limit import rate_limit
 from gameapi.core.security import create_access_token, verify_password
 from gameapi.db.models.user import User
 from gameapi.schemas.token import LoginRequest, LoginResponse
-from gameapi.schemas.user import UserCreate, UserResponse, UserUpdate
+from gameapi.schemas.user import PublicUserResponse, UserCreate, UserResponse, UserUpdate
 from gameapi.services import EmailAlreadyExistsError, UserNotFoundError
 
 logger = logging.getLogger(__name__)
@@ -67,25 +67,46 @@ async def create_user(
 
 @router.get(
     "",
-    response_model=list[UserResponse],
-    summary="List all users",
+    response_model=None,
+    status_code=status.HTTP_410_GONE,
+    deprecated=True,
+    summary="List all users (removed)",
+    description=(
+        "This endpoint was removed for privacy reasons. It exposed personal "
+        "information for every user and enabled account enumeration and doxing."
+    ),
+    responses={
+        status.HTTP_410_GONE: {
+            "description": "Removed for privacy reasons",
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "type": "object",
+                        "properties": {"detail": {"type": "string"}},
+                        "required": ["detail"],
+                    },
+                    "example": {"detail": "This endpoint has been removed for privacy reasons."},
+                }
+            },
+        }
+    },
 )
 @rate_limit(settings.rate_limit.authenticated_default)
 async def list_users(
     request: Request,
-    response: Response,
     _current_user: CurrentUser,
-    service: UserServiceDep,
-) -> list[UserResponse]:
+) -> JSONResponse:
     del request
-    del response
-    users = await service.list_all()
-    return [_to_response(u) for u in users]
+    # See the user-list privacy task: prevent account enumeration and doxing.
+    return JSONResponse(
+        status_code=status.HTTP_410_GONE,
+        content={"detail": "This endpoint has been removed for privacy reasons."},
+    )
 
 
 @router.get(
     "/{user_id}",
-    response_model=UserResponse,
+    response_model=PublicUserResponse,
     summary="Get a user by id",
 )
 @rate_limit(settings.rate_limit.authenticated_default)
@@ -95,7 +116,7 @@ async def get_user(
     user_id: str,
     _current_user: CurrentUser,
     service: UserServiceDep,
-) -> UserResponse:
+) -> PublicUserResponse:
     del request
     del response
     user = await service.get_by_id(user_id)
@@ -104,7 +125,7 @@ async def get_user(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found",
         )
-    return _to_response(user)
+    return PublicUserResponse.model_validate(user)
 
 
 @router.put(

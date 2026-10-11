@@ -1,13 +1,14 @@
 """v2 Users endpoints — require authentication.
 
-v2 intentionally excludes `GET /users` (privacy) and `POST /users` (register,
-now under `/api/v2/auth/register`). Only resource operations by id remain.
+`GET /users` is retained as a deprecated 410 response for privacy, while
+registration is handled under `/api/v2/auth/register`.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi.responses import JSONResponse
 
 from gameapi.api.deps import CurrentUser, UserServiceDep, get_current_user
-from gameapi.schemas.user import UserResponse, UserUpdate
+from gameapi.schemas.user import PublicUserResponse, UserUpdate
 from gameapi.services import EmailAlreadyExistsError, UserNotFoundError
 
 router = APIRouter(
@@ -17,15 +18,50 @@ router = APIRouter(
 )
 
 
-@router.get("/{user_id}", response_model=UserResponse)
+@router.get(
+    "",
+    response_model=None,
+    status_code=status.HTTP_410_GONE,
+    deprecated=True,
+    summary="List all users (removed)",
+    description=(
+        "This endpoint was removed for privacy reasons. It exposed personal "
+        "information for every user and enabled account enumeration and doxing. "
+        "Use GET /api/v2/users/{user_id} for minimal public user details."
+    ),
+    responses={
+        status.HTTP_410_GONE: {
+            "description": "Removed for privacy reasons",
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "type": "object",
+                        "properties": {"detail": {"type": "string"}},
+                        "required": ["detail"],
+                    },
+                    "example": {"detail": "This endpoint has been removed for privacy reasons."},
+                }
+            },
+        }
+    },
+)
+async def list_users() -> JSONResponse:
+    # See the user-list privacy task: prevent account enumeration and doxing.
+    return JSONResponse(
+        status_code=status.HTTP_410_GONE,
+        content={"detail": "This endpoint has been removed for privacy reasons."},
+    )
+
+
+@router.get("/{user_id}", response_model=PublicUserResponse)
 async def get_user(
     user_id: str,
     service: UserServiceDep,
-) -> UserResponse:
+) -> PublicUserResponse:
     user = await service.get_by_id(user_id)
     if user is None:
         raise HTTPException(404, "User not found")
-    return UserResponse.model_validate(user, from_attributes=True)
+    return PublicUserResponse.model_validate(user, from_attributes=True)
 
 
 @router.put("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
