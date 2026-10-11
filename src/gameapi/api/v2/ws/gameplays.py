@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from gameapi.api.v2.ws.auth import authenticate_websocket
 from gameapi.api.v2.ws.manager import gameplays_manager
+from gameapi.core.idempotency import lookup_ws_create_game, remember_ws_create_game
 from gameapi.db.session import PostgresDatabase
 from gameapi.schemas.ws_events import (
     AcceptInvitationPayload,
@@ -26,11 +27,13 @@ from gameapi.services.exceptions import (
     DomainError,
     GameNotActiveError,
     GameplayNotFoundError,
+    HostBusyError,
     InvalidMoveError,
     InvitationNotPendingError,
     NotAParticipantError,
     NotYourTurnError,
     OpponentOfflineError,
+    UserBusyError,
 )
 from gameapi.services.game_engine_service import GameEngineService
 from gameapi.services.gameplay_service import GameplayService
@@ -58,6 +61,10 @@ def _map_domain_error(exc: DomainError) -> str:
         return "CANNOT_INVITE_SELF"
     if isinstance(exc, OpponentOfflineError):
         return "OPPONENT_OFFLINE"
+    if isinstance(exc, HostBusyError):
+        return "HOST_BUSY"
+    if isinstance(exc, UserBusyError):
+        return "USER_BUSY"
     return "UNKNOWN_ERROR"
 
 
@@ -209,7 +216,28 @@ async def _handle_message(
             if not gameplays_manager.is_online(payload.guest_id):
                 raise OpponentOfflineError(payload.guest_id)
 
+            existing = await engine_service.gameplay_service.list_by_player(user_id)
+            if any(
+                item.invitation_state in {"pending", "queued"} or item.match_result is None
+                for item in existing
+                if item.host_player == user_id
+            ):
+                raise HostBusyError(user_id)
+            guest_active_game = await engine_service.gameplay_service.find_active_game_for_user(
+                payload.guest_id
+            )
+            if guest_active_game is not None and guest_active_game.host_player != user_id:
+                raise UserBusyError(payload.guest_id)
+
+            request_id = payload_raw.get("client_request_id") or payload_raw.get("request_id")
+            if isinstance(request_id, str) and request_id:
+                cached = lookup_ws_create_game(host_id=user_id, request_id=request_id)
+                if cached is not None:
+                    return cached
+
             game_id = await engine_service.create_game(host_id=user_id, guest_id=payload.guest_id)
+            if isinstance(request_id, str) and request_id:
+                remember_ws_create_game(host_id=user_id, request_id=request_id, game_id=game_id)
             await session.commit()
 
             if current_game_id is not None and current_game_id != game_id:
