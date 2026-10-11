@@ -1,3 +1,5 @@
+import asyncio
+import contextlib
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -17,7 +19,14 @@ from gameapi.core.config import settings
 from gameapi.core.rate_limit import limiter
 from gameapi.db import PostgresDatabase
 from gameapi.services.event_bus import event_bus
+from gameapi.services.game_engine_service import GameEngineService
+from gameapi.services.gameplay_service import GameplayService
+from gameapi.services.invitation_expiry import (
+    run_pending_expiry_loop,
+    run_queued_expiry_loop,
+)
 from gameapi.services.log_service import LogService
+from gameapi.services.user_service import UserService
 
 logger = logging.getLogger(__name__)
 
@@ -35,16 +44,29 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     )
     await log_service.start()
 
+    async with PostgresDatabase.session_factory()() as session:
+        gameplay_service = GameplayService(session)
+        user_service = UserService(session)
+        engine = GameEngineService(gameplay_service, user_service, event_bus)
+
+    pending_task = asyncio.create_task(run_pending_expiry_loop(engine))
+    queued_task = asyncio.create_task(run_queued_expiry_loop(engine))
+
     root_logger = logging.getLogger()
     root_logger.addHandler(log_service.get_handler())
     root_logger.setLevel(logging.INFO)
 
     _.state.log_service = log_service
+    _.state.expiry_tasks = (pending_task, queued_task)
 
     try:
         yield
     finally:
         root_logger.removeHandler(log_service.get_handler())
+        for task in (pending_task, queued_task):
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
         await log_service.stop()
         await event_bus.shutdown()
         await PostgresDatabase.disconnect()
