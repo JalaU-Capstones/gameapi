@@ -1833,6 +1833,11 @@
             "type": "string",
             "title": "Playerturn"
           },
+          "invitationState": {
+            "type": "string",
+            "title": "Invitationstate",
+            "default": "accepted"
+          },
           "matchResult": {
             "anyOf": [
               {
@@ -1881,6 +1886,10 @@
             "type": "string",
             "title": "Playerturn"
           },
+          "invitationState": {
+            "type": "string",
+            "title": "Invitationstate"
+          },
           "matchResult": {
             "anyOf": [
               {
@@ -1910,6 +1919,7 @@
           "hostPlayer",
           "guestPlayer",
           "playerTurn",
+          "invitationState",
           "matchResult",
           "createdDate",
           "updatedDate"
@@ -1950,6 +1960,17 @@
               }
             ],
             "title": "Playerturn"
+          },
+          "invitationState": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invitationstate"
           },
           "matchResult": {
             "anyOf": [

@@ -38,27 +38,78 @@
         }
       },
       "messages": {
-        "auth": { "$ref": "#/components/messages/auth" },
-        "ping": { "$ref": "#/components/messages/ping" },
-        "create_game": { "$ref": "#/components/messages/create_game" },
-        "accept_invitation": { "$ref": "#/components/messages/accept_invitation" },
-        "reject_invitation": { "$ref": "#/components/messages/reject_invitation" },
-        "play_move": { "$ref": "#/components/messages/play_move" },
-        "leave_game": { "$ref": "#/components/messages/leave_game" },
-        "subscribe_game": { "$ref": "#/components/messages/subscribe_game" },
-        "unsubscribe_game": { "$ref": "#/components/messages/unsubscribe_game" },
-        "auth_ok": { "$ref": "#/components/messages/auth_ok" },
-        "auth_error": { "$ref": "#/components/messages/auth_error" },
-        "pong": { "$ref": "#/components/messages/pong" },
-        "game_created": { "$ref": "#/components/messages/game_created" },
-        "invitation_received": { "$ref": "#/components/messages/invitation_received" },
-        "invitation_accepted": { "$ref": "#/components/messages/invitation_accepted" },
-        "invitation_rejected": { "$ref": "#/components/messages/invitation_rejected" },
-        "board_updated": { "$ref": "#/components/messages/board_updated" },
-        "game_ended": { "$ref": "#/components/messages/game_ended" },
-        "subscribed": { "$ref": "#/components/messages/subscribed" },
-        "unsubscribed": { "$ref": "#/components/messages/unsubscribed" },
-        "error": { "$ref": "#/components/messages/error" }
+        "auth": {
+          "$ref": "#/components/messages/auth"
+        },
+        "ping": {
+          "$ref": "#/components/messages/ping"
+        },
+        "create_game": {
+          "$ref": "#/components/messages/create_game"
+        },
+        "accept_invitation": {
+          "$ref": "#/components/messages/accept_invitation"
+        },
+        "reject_invitation": {
+          "$ref": "#/components/messages/reject_invitation"
+        },
+        "play_move": {
+          "$ref": "#/components/messages/play_move"
+        },
+        "leave_game": {
+          "$ref": "#/components/messages/leave_game"
+        },
+        "subscribe_game": {
+          "$ref": "#/components/messages/subscribe_game"
+        },
+        "unsubscribe_game": {
+          "$ref": "#/components/messages/unsubscribe_game"
+        },
+        "auth_ok": {
+          "$ref": "#/components/messages/auth_ok"
+        },
+        "auth_error": {
+          "$ref": "#/components/messages/auth_error"
+        },
+        "pong": {
+          "$ref": "#/components/messages/pong"
+        },
+        "game_created": {
+          "$ref": "#/components/messages/game_created"
+        },
+        "invitation_received": {
+          "$ref": "#/components/messages/invitation_received"
+        },
+        "invitation_accepted": {
+          "$ref": "#/components/messages/invitation_accepted"
+        },
+        "invitation_rejected": {
+          "$ref": "#/components/messages/invitation_rejected"
+        },
+        "board_updated": {
+          "$ref": "#/components/messages/board_updated"
+        },
+        "game_ended": {
+          "$ref": "#/components/messages/game_ended"
+        },
+        "subscribed": {
+          "$ref": "#/components/messages/subscribed"
+        },
+        "unsubscribed": {
+          "$ref": "#/components/messages/unsubscribed"
+        },
+        "error": {
+          "$ref": "#/components/messages/error"
+        },
+        "invitation_queued": {
+          "$ref": "#/components/messages/invitation_queued"
+        },
+        "invitation_expired": {
+          "$ref": "#/components/messages/invitation_expired"
+        },
+        "invitation_canceled": {
+          "$ref": "#/components/messages/invitation_canceled"
+        }
       }
     },
     "presence": {
@@ -71,81 +122,180 @@
         }
       },
       "messages": {
-        "auth": { "$ref": "#/components/messages/auth" },
-        "ping": { "$ref": "#/components/messages/ping" },
-        "list_online_users": { "$ref": "#/components/messages/list_online_users" },
-        "auth_ok": { "$ref": "#/components/messages/auth_ok" },
-        "auth_error": { "$ref": "#/components/messages/auth_error" },
-        "pong": { "$ref": "#/components/messages/pong" },
-        "online_users": { "$ref": "#/components/messages/online_users" },
-        "user_online": { "$ref": "#/components/messages/user_online" },
-        "user_offline": { "$ref": "#/components/messages/user_offline" },
-        "error": { "$ref": "#/components/messages/error" }
+        "auth": {
+          "$ref": "#/components/messages/auth"
+        },
+        "ping": {
+          "$ref": "#/components/messages/ping"
+        },
+        "list_online_users": {
+          "$ref": "#/components/messages/list_online_users"
+        },
+        "auth_ok": {
+          "$ref": "#/components/messages/auth_ok"
+        },
+        "auth_error": {
+          "$ref": "#/components/messages/auth_error"
+        },
+        "pong": {
+          "$ref": "#/components/messages/pong"
+        },
+        "online_users": {
+          "$ref": "#/components/messages/online_users"
+        },
+        "user_online": {
+          "$ref": "#/components/messages/user_online"
+        },
+        "user_offline": {
+          "$ref": "#/components/messages/user_offline"
+        },
+        "error": {
+          "$ref": "#/components/messages/error"
+        }
       }
     }
   },
   "operations": {
     "receiveGameplayClientMessages": {
       "action": "receive",
-      "channel": { "$ref": "#/channels/gameplays" },
+      "channel": {
+        "$ref": "#/channels/gameplays"
+      },
       "title": "Client to server (gameplays)",
       "summary": "Messages sent by clients on the gameplays channel.",
       "messages": [
-        { "$ref": "#/channels/gameplays/messages/auth" },
-        { "$ref": "#/channels/gameplays/messages/ping" },
-        { "$ref": "#/channels/gameplays/messages/create_game" },
-        { "$ref": "#/channels/gameplays/messages/accept_invitation" },
-        { "$ref": "#/channels/gameplays/messages/reject_invitation" },
-        { "$ref": "#/channels/gameplays/messages/play_move" },
-        { "$ref": "#/channels/gameplays/messages/leave_game" },
-        { "$ref": "#/channels/gameplays/messages/subscribe_game" },
-        { "$ref": "#/channels/gameplays/messages/unsubscribe_game" }
+        {
+          "$ref": "#/channels/gameplays/messages/auth"
+        },
+        {
+          "$ref": "#/channels/gameplays/messages/ping"
+        },
+        {
+          "$ref": "#/channels/gameplays/messages/create_game"
+        },
+        {
+          "$ref": "#/channels/gameplays/messages/accept_invitation"
+        },
+        {
+          "$ref": "#/channels/gameplays/messages/reject_invitation"
+        },
+        {
+          "$ref": "#/channels/gameplays/messages/play_move"
+        },
+        {
+          "$ref": "#/channels/gameplays/messages/leave_game"
+        },
+        {
+          "$ref": "#/channels/gameplays/messages/subscribe_game"
+        },
+        {
+          "$ref": "#/channels/gameplays/messages/unsubscribe_game"
+        }
       ]
     },
     "sendGameplayServerMessages": {
       "action": "send",
-      "channel": { "$ref": "#/channels/gameplays" },
+      "channel": {
+        "$ref": "#/channels/gameplays"
+      },
       "title": "Server to clients (gameplays)",
       "summary": "Messages pushed by the server on the gameplays channel.",
       "messages": [
-        { "$ref": "#/channels/gameplays/messages/auth_ok" },
-        { "$ref": "#/channels/gameplays/messages/auth_error" },
-        { "$ref": "#/channels/gameplays/messages/pong" },
-        { "$ref": "#/channels/gameplays/messages/game_created" },
-        { "$ref": "#/channels/gameplays/messages/invitation_received" },
-        { "$ref": "#/channels/gameplays/messages/invitation_accepted" },
-        { "$ref": "#/channels/gameplays/messages/invitation_rejected" },
-        { "$ref": "#/channels/gameplays/messages/board_updated" },
-        { "$ref": "#/channels/gameplays/messages/game_ended" },
-        { "$ref": "#/channels/gameplays/messages/subscribed" },
-        { "$ref": "#/channels/gameplays/messages/unsubscribed" },
-        { "$ref": "#/channels/gameplays/messages/error" }
+        {
+          "$ref": "#/channels/gameplays/messages/auth_ok"
+        },
+        {
+          "$ref": "#/channels/gameplays/messages/auth_error"
+        },
+        {
+          "$ref": "#/channels/gameplays/messages/pong"
+        },
+        {
+          "$ref": "#/channels/gameplays/messages/game_created"
+        },
+        {
+          "$ref": "#/channels/gameplays/messages/invitation_received"
+        },
+        {
+          "$ref": "#/channels/gameplays/messages/invitation_accepted"
+        },
+        {
+          "$ref": "#/channels/gameplays/messages/invitation_canceled"
+        },
+        {
+          "$ref": "#/channels/gameplays/messages/invitation_expired"
+        },
+        {
+          "$ref": "#/channels/gameplays/messages/invitation_queued"
+        },
+        {
+          "$ref": "#/channels/gameplays/messages/invitation_rejected"
+        },
+        {
+          "$ref": "#/channels/gameplays/messages/board_updated"
+        },
+        {
+          "$ref": "#/channels/gameplays/messages/game_ended"
+        },
+        {
+          "$ref": "#/channels/gameplays/messages/subscribed"
+        },
+        {
+          "$ref": "#/channels/gameplays/messages/unsubscribed"
+        },
+        {
+          "$ref": "#/channels/gameplays/messages/error"
+        }
       ]
     },
     "receivePresenceClientMessages": {
       "action": "receive",
-      "channel": { "$ref": "#/channels/presence" },
+      "channel": {
+        "$ref": "#/channels/presence"
+      },
       "title": "Client to server (presence)",
       "summary": "Messages sent by clients on the presence channel.",
       "messages": [
-        { "$ref": "#/channels/presence/messages/auth" },
-        { "$ref": "#/channels/presence/messages/ping" },
-        { "$ref": "#/channels/presence/messages/list_online_users" }
+        {
+          "$ref": "#/channels/presence/messages/auth"
+        },
+        {
+          "$ref": "#/channels/presence/messages/ping"
+        },
+        {
+          "$ref": "#/channels/presence/messages/list_online_users"
+        }
       ]
     },
     "sendPresenceServerMessages": {
       "action": "send",
-      "channel": { "$ref": "#/channels/presence" },
+      "channel": {
+        "$ref": "#/channels/presence"
+      },
       "title": "Server to clients (presence)",
       "summary": "Messages pushed by the server on the presence channel.",
       "messages": [
-        { "$ref": "#/channels/presence/messages/auth_ok" },
-        { "$ref": "#/channels/presence/messages/auth_error" },
-        { "$ref": "#/channels/presence/messages/pong" },
-        { "$ref": "#/channels/presence/messages/online_users" },
-        { "$ref": "#/channels/presence/messages/user_online" },
-        { "$ref": "#/channels/presence/messages/user_offline" },
-        { "$ref": "#/channels/presence/messages/error" }
+        {
+          "$ref": "#/channels/presence/messages/auth_ok"
+        },
+        {
+          "$ref": "#/channels/presence/messages/auth_error"
+        },
+        {
+          "$ref": "#/channels/presence/messages/pong"
+        },
+        {
+          "$ref": "#/channels/presence/messages/online_users"
+        },
+        {
+          "$ref": "#/channels/presence/messages/user_online"
+        },
+        {
+          "$ref": "#/channels/presence/messages/user_offline"
+        },
+        {
+          "$ref": "#/channels/presence/messages/error"
+        }
       ]
     }
   },
@@ -155,7 +305,9 @@
         "name": "auth",
         "title": "Authentication",
         "summary": "Must be the first message after the WebSocket handshake.",
-        "payload": { "$ref": "#/components/schemas/AuthPayload" }
+        "payload": {
+          "$ref": "#/components/schemas/AuthPayload"
+        }
       },
       "ping": {
         "name": "ping",
@@ -171,43 +323,57 @@
         "name": "create_game",
         "title": "Create game",
         "summary": "Host invites another user to a new game.",
-        "payload": { "$ref": "#/components/schemas/CreateGamePayload" }
+        "payload": {
+          "$ref": "#/components/schemas/CreateGamePayload"
+        }
       },
       "accept_invitation": {
         "name": "accept_invitation",
         "title": "Accept invitation",
         "summary": "Accept a pending invitation to join a gameplay.",
-        "payload": { "$ref": "#/components/schemas/GameIdPayload" }
+        "payload": {
+          "$ref": "#/components/schemas/GameIdPayload"
+        }
       },
       "reject_invitation": {
         "name": "reject_invitation",
         "title": "Reject invitation",
         "summary": "Reject a pending invitation to join a gameplay.",
-        "payload": { "$ref": "#/components/schemas/GameIdPayload" }
+        "payload": {
+          "$ref": "#/components/schemas/GameIdPayload"
+        }
       },
       "play_move": {
         "name": "play_move",
         "title": "Play move",
         "summary": "Submit a move on the board. Only the player whose turn it is can move.",
-        "payload": { "$ref": "#/components/schemas/PlayMovePayload" }
+        "payload": {
+          "$ref": "#/components/schemas/PlayMovePayload"
+        }
       },
       "leave_game": {
         "name": "leave_game",
         "title": "Leave game",
         "summary": "Abandon an active game. The opponent wins.",
-        "payload": { "$ref": "#/components/schemas/GameIdPayload" }
+        "payload": {
+          "$ref": "#/components/schemas/GameIdPayload"
+        }
       },
       "subscribe_game": {
         "name": "subscribe_game",
         "title": "Subscribe to game",
         "summary": "Subscribe this socket to a game's event stream. A socket can only be subscribed to one game at a time.",
-        "payload": { "$ref": "#/components/schemas/GameIdPayload" }
+        "payload": {
+          "$ref": "#/components/schemas/GameIdPayload"
+        }
       },
       "unsubscribe_game": {
         "name": "unsubscribe_game",
         "title": "Unsubscribe from game",
         "summary": "Remove this socket from the active game's channel subscription.",
-        "payload": { "$ref": "#/components/schemas/GameIdPayload" }
+        "payload": {
+          "$ref": "#/components/schemas/GameIdPayload"
+        }
       },
       "list_online_users": {
         "name": "list_online_users",
@@ -223,13 +389,17 @@
         "name": "auth_ok",
         "title": "Auth success",
         "summary": "Sent immediately after a valid JWT is accepted.",
-        "payload": { "$ref": "#/components/schemas/AuthOkPayload" }
+        "payload": {
+          "$ref": "#/components/schemas/AuthOkPayload"
+        }
       },
       "auth_error": {
         "name": "auth_error",
         "title": "Auth failure",
         "summary": "Sent before the socket is closed with code 4401 (invalid token) or 4408 (timeout).",
-        "payload": { "$ref": "#/components/schemas/AuthErrorPayload" }
+        "payload": {
+          "$ref": "#/components/schemas/AuthErrorPayload"
+        }
       },
       "pong": {
         "name": "pong",
@@ -245,79 +415,129 @@
         "name": "game_created",
         "title": "Game created",
         "summary": "The hosted game has been created and the guest was invited.",
-        "payload": { "$ref": "#/components/schemas/GameCreatedPayload" }
+        "payload": {
+          "$ref": "#/components/schemas/GameCreatedPayload"
+        }
       },
       "invitation_received": {
         "name": "invitation_received",
         "title": "Invitation received",
         "summary": "A host invites this user to a new game.",
-        "payload": { "$ref": "#/components/schemas/InvitationReceivedPayload" }
+        "payload": {
+          "$ref": "#/components/schemas/InvitationReceivedPayload"
+        }
       },
       "invitation_accepted": {
         "name": "invitation_accepted",
         "title": "Invitation accepted",
         "summary": "A pending invitation was accepted and the board is now active.",
-        "payload": { "$ref": "#/components/schemas/InvitationAcceptedPayload" }
+        "payload": {
+          "$ref": "#/components/schemas/InvitationAcceptedPayload"
+        }
       },
       "invitation_rejected": {
         "name": "invitation_rejected",
         "title": "Invitation rejected",
         "summary": "A pending invitation was rejected by the guest.",
-        "payload": { "$ref": "#/components/schemas/InvitationRejectedPayload" }
+        "payload": {
+          "$ref": "#/components/schemas/InvitationRejectedPayload"
+        }
       },
       "board_updated": {
         "name": "board_updated",
         "title": "Board updated",
         "summary": "The board was advanced after a valid move.",
-        "payload": { "$ref": "#/components/schemas/BoardUpdatedPayload" }
+        "payload": {
+          "$ref": "#/components/schemas/BoardUpdatedPayload"
+        }
       },
       "game_ended": {
         "name": "game_ended",
         "title": "Game ended",
         "summary": "The gameplay ended. The payload contains the final board and the winning line when applicable.",
-        "payload": { "$ref": "#/components/schemas/GameEndedPayload" }
+        "payload": {
+          "$ref": "#/components/schemas/GameEndedPayload"
+        }
       },
       "subscribed": {
         "name": "subscribed",
         "title": "Subscribed",
         "summary": "The socket was subscribed to a specific game stream.",
-        "payload": { "$ref": "#/components/schemas/GameIdPayload" }
+        "payload": {
+          "$ref": "#/components/schemas/GameIdPayload"
+        }
       },
       "unsubscribed": {
         "name": "unsubscribed",
         "title": "Unsubscribed",
         "summary": "The socket was removed from the active game stream.",
-        "payload": { "$ref": "#/components/schemas/GameIdPayload" }
+        "payload": {
+          "$ref": "#/components/schemas/GameIdPayload"
+        }
       },
       "online_users": {
         "name": "online_users",
         "title": "Online users list",
         "summary": "Current online users for the presence channel.",
-        "payload": { "$ref": "#/components/schemas/OnlineUsersPayload" }
+        "payload": {
+          "$ref": "#/components/schemas/OnlineUsersPayload"
+        }
       },
       "user_online": {
         "name": "user_online",
         "title": "User came online",
         "summary": "Another user joined the presence channel.",
-        "payload": { "$ref": "#/components/schemas/UserIdPayload" }
+        "payload": {
+          "$ref": "#/components/schemas/UserIdPayload"
+        }
       },
       "user_offline": {
         "name": "user_offline",
         "title": "User went offline",
         "summary": "Another user disconnected from the presence channel.",
-        "payload": { "$ref": "#/components/schemas/UserIdPayload" }
+        "payload": {
+          "$ref": "#/components/schemas/UserIdPayload"
+        }
       },
       "error": {
         "name": "error",
         "title": "Error",
         "summary": "Generic error message for invalid event, invalid payload, or domain logic failures.",
-        "payload": { "$ref": "#/components/schemas/ErrorPayload" }
+        "payload": {
+          "$ref": "#/components/schemas/ErrorPayload"
+        }
+      },
+      "invitation_queued": {
+        "name": "invitation_queued",
+        "title": "Invitation queued",
+        "summary": "A guest already has an active or waiting invitation, so the next request is queued.",
+        "payload": {
+          "$ref": "#/components/schemas/InvitationQueuedPayload"
+        }
+      },
+      "invitation_expired": {
+        "name": "invitation_expired",
+        "title": "Invitation expired",
+        "summary": "A pending or queued invitation exceeded the TTL and was expired.",
+        "payload": {
+          "$ref": "#/components/schemas/InvitationExpiredPayload"
+        }
+      },
+      "invitation_canceled": {
+        "name": "invitation_canceled",
+        "title": "Invitation canceled",
+        "summary": "A pending invitation was canceled because the host or guest left.",
+        "payload": {
+          "$ref": "#/components/schemas/InvitationCanceledPayload"
+        }
       }
     },
     "schemas": {
       "AuthPayload": {
         "type": "object",
-        "required": ["token"],
+        "required": [
+          "token"
+        ],
         "properties": {
           "token": {
             "type": "string",
@@ -327,7 +547,9 @@
       },
       "AuthOkPayload": {
         "type": "object",
-        "required": ["user_id"],
+        "required": [
+          "user_id"
+        ],
         "properties": {
           "user_id": {
             "type": "string",
@@ -338,18 +560,27 @@
       },
       "AuthErrorPayload": {
         "type": "object",
-        "required": ["reason"],
+        "required": [
+          "reason"
+        ],
         "properties": {
           "reason": {
             "type": "string",
-            "enum": ["invalid_token", "expired_token", "auth_timeout", "expected_auth_event"],
+            "enum": [
+              "invalid_token",
+              "expired_token",
+              "auth_timeout",
+              "expected_auth_event"
+            ],
             "description": "Reason the websocket authentication failed."
           }
         }
       },
       "CreateGamePayload": {
         "type": "object",
-        "required": ["guest_id"],
+        "required": [
+          "guest_id"
+        ],
         "properties": {
           "guest_id": {
             "type": "string",
@@ -360,7 +591,9 @@
       },
       "GameIdPayload": {
         "type": "object",
-        "required": ["game_id"],
+        "required": [
+          "game_id"
+        ],
         "properties": {
           "game_id": {
             "type": "string",
@@ -371,7 +604,11 @@
       },
       "PlayMovePayload": {
         "type": "object",
-        "required": ["game_id", "row", "col"],
+        "required": [
+          "game_id",
+          "row",
+          "col"
+        ],
         "properties": {
           "game_id": {
             "type": "string",
@@ -394,7 +631,9 @@
       },
       "UserIdPayload": {
         "type": "object",
-        "required": ["user_id"],
+        "required": [
+          "user_id"
+        ],
         "properties": {
           "user_id": {
             "type": "string",
@@ -411,13 +650,24 @@
           "type": "array",
           "minItems": 3,
           "maxItems": 3,
-          "items": { "type": "integer", "enum": [0, 1, 2] }
+          "items": {
+            "type": "integer",
+            "enum": [
+              0,
+              1,
+              2
+            ]
+          }
         },
         "description": "3x3 board representing the current game state. 0 = empty, 1 = host, 2 = guest."
       },
       "LastMove": {
         "type": "object",
-        "required": ["row", "col", "player"],
+        "required": [
+          "row",
+          "col",
+          "player"
+        ],
         "properties": {
           "row": {
             "type": "integer",
@@ -433,14 +683,22 @@
           },
           "player": {
             "type": "string",
-            "enum": ["host", "guest"],
+            "enum": [
+              "host",
+              "guest"
+            ],
             "description": "Player who made the last move."
           }
         }
       },
       "GameCreatedPayload": {
         "type": "object",
-        "required": ["game_id", "guest_id", "board", "turn"],
+        "required": [
+          "game_id",
+          "guest_id",
+          "board",
+          "turn"
+        ],
         "properties": {
           "game_id": {
             "type": "string",
@@ -465,7 +723,10 @@
       },
       "InvitationReceivedPayload": {
         "type": "object",
-        "required": ["game_id", "host"],
+        "required": [
+          "game_id",
+          "host"
+        ],
         "properties": {
           "game_id": {
             "type": "string",
@@ -474,7 +735,10 @@
           },
           "host": {
             "type": "object",
-            "required": ["id", "name"],
+            "required": [
+              "id",
+              "name"
+            ],
             "properties": {
               "id": {
                 "type": "string",
@@ -492,7 +756,11 @@
       },
       "InvitationAcceptedPayload": {
         "type": "object",
-        "required": ["game_id", "board", "turn"],
+        "required": [
+          "game_id",
+          "board",
+          "turn"
+        ],
         "properties": {
           "game_id": {
             "type": "string",
@@ -512,7 +780,10 @@
       },
       "InvitationRejectedPayload": {
         "type": "object",
-        "required": ["game_id", "guest_id"],
+        "required": [
+          "game_id",
+          "guest_id"
+        ],
         "properties": {
           "game_id": {
             "type": "string",
@@ -528,7 +799,11 @@
       },
       "BoardUpdatedPayload": {
         "type": "object",
-        "required": ["board", "turn", "last_move"],
+        "required": [
+          "board",
+          "turn",
+          "last_move"
+        ],
         "properties": {
           "board": {
             "$ref": "#/components/schemas/Board",
@@ -547,7 +822,12 @@
       },
       "GameEndedPayload": {
         "type": "object",
-        "required": ["game_id", "board", "winner", "reason"],
+        "required": [
+          "game_id",
+          "board",
+          "winner",
+          "reason"
+        ],
         "properties": {
           "game_id": {
             "type": "string",
@@ -560,37 +840,60 @@
           },
           "winner": {
             "oneOf": [
-              { "type": "string", "format": "uuid", "description": "User ID of the winner of the gameplay." },
-              { "type": "null", "description": "No winner; this was a draw." }
+              {
+                "type": "string",
+                "format": "uuid",
+                "description": "User ID of the winner of the gameplay."
+              },
+              {
+                "type": "null",
+                "description": "No winner; this was a draw."
+              }
             ],
             "description": "Winner user ID or null in draw scenarios."
           },
           "reason": {
             "type": "string",
-            "enum": ["line", "draw", "abandon", "rejected"],
+            "enum": [
+              "line",
+              "draw",
+              "abandon",
+              "rejected"
+            ],
             "description": "Why the game ended: line, draw, abandon, or rejected invitation."
           },
           "winner_line": {
-            "type": ["array", "null"],
+            "type": [
+              "array",
+              "null"
+            ],
             "description": "Three coordinates in row/column format for the winning line, or null when no line exists.",
             "items": {
               "type": "array",
               "minItems": 2,
               "maxItems": 2,
-              "items": { "type": "integer", "minimum": 0, "maximum": 2 }
+              "items": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 2
+              }
             }
           }
         }
       },
       "OnlineUsersPayload": {
         "type": "object",
-        "required": ["users"],
+        "required": [
+          "users"
+        ],
         "properties": {
           "users": {
             "type": "array",
             "items": {
               "type": "object",
-              "required": ["user_id"],
+              "required": [
+                "user_id"
+              ],
               "properties": {
                 "user_id": {
                   "type": "string",
@@ -605,7 +908,10 @@
       },
       "ErrorPayload": {
         "type": "object",
-        "required": ["code", "message"],
+        "required": [
+          "code",
+          "message"
+        ],
         "properties": {
           "code": {
             "type": "string",
@@ -621,13 +927,81 @@
               "INVITATION_NOT_PENDING",
               "CANNOT_INVITE_SELF",
               "OPPONENT_OFFLINE",
-              "UNKNOWN_ERROR"
+              "UNKNOWN_ERROR",
+              "HOST_BUSY",
+              "USER_BUSY"
             ],
             "description": "Machine-readable error code for the problem."
           },
           "message": {
             "type": "string",
             "description": "Human-readable description of the error."
+          }
+        }
+      },
+      "InvitationQueuedPayload": {
+        "type": "object",
+        "required": [
+          "game_id",
+          "reason"
+        ],
+        "properties": {
+          "game_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Gameplay identifier waiting behind the current queue."
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "target_busy",
+              "host_busy"
+            ],
+            "description": "Why the invitation was queued."
+          }
+        }
+      },
+      "InvitationExpiredPayload": {
+        "type": "object",
+        "required": [
+          "game_id",
+          "reason"
+        ],
+        "properties": {
+          "game_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Gameplay identifier that expired."
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "timeout",
+              "target_busy"
+            ],
+            "description": "Expiration reason."
+          }
+        }
+      },
+      "InvitationCanceledPayload": {
+        "type": "object",
+        "required": [
+          "game_id",
+          "reason"
+        ],
+        "properties": {
+          "game_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Gameplay identifier that was canceled."
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "host_left",
+              "guest_left"
+            ],
+            "description": "Why the invitation was canceled."
           }
         }
       }
