@@ -35,4 +35,4 @@ async def test_v1_endpoints_work_with_bearer_header(client: AsyncClient) -> None
         headers={"Authorization": f"Bearer {login.json()['token']}"},
     )
     assert response.status_code == 200, response.text
-    assert response.json()["email"] == "test@example.com"
+    assert response.json() == {"id": created.json()["id"], "name": "Test User"}

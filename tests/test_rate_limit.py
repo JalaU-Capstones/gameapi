@@ -203,7 +203,10 @@ async def test_v1_list_users_rate_limited(client: AsyncClient) -> None:
             headers={"Authorization": f"Bearer {token}"},
         )
         if index < 60:
-            assert response.status_code == 200, response.text
+            assert response.status_code == 410, response.text
+            assert response.json() == {
+                "detail": "This endpoint has been removed for privacy reasons."
+            }
         else:
             assert response.status_code == 429, response.text
             assert response.json() == {"message": "Too many requests. Please slow down."}

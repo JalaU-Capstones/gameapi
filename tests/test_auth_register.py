@@ -10,6 +10,7 @@ async def test_register_creates_user_and_returns_201(client: AsyncClient) -> Non
     body = response.json()
     assert body["user"]["email"] == "alice@example.com"
     assert body["user"]["name"] == "Alice"
+    assert "registerDate" in body["user"]
     assert body["access_token"]
     assert body["token_type"] == "bearer"
 
@@ -103,4 +104,4 @@ async def test_register_user_can_immediately_call_authenticated_endpoints(
 
     user_response = await client.get(f"/api/v2/users/{user_id}")
     assert user_response.status_code == 200, user_response.text
-    assert user_response.json()["email"] == "authed@example.com"
+    assert user_response.json() == {"id": user_id, "name": "Authed"}

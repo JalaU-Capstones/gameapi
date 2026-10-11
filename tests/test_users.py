@@ -78,7 +78,7 @@ async def test_register_duplicate_email_returns_409(client: AsyncClient) -> None
     assert second.json()["message"] == "Email is currently registered"
 
 
-async def test_list_users_returns_registered_users(
+async def test_list_users_v1_returns_410(
     client: AsyncClient,
     auth_headers: dict[str, str],
 ) -> None:
@@ -87,12 +87,20 @@ async def test_list_users_returns_registered_users(
         json={"name": "Alice", "email": "alice@example.com", "password": "password123"},
     )
     response = await client.get("/api/v1/users", headers=auth_headers)
-    assert response.status_code == 200
-    users = response.json()
-    assert any(user["email"] == "alice@example.com" for user in users)
+    assert response.status_code == 410
+    assert response.json() == {"detail": "This endpoint has been removed for privacy reasons."}
 
 
-async def test_get_user_by_id(
+async def test_list_users_v2_returns_410(
+    client: AsyncClient,
+    auth_headers: dict[str, str],
+) -> None:
+    response = await client.get("/api/v2/users", headers=auth_headers)
+    assert response.status_code == 410
+    assert response.json() == {"detail": "This endpoint has been removed for privacy reasons."}
+
+
+async def test_get_user_returns_only_id_and_name(
     client: AsyncClient,
     auth_headers: dict[str, str],
 ) -> None:
@@ -104,7 +112,7 @@ async def test_get_user_by_id(
 
     response = await client.get(f"/api/v1/users/{user_id}", headers=auth_headers)
     assert response.status_code == 200
-    assert response.json()["id"] == user_id
+    assert response.json() == {"id": user_id, "name": "Alice"}
 
 
 async def test_get_user_by_id_not_found(
@@ -163,9 +171,12 @@ async def test_update_user_with_email_only_updates_email(
     )
     assert response.status_code == 204, response.text
 
-    fetched = await client.get(f"/api/v1/users/{user_id}", headers=auth_headers)
-    assert fetched.status_code == 200, fetched.text
-    assert fetched.json()["email"] == "new@example.com"
+    login = await client.post(
+        "/api/v1/users/login",
+        json={"email": "new@example.com", "password": "password123"},
+    )
+    assert login.status_code == 200, login.text
+    assert login.json()["user"]["email"] == "new@example.com"
 
 
 async def test_update_user_with_password(
