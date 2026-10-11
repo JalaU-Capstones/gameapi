@@ -36,6 +36,10 @@ class Gameplay(Base):
         ForeignKey("users.id"),
         nullable=False,
     )
+    invitation_state: Mapped[str] = mapped_column(
+        default="accepted",
+        nullable=False,
+    )
     match_result: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     created_date: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

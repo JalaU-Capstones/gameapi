@@ -21,6 +21,7 @@ class GameplayCreate(ApiModel):
     host_player: str
     guest_player: str | None = None
     player_turn: str
+    invitation_state: str = "accepted"
     match_result: str | None = None
 
     @field_validator("current_positions")
@@ -33,6 +34,7 @@ class GameplayUpdate(ApiModel):
     current_positions: str | None = None
     guest_player: str | None = None
     player_turn: str | None = None
+    invitation_state: str | None = None
     match_result: str | None = None
 
     @field_validator("current_positions")
@@ -47,6 +49,7 @@ class GameplayResponse(ApiModel):
     host_player: str
     guest_player: str | None
     player_turn: str
+    invitation_state: str
     match_result: str | None
     created_date: datetime
     updated_date: datetime

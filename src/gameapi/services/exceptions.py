@@ -68,6 +68,18 @@ class CannotInviteSelfError(DomainError):
         super().__init__(f"Cannot invite yourself: {user_id}")
 
 
+class HostBusyError(DomainError):
+    def __init__(self, user_id: str) -> None:
+        self.user_id = user_id
+        super().__init__(f"Host {user_id} is busy")
+
+
+class UserBusyError(DomainError):
+    def __init__(self, user_id: str) -> None:
+        self.user_id = user_id
+        super().__init__(f"User {user_id} is busy")
+
+
 class InvitationNotPendingError(DomainError):
     def __init__(self, game_id: str) -> None:
         self.game_id = game_id

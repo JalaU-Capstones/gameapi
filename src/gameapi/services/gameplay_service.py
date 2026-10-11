@@ -1,6 +1,7 @@
 import json
 import logging
 import uuid
+from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -51,6 +52,7 @@ class GameplayService:
             host_player=str(gameplay.host_player),
             guest_player=str(gameplay.guest_player) if gameplay.guest_player is not None else None,
             player_turn=str(gameplay.player_turn),
+            invitation_state=gameplay.invitation_state,
             match_result=(
                 _legacy_json_string(gameplay.match_result)
                 if gameplay.match_result is not None
@@ -82,12 +84,62 @@ class GameplayService:
         gameplays = await self._repo.list_by_player(parsed_id)
         return [self._to_response(gameplay) for gameplay in gameplays]
 
+    async def find_expired_pending(self, cutoff: datetime) -> list[Gameplay]:
+        return list(await self._repo.list_expired_pending(cutoff))
+
+    async def find_expired_queued(self, cutoff: datetime) -> list[Gameplay]:
+        return list(await self._repo.list_expired_queued(cutoff))
+
+    async def find_active_game_for_user(self, user_id: str) -> Gameplay | None:
+        try:
+            parsed_id = uuid.UUID(user_id)
+        except ValueError:
+            return None
+        return await self._repo.find_active_game_for_user(parsed_id)
+
+    async def get_active_game_for_user(self, user_id: str) -> Gameplay | None:
+        return await self.find_active_game_for_user(user_id)
+
+    async def find_next_queued_for_guest(self, guest_id: str) -> Gameplay | None:
+        try:
+            parsed_id = uuid.UUID(guest_id)
+        except ValueError:
+            return None
+        return await self._repo.find_next_queued_for_guest(parsed_id)
+
+    async def get_next_queued_for_guest(self, guest_id: str) -> Gameplay | None:
+        return await self.find_next_queued_for_guest(guest_id)
+
+    async def update_invitation_state(
+        self,
+        gameplay_id: str,
+        state: str,
+        *,
+        match_result: dict[str, object] | None = None,
+    ) -> Gameplay | None:
+        try:
+            parsed_id = uuid.UUID(gameplay_id)
+        except ValueError:
+            return None
+
+        gameplay = await self._repo.get_by_id(parsed_id)
+        if gameplay is None:
+            return None
+
+        gameplay.invitation_state = state
+        if match_result is not None:
+            gameplay.match_result = match_result
+
+        await self._repo.update(gameplay)
+        return gameplay
+
     async def create(self, data: GameplayCreate) -> GameplayResponse:
         gameplay = Gameplay(
             current_positions=json.loads(data.current_positions) if data.current_positions else {},
             host_player=uuid.UUID(data.host_player),
             guest_player=uuid.UUID(data.guest_player) if data.guest_player else None,
             player_turn=uuid.UUID(data.player_turn),
+            invitation_state=data.invitation_state or "accepted",
             match_result=json.loads(data.match_result) if data.match_result else None,
         )
         created = await self._repo.create(gameplay)
@@ -124,6 +176,8 @@ class GameplayService:
                 gameplay.host_player = uuid.UUID(value)
             elif field_name == "player_turn":
                 gameplay.player_turn = uuid.UUID(value)
+            elif field_name == "invitation_state":
+                gameplay.invitation_state = value
             else:
                 setattr(gameplay, field_name, value)
 

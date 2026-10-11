@@ -7,6 +7,8 @@ from pydantic import BaseModel, Field
 
 class CreateGamePayload(BaseModel):
     guest_id: str
+    client_request_id: str | None = None
+    request_id: str | None = None
 
 
 class AcceptInvitationPayload(BaseModel):
