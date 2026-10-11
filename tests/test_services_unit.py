@@ -1,16 +1,30 @@
+import asyncio
+import time
 import uuid
 from datetime import UTC, datetime, timedelta
 
 import pytest
 
 from gameapi.core.config import AppSettings, LogSettings, settings
+from gameapi.core.idempotency import (
+    InMemoryIdempotencyStore,
+    lookup_ws_create_game,
+    normalize_registration_identity,
+    remember_response,
+    remember_ws_create_game,
+    replay_response_for,
+)
 from gameapi.db.models.log_entry import LogEntry
 from gameapi.repositories.log_repository import LogRepository
 from gameapi.schemas.gameplay import GameplayUpdate
 from gameapi.schemas.user import UserUpdate
 from gameapi.services import GameplayService, UserService
-from gameapi.services.exceptions import GameplayNotFoundError, UserNotFoundError
+from gameapi.services.exceptions import (
+    GameplayNotFoundError,
+    UserNotFoundError,
+)
 from gameapi.services.gameplay_service import _legacy_json_string
+from gameapi.services.invitation_expiry import run_pending_expiry_loop, run_queued_expiry_loop
 
 
 def test_module_entrypoint_uses_configured_server_settings(monkeypatch) -> None:
@@ -178,3 +192,67 @@ async def test_user_service_delete_nonexistent_uuid(db_session) -> None:
 async def test_user_service_ensure_indexes_returns_none(db_session) -> None:
     service = UserService(db_session)
     assert await service.ensure_indexes() is None
+
+
+def test_in_memory_store_key_for_normalizes_and_deduplicates() -> None:
+    store = InMemoryIdempotencyStore(ttl_seconds=60)
+
+    assert (
+        store.key_for("ws:create_game", " Alice ", "request-1") == "ws:create_game:Alice:request-1"
+    )
+    assert store.key_for("auth", "USER@EXAMPLE.com", "", "abc") == "auth:USER@EXAMPLE.com:abc"
+
+    remembered = remember_response(
+        store=store,
+        namespace="register",
+        key_parts=("USER@EXAMPLE.com", "request-1"),
+        value={"ok": True},
+    )
+    assert remembered == {"ok": True}
+    assert replay_response_for(
+        store=store,
+        namespace="register",
+        key_parts=("user@example.com", "request-1"),
+    ) == {"ok": True}
+
+
+def test_in_memory_store_replays_only_until_ttl_expiry() -> None:
+    store = InMemoryIdempotencyStore(ttl_seconds=1)
+    remember_ws_create_game(host_id="u-1", request_id="abc", game_id="game-1", store=store)
+
+    assert lookup_ws_create_game(host_id="u-1", request_id="abc", store=store) == "game-1"
+
+    key = store.key_for("ws:create_game", "u-1", "abc")
+    store._values[key] = (time.monotonic() - 1, "stale")
+    assert lookup_ws_create_game(host_id="u-1", request_id="abc", store=store) is None
+
+
+def test_normalize_registration_identity_uses_case_insensitive_trimmed_email() -> None:
+    assert normalize_registration_identity("  User@Example.com  ") == "user@example.com"
+
+
+async def test_expiry_loops_cancel_gracefully() -> None:
+    class DummyEngine:
+        async def expire_pending_invitations(self, older_than_seconds: int) -> int:
+            return older_than_seconds
+
+        async def expire_queued_invitations(self, older_than_seconds: int) -> int:
+            return older_than_seconds
+
+    engine = DummyEngine()
+
+    pending_task = asyncio.create_task(
+        run_pending_expiry_loop(engine, interval_seconds=0.01, ttl_seconds=30)
+    )
+    queued_task = asyncio.create_task(
+        run_queued_expiry_loop(engine, interval_seconds=0.01, ttl_seconds=60)
+    )
+
+    await asyncio.sleep(0.03)
+    pending_task.cancel()
+    queued_task.cancel()
+
+    with pytest.raises(asyncio.CancelledError):
+        await pending_task
+    with pytest.raises(asyncio.CancelledError):
+        await queued_task
