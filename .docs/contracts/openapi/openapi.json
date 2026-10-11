@@ -85,8 +85,10 @@
         "tags": [
           "Users"
         ],
-        "summary": "List all users",
+        "summary": "List all users (removed)",
+        "description": "This endpoint was removed for privacy reasons. It exposed personal information for every user and enabled account enumeration and doxing.",
         "operationId": "list_users_api_v1_users_get",
+        "deprecated": true,
         "security": [
           {
             "HTTPBearer": []
@@ -111,16 +113,23 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "Successful Response",
+          "410": {
+            "description": "Removed for privacy reasons",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/UserResponse"
+                  "type": "object",
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
                   },
-                  "title": "Response List Users Api V1 Users Get"
+                  "required": [
+                    "detail"
+                  ]
+                },
+                "example": {
+                  "detail": "This endpoint has been removed for privacy reasons."
                 }
               }
             }
@@ -183,7 +192,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/UserResponse"
+                  "$ref": "#/components/schemas/PublicUserResponse"
                 }
               }
             }
@@ -1079,6 +1088,73 @@
         }
       }
     },
+    "/api/v2/users": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "List all users (removed)",
+        "description": "This endpoint was removed for privacy reasons. It exposed personal information for every user and enabled account enumeration and doxing. Use GET /api/v2/users/{user_id} for minimal public user details.",
+        "operationId": "list_users_api_v2_users_get",
+        "deprecated": true,
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "gameapi_at",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Gameapi At"
+            }
+          }
+        ],
+        "responses": {
+          "410": {
+            "description": "Removed for privacy reasons",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "detail"
+                  ]
+                },
+                "example": {
+                  "detail": "This endpoint has been removed for privacy reasons."
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v2/users/{user_id}": {
       "get": {
         "tags": [
@@ -1124,7 +1200,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/UserResponse"
+                  "$ref": "#/components/schemas/PublicUserResponse"
                 }
               }
             }
@@ -2025,6 +2101,25 @@
         ],
         "title": "LogsQueryResponse"
       },
+      "PublicUserResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "PublicUserResponse",
+        "description": "Minimal user information exposed to other authenticated users."
+      },
       "RefreshResponse": {
         "properties": {
           "access_token": {
@@ -2099,7 +2194,8 @@
           "email",
           "registerDate"
         ],
-        "title": "UserResponse"
+        "title": "UserResponse",
+        "description": "Full user information exposed only to the authenticated user."
       },
       "UserUpdate": {
         "properties": {
