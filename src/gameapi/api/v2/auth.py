@@ -5,6 +5,12 @@ from fastapi import APIRouter, Cookie, HTTPException, Request, Response, status
 from gameapi.api.deps import AuthServiceDep, CurrentUser
 from gameapi.api.v2.ws.manager import gameplays_manager, presence_manager
 from gameapi.core.config import settings
+from gameapi.core.idempotency import (
+    normalize_registration_identity,
+    remember_response,
+    replay_response_for,
+    request_idempotency_store,
+)
 from gameapi.core.rate_limit import rate_limit
 from gameapi.schemas.auth import LoginRequest, LoginResponse, RefreshResponse
 from gameapi.schemas.user import UserCreate, UserResponse
@@ -101,17 +107,70 @@ async def register(
     payload: UserCreate,
     service: AuthServiceDep,
 ) -> LoginResponse:
+    idem_key = request.headers.get("Idempotency-Key")
+    identity = normalize_registration_identity(payload.email)
+    cache_namespace = "register"
+    cached = None
+    if idem_key:
+        cached = replay_response_for(
+            store=request_idempotency_store,
+            namespace=cache_namespace,
+            key_parts=(identity, idem_key),
+        )
+        if cached is not None:
+            payload_json = cached["payload"]
+            response.status_code = cached["status_code"]
+            _set_auth_cookies(response, payload_json["access_token"], payload_json["refresh_token"])
+            return LoginResponse.model_validate(payload_json)
+
     try:
         access_token, refresh_token, user = await service.register(payload)
+        result = LoginResponse(
+            access_token=access_token,
+            token_type="bearer",
+            user=UserResponse.model_validate(user, from_attributes=True),
+        )
+        if idem_key:
+            remember_response(
+                store=request_idempotency_store,
+                namespace=cache_namespace,
+                key_parts=(identity, idem_key),
+                value={
+                    "status_code": status.HTTP_201_CREATED,
+                    "payload": {
+                        "access_token": access_token,
+                        "token_type": "bearer",
+                        "user": UserResponse.model_validate(user, from_attributes=True).model_dump(
+                            mode="json"
+                        ),
+                        "refresh_token": refresh_token,
+                    },
+                },
+                ttl_seconds=86400,
+            )
     except EmailAlreadyExistsError as exc:
+        if idem_key:
+            cached_error = replay_response_for(
+                store=request_idempotency_store,
+                namespace=f"{cache_namespace}:error",
+                key_parts=(identity, idem_key),
+            )
+            if cached_error is not None:
+                response.status_code = cached_error["status_code"]
+                raise HTTPException(cached_error["status_code"], cached_error["detail"]) from exc
+        error_payload = {"status_code": 409, "detail": "Email is currently registered"}
+        if idem_key:
+            remember_response(
+                store=request_idempotency_store,
+                namespace=f"{cache_namespace}:error",
+                key_parts=(identity, idem_key),
+                value=error_payload,
+                ttl_seconds=86400,
+            )
         raise HTTPException(409, "Email is currently registered") from exc
 
     _set_auth_cookies(response, access_token, refresh_token)
-    return LoginResponse(
-        access_token=access_token,
-        token_type="bearer",
-        user=UserResponse.model_validate(user, from_attributes=True),
-    )
+    return result
 
 
 @router.post(
