@@ -7,8 +7,8 @@ REST API para gestión de usuarios y partidas de Tic-Tac-Toe.
 [![Render](https://img.shields.io/badge/Render-production-46E3B7?logo=render&logoColor=white)](https://gameapi-9vos.onrender.com/health)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg)](https://fastapi.tiangolo.com/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![Tests](https://img.shields.io/badge/tests-300%20passed-success.svg)](#pruebas)
-[![Coverage](https://img.shields.io/badge/coverage-95.13%25-brightgreen.svg)](#cobertura)
+[![Tests](https://img.shields.io/badge/tests-305%20passed-success.svg)](#pruebas)
+[![Coverage](https://img.shields.io/badge/coverage-95%25-brightgreen.svg)](#cobertura)
 
 **Stack:** Python 3.11+ · FastAPI · PostgreSQL 16 · SQLAlchemy 2.0 async · Pydantic v2 · JWT · WebSocket · uv · Docker
 
@@ -282,10 +282,10 @@ Las migraciones versionadas se almacenan en `migrations/versions/`.
 
 El proyecto mantiene dos contratos activos:
 
-- `/api/v1`: versión congelada, compatible con el contrato legado original.
+- `/api/v1`: versión congelada, compatible con el contrato legado original, salvo parches de seguridad que reduzcan la divulgación de datos.
 - `/api/v2`: versión activa para nuevas integraciones y WebSockets.
 
-> La versión v1 queda fija para compatibilidad. La v2 puede evolucionar sin romper la v1.
+> La versión v1 queda fija para compatibilidad; se permiten parches de seguridad que reduzcan la divulgación de datos. La v2 puede evolucionar sin romper la v1.
 
 ## Autenticación
 
@@ -328,17 +328,21 @@ El login tradicional sigue devolviendo el access token en el body. Se puede usar
 | Método   | Ruta                  | Auth | Descripción                     |
 |----------|-----------------------|------|---------------------------------|
 | `POST`   | `/api/v1/users`       | ❌   | Registrar usuario               |
-| `GET`    | `/api/v1/users`       | ❌   | Listar usuarios                 |
+| `GET`    | `/api/v1/users`       | ✅   | 410 Gone (privacidad)           |
 | `GET`    | `/api/v1/users/{id}`  | ❌   | Obtener un usuario              |
 | `PUT`    | `/api/v1/users/{id}`  | ✅   | Actualizar **tu propia** cuenta |
 | `DELETE` | `/api/v1/users/{id}`  | ✅   | Eliminar **tu propia** cuenta   |
 | `POST`   | `/api/v1/users/login` | ❌   | Login (devuelve JWT)            |
 | `POST`   | `/api/v2/users`       | ❌   | Mismo contrato v2               |
-| `GET`    | `/api/v2/users`       | ❌   | Mismo contrato v2               |
+| `GET`    | `/api/v2/users`       | ✅   | 410 Gone (privacidad)           |
 | `GET`    | `/api/v2/users/{id}`  | ❌   | Mismo contrato v2               |
 | `PUT`    | `/api/v2/users/{id}`  | ✅   | Mismo contrato v2               |
 | `DELETE` | `/api/v2/users/{id}`  | ✅   | Mismo contrato v2               |
 | `POST`   | `/api/v2/users/login` | ❌   | Mismo contrato v2               |
+
+#### Privacidad
+
+El email y la fecha de registro solo se devuelven al propio usuario en las respuestas de registro, autenticación y `/api/v2/auth/me`. Las búsquedas autenticadas de usuarios por ID devuelven únicamente `{ id, name }`. Los endpoints de listado de usuarios responden `410 Gone` por privacidad.
 
 ### Gameplays v1 y v2
 
@@ -519,11 +523,13 @@ Con header `Authorization`:
 curl -H "Authorization: ******" http://localhost:8080/api/v2/auth/me | jq
 ```
 
-#### Listar usuarios (v1, requiere autenticación)
+#### Listado de usuarios retirado por privacidad (v1 y v2)
 
 ```bash
 curl -H "Authorization: ******" http://localhost:8080/api/v1/users | jq
 ```
+
+La respuesta es `410 Gone`: `{"detail": "This endpoint has been removed for privacy reasons."}`.
 
 #### Crear una partida vía REST (v1, requiere autenticación)
 
@@ -608,7 +614,7 @@ make test
 Salida esperada:
 
 ```
-300 passed in ~6m 30s
+305 passed in ~6m 30s
 Required test coverage of 93.0% reached. Total coverage: 95%
 ```
 
