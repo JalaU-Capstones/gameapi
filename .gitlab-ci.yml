@@ -18,7 +18,7 @@ default:
       files:
         - uv.lock
         - pyproject.toml
-        - .python-version
+      prefix: "py${PYTHON_VERSION}"
     paths:
       - .cache/uv/
 
