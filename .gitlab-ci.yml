@@ -1,19 +1,29 @@
+# Python version policy
+# ---------------------
+# The default before_script MUST pin the Python version explicitly to avoid
+# uv installing the latest release, which may lack prebuilt wheels for some
+# dependencies such as httptools. GitHub Actions already uses an explicit
+# matrix; GitLab must match.
+
 default:
   image: python:3.12-slim
   before_script:
-    - apt-get update && apt-get install -y --no-install-recommends make git
+    # Keep a compiler available for locked dependencies without prebuilt wheels.
+    - apt-get update && apt-get install -y --no-install-recommends make git build-essential
     - pip install --no-cache-dir uv
-    - uv python install
-    - uv sync --frozen --all-extras --dev
+    - uv python install "${PYTHON_VERSION}"
+    - uv sync --frozen --all-extras --dev --python "${PYTHON_VERSION}"
   cache:
     key:
       files:
         - uv.lock
         - pyproject.toml
+        - .python-version
     paths:
       - .cache/uv/
 
 variables:
+  PYTHON_VERSION: "3.12"
   UV_CACHE_DIR: "$CI_PROJECT_DIR/.cache/uv"
   UV_LINK_MODE: "copy"
   UV_PYTHON_DOWNLOADS: "automatic"
@@ -73,13 +83,15 @@ test:python:
     POSTGRES_DB: "gameapi"
     TEST_POSTGRES_URI: "postgresql+asyncpg://gameapi:gameapi@postgres:5432/gameapi"
   before_script:
+    # Keep a compiler available for locked dependencies without prebuilt wheels.
+    - apt-get update && apt-get install -y --no-install-recommends make git build-essential
     - pip install --no-cache-dir uv
-    - uv python install ${PYTHON_VERSION}
-    - uv sync --frozen --all-extras --dev --python ${PYTHON_VERSION}
+    - uv python install "${PYTHON_VERSION}"
+    - uv sync --frozen --all-extras --dev --python "${PYTHON_VERSION}"
   script:
-    - uv run coverage run -m pytest -o addopts=""
-    - uv run coverage report --fail-under=93
-    - uv run coverage xml -o coverage.xml
+    - uv run --python "${PYTHON_VERSION}" coverage run -m pytest -o addopts=""
+    - uv run --python "${PYTHON_VERSION}" coverage report --fail-under=93
+    - uv run --python "${PYTHON_VERSION}" coverage xml -o coverage.xml
   artifacts:
     when: always
     paths:
