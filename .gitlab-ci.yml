@@ -1,26 +1,12 @@
-# Python version policy
-# ---------------------
-# The default before_script MUST pin the Python version explicitly to avoid
-# uv installing the latest release, which may lack prebuilt wheels for some
-# dependencies such as httptools. GitHub Actions already uses an explicit
-# matrix; GitLab must match.
-
 default:
   image: python:3.12-slim
   before_script:
-    # Keep a compiler available for locked dependencies without prebuilt wheels.
     - apt-get update && apt-get install -y --no-install-recommends make git build-essential
     - pip install --no-cache-dir uv
     - uv python install "${PYTHON_VERSION}"
     - uv sync --frozen --all-extras --dev --python "${PYTHON_VERSION}"
-    # Explicitly ensure the PostgreSQL async driver is present.
-    - uv pip install --python .venv/bin/python asyncpg
   cache:
-    key:
-      files:
-        - uv.lock
-        - pyproject.toml
-      prefix: "py${PYTHON_VERSION}"
+    key: "py${PYTHON_VERSION}-${CI_COMMIT_REF_SLUG}"
     paths:
       - .cache/uv/
 
@@ -85,17 +71,14 @@ test:python:
     POSTGRES_DB: "gameapi"
     TEST_POSTGRES_URI: "postgresql+asyncpg://gameapi:gameapi@postgres:5432/gameapi"
   before_script:
-    # Keep a compiler available for locked dependencies without prebuilt wheels.
     - apt-get update && apt-get install -y --no-install-recommends make git build-essential
     - pip install --no-cache-dir uv
     - uv python install "${PYTHON_VERSION}"
     - uv sync --frozen --all-extras --dev --python "${PYTHON_VERSION}"
-    # Explicitly ensure the PostgreSQL async driver is present.
-    - uv pip install --python .venv/bin/python asyncpg
   script:
-    - uv run --python "${PYTHON_VERSION}" coverage run -m pytest -o addopts=""
-    - uv run --python "${PYTHON_VERSION}" coverage report --fail-under=93
-    - uv run --python "${PYTHON_VERSION}" coverage xml -o coverage.xml
+    - uv run coverage run -m pytest -o addopts=""
+    - uv run coverage report --fail-under=93
+    - uv run coverage xml -o coverage.xml
   artifacts:
     when: always
     paths:
@@ -104,7 +87,6 @@ test:python:
       coverage_report:
         coverage_format: cobertura
         path: coverage.xml
-  coverage: '/(?i)total.*? (100(?:\.0+)?|[1-9]?\d(?:\.\d+)?)%/'
 
 docker:build:
   stage: build
