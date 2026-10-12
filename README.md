@@ -614,8 +614,8 @@ make test
 Salida esperada:
 
 ```
-305 passed in ~6m 30s
-Required test coverage of 93.0% reached. Total coverage: 95%
+314 passed in ~3m 20s
+Required test coverage of 93.0% reached. Total coverage: 93%
 ```
 
 Los tests usan **PostgreSQL** de dos formas según el entorno:
@@ -811,30 +811,99 @@ make docker-down
 ```
 gameapi/
 ├── src/gameapi/
-│   ├── core/            # Config, seguridad (JWT + bcrypt)
-│   ├── db/              # SQLAlchemy ORM + session management
-│   ├── repositories/    # Data access layer (queries SQLAlchemy)
-│   ├── schemas/         # Contratos de API (camelCase, validación)
-│   │   ├── ...
-│   │   └── ws_events.py         # Payloads tipados de eventos WebSocket
-│   ├── services/        # Lógica de negocio async, errores de dominio
-│   │   ├── ...
-│   │   ├── event_bus.py         # Pub/sub in-process por canal (gameplay)
-│   │   ├── game_engine.py       # Reglas puras de Tic-Tac-Toe (sin I/O)
-│   │   ├── game_engine_service.py  # Orquestación: reglas + persistencia + bus
-│   │   └── ...
-│   ├── api/             # Routers FastAPI + dependencias (auth, DI)
-│   │   ├── v1/          # Congelado (compatibilidad legacy C#)
-│   │   └── v2/          # Activo: REST + WebSocket
-│   │       └── ws/      # Endpoints WebSocket (auth, manager, gameplays, presence)
-│   └── main.py          # App FastAPI, lifespan, CORS, exception handlers
-├── migrations/          # Migraciones Alembic
-├── tests/               # pytest + httpx + PostgreSQL (local/CI dual-mode)
-├── .docs/collections/   # Colecciones Postman e Insomnia
+│   ├── __init__.py
+│   ├── __main__.py
+│   ├── main.py
+│   ├── core/                          # Configuración, seguridad, idempotencia
+│   │   ├── __init__.py
+│   │   ├── config.py
+│   │   ├── idempotency.py
+│   │   ├── rate_limit.py
+│   │   └── security.py
+│   ├── db/                            # Modelos ORM y sesión
+│   │   ├── __init__.py
+│   │   ├── base.py
+│   │   ├── session.py
+│   │   └── models/
+│   │       ├── __init__.py
+│   │       ├── gameplay.py
+│   │       ├── log_entry.py
+│   │       ├── refresh_token.py
+│   │       └── user.py
+│   ├── repositories/                  # Capa de acceso a datos
+│   │   ├── __init__.py
+│   │   ├── gameplay_repository.py
+│   │   ├── log_repository.py
+│   │   ├── refresh_token_repository.py
+│   │   └── user_repository.py
+│   ├── schemas/                       # Contratos Pydantic (camelCase automático)
+│   │   ├── __init__.py
+│   │   ├── auth.py
+│   │   ├── base.py
+│   │   ├── gameplay.py
+│   │   ├── log.py
+│   │   ├── token.py
+│   │   ├── user.py
+│   │   └── ws_events.py
+│   ├── services/                      # Lógica de negocio
+│   │   ├── __init__.py
+│   │   ├── auth_service.py
+│   │   ├── event_bus.py               # Pub/sub por canal en memoria
+│   │   ├── exceptions.py
+│   │   ├── game_engine.py             # Reglas puras del juego (sin I/O)
+│   │   ├── game_engine_service.py     # Orquestación: persistencia + bus
+│   │   ├── gameplay_service.py
+│   │   ├── invitation_expiry.py       # Cierres automáticos de invitaciones
+│   │   ├── log_service.py
+│   │   └── user_service.py
+│   └── api/                           # Rutas FastAPI
+│       ├── __init__.py
+│       ├── deps.py
+│       ├── v1/                        # Versión congelada (compatibilidad)
+│       │   ├── __init__.py
+│       │   ├── gameplays.py
+│       │   ├── router.py
+│       │   └── users.py
+│       └── v2/                        # Versión activa: REST + WebSocket
+│           ├── __init__.py
+│           ├── auth.py
+│           ├── gameplays.py
+│           ├── logs.py
+│           ├── router.py
+│           ├── users.py
+│           └── ws/                   # Endpoints WebSocket
+│               ├── __init__.py
+│               ├── auth.py
+│               ├── gameplays.py
+│               ├── manager.py
+│               ├── presence.py
+│               └── router.py
+├── migrations/                        # Migraciones Alembic
+│   ├── env.py
+│   ├── script.py.mako
+│   └── versions/
+│       ├── 0001_initial_schema.py
+│       ├── 0002_refresh_tokens.py
+│       ├── 0003_least_privilege.py
+│       └── 0004_invitation_lifecycle.py
+├── tests/                             # Suite pytest con PostgreSQL
+│   ├── conftest.py
+│   └── ... (archivos de prueba)
+├── .docs/                             # Documentación técnica y contratos
+│   ├── collections/                   # Colecciones Postman / Insomnia
+│   ├── contracts/                     # OpenAPI + AsyncAPI
+│   ├── deployment/
+│   └── rate-limiting/
+├── scripts/
+├── .python-version
+├── .gitlab-ci.yml
+├── .github/workflows/ci.yml
 ├── Dockerfile
 ├── docker-compose.yml
 ├── Makefile
-└── pyproject.toml
+├── pyproject.toml
+├── render.yaml
+└── uv.lock
 ```
 
 Flujo de una request:
