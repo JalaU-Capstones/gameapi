@@ -13,6 +13,8 @@ default:
     - pip install --no-cache-dir uv
     - uv python install "${PYTHON_VERSION}"
     - uv sync --frozen --all-extras --dev --python "${PYTHON_VERSION}"
+    # Explicitly ensure the PostgreSQL async driver is present.
+    - uv pip install --python .venv/bin/python asyncpg
   cache:
     key:
       files:
@@ -88,6 +90,8 @@ test:python:
     - pip install --no-cache-dir uv
     - uv python install "${PYTHON_VERSION}"
     - uv sync --frozen --all-extras --dev --python "${PYTHON_VERSION}"
+    # Explicitly ensure the PostgreSQL async driver is present.
+    - uv pip install --python .venv/bin/python asyncpg
   script:
     - uv run --python "${PYTHON_VERSION}" coverage run -m pytest -o addopts=""
     - uv run --python "${PYTHON_VERSION}" coverage report --fail-under=93
