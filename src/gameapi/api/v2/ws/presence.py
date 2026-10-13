@@ -6,7 +6,7 @@ from fastapi import APIRouter, WebSocket
 from fastapi.websockets import WebSocketDisconnect
 
 from gameapi.api.v2.ws.auth import authenticate_websocket
-from gameapi.api.v2.ws.manager import presence_manager
+from gameapi.api.v2.ws.manager import playing_user_ids, presence_manager
 
 router = APIRouter()
 
@@ -28,7 +28,13 @@ async def _handle_message(user_id: str, message: dict[str, Any], websocket: WebS
 
     if event == "list_online_users":
         await websocket.send_json(
-            {"event": "online_users", "payload": {"users": presence_manager.online_user_ids()}}
+            {
+                "event": "online_users",
+                "payload": {
+                    "users": presence_manager.online_user_ids(),
+                    "playing": playing_user_ids(),
+                },
+            }
         )
         return
 

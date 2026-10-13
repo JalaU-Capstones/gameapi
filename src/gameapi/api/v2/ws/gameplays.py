@@ -11,7 +11,7 @@ from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from gameapi.api.v2.ws.auth import authenticate_websocket
-from gameapi.api.v2.ws.manager import gameplays_manager
+from gameapi.api.v2.ws.manager import gameplays_manager, is_playing, set_players_status
 from gameapi.core.idempotency import lookup_ws_create_game, remember_ws_create_game
 from gameapi.db.session import PostgresDatabase
 from gameapi.schemas.ws_events import (
@@ -215,6 +215,8 @@ async def _handle_message(
                 raise CannotInviteSelfError(user_id)
             if not gameplays_manager.is_online(payload.guest_id):
                 raise OpponentOfflineError(payload.guest_id)
+            if is_playing(payload.guest_id):
+                raise UserBusyError(payload.guest_id)
 
             existing = await engine_service.gameplay_service.list_by_player(user_id)
             if any(
@@ -295,6 +297,7 @@ async def _handle_message(
 
             gameplay = await engine_service.gameplay_service.get_by_id(game_id)
             host_id = gameplay.host_player if gameplay else ""
+            await set_players_status([host_id, user_id], playing=True)
 
             logger.info(
                 "Invitation accepted",
@@ -359,6 +362,12 @@ async def _handle_message(
                 },
             )
             await event_bus.publish(game_id, response_event)
+            if response_event.get("event") == "game_ended":
+                gameplay = await engine_service.gameplay_service.get_by_id(game_id)
+                if gameplay:
+                    await set_players_status(
+                        [gameplay.host_player, gameplay.guest_player], playing=False
+                    )
             return current_game_id
 
         if event == "leave_game":
@@ -378,6 +387,7 @@ async def _handle_message(
                     else gameplay.host_player
                 )
                 board = json.loads(gameplay.current_positions)["board"]
+            await set_players_status([user_id, opponent_id], playing=False)
 
             logger.warning(
                 "Game abandoned",
@@ -468,6 +478,7 @@ async def gameplays_websocket(websocket: WebSocket) -> None:
                             else gameplay.host_player
                         )
                         board = json.loads(gameplay.current_positions)["board"]
+                        await set_players_status([user_id, opponent_id], playing=False)
                         logger.info(
                             "Game ended",
                             extra={

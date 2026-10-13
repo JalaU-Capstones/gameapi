@@ -2,10 +2,16 @@ import uuid
 from collections.abc import Sequence
 from datetime import datetime
 
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from gameapi.db.models.gameplay import Gameplay
+
+# match_result may be SQL NULL or a JSONB 'null' literal (Python None is persisted as JSON null).
+_NO_RESULT = or_(
+    Gameplay.match_result.is_(None),
+    func.jsonb_typeof(Gameplay.match_result) == "null",
+)
 
 
 class GameplayRepository:
@@ -50,14 +56,9 @@ class GameplayRepository:
         result = await self._session.execute(
             select(Gameplay)
             .where(
-                or_(
-                    (Gameplay.host_player == user_id)
-                    & (Gameplay.invitation_state == "accepted")
-                    & (Gameplay.match_result.is_(None)),
-                    (Gameplay.guest_player == user_id)
-                    & (Gameplay.invitation_state == "accepted")
-                    & (Gameplay.match_result.is_(None)),
-                )
+                or_(Gameplay.host_player == user_id, Gameplay.guest_player == user_id),
+                Gameplay.invitation_state == "accepted",
+                _NO_RESULT,
             )
             .order_by(Gameplay.created_date.desc())
             .limit(1)
