@@ -326,3 +326,86 @@ async def test_disconnect_without_subscription_is_safe(
     except BaseExceptionGroup as exc:
         if not _contains_end_of_stream(exc):
             raise
+
+
+async def _start_active_game(
+    wsa: object, wsb: object, guest_id: str, token_a: str, token_b: str
+) -> str:
+    await _send_recv(wsa, {"event": "auth", "payload": {"token": token_a}})
+    await _send_recv(wsb, {"event": "auth", "payload": {"token": token_b}})
+    response = await _send_recv(wsa, {"event": "create_game", "payload": {"guest_id": guest_id}})
+    game_id = str(response["payload"]["game_id"])
+    await wsb.receive_json()
+    await wsb.send_json({"event": "accept_invitation", "payload": {"game_id": game_id}})
+    await wsb.receive_json()
+    await wsa.receive_json()
+    return game_id
+
+
+@pytest.mark.asyncio
+async def test_session_handover_keeps_game_and_new_tab_resumes(
+    ws_client_factory: Callable[[], AsyncClient],
+    registered_user_b: dict[str, object],
+    auth_token_a: str,
+    auth_token_b: str,
+) -> None:
+    try:
+        async with (
+            ws_client_factory() as ca,
+            aconnect_ws("ws://test/api/v2/ws/gameplays", client=ca) as wsa,
+            ws_client_factory() as cb,
+        ):
+            async with aconnect_ws("ws://test/api/v2/ws/gameplays", client=cb) as wsb:
+                game_id = await _start_active_game(
+                    wsa, wsb, str(registered_user_b["id"]), auth_token_a, auth_token_b
+                )
+                await wsb.close(reason="session_handover")
+
+            with pytest.raises(asyncio.TimeoutError):
+                await asyncio.wait_for(wsa.receive_json(), timeout=0.5)
+
+            async with aconnect_ws("ws://test/api/v2/ws/gameplays", client=cb) as wsb2:
+                await _send_recv(wsb2, {"event": "auth", "payload": {"token": auth_token_b}})
+                subscribed = await _send_recv(
+                    wsb2, {"event": "subscribe_game", "payload": {"game_id": game_id}}
+                )
+                assert subscribed["event"] == "subscribed"
+
+                await wsa.send_json(
+                    {"event": "play_move", "payload": {"game_id": game_id, "row": 0, "col": 0}}
+                )
+                assert (await wsb2.receive_json())["event"] == "board_updated"
+    except BaseExceptionGroup as exc:
+        if not _contains_end_of_stream(exc):
+            raise
+
+
+@pytest.mark.asyncio
+async def test_session_handover_without_resume_abandons_after_grace(
+    ws_client_factory: Callable[[], AsyncClient],
+    registered_user_b: dict[str, object],
+    auth_token_a: str,
+    auth_token_b: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from gameapi.api.v2.ws import gameplays as ws_gameplays
+
+    monkeypatch.setattr(ws_gameplays, "ABANDON_GRACE_SECONDS", 0.2)
+    try:
+        async with (
+            ws_client_factory() as ca,
+            aconnect_ws("ws://test/api/v2/ws/gameplays", client=ca) as wsa,
+            ws_client_factory() as cb,
+        ):
+            async with aconnect_ws("ws://test/api/v2/ws/gameplays", client=cb) as wsb:
+                await _start_active_game(
+                    wsa, wsb, str(registered_user_b["id"]), auth_token_a, auth_token_b
+                )
+                await wsb.close(reason="session_handover")
+
+            res_end = await asyncio.wait_for(wsa.receive_json(), timeout=3)
+            assert res_end["event"] == "game_ended"
+            assert res_end["payload"]["reason"] == "abandon"
+    except BaseExceptionGroup as exc:
+        if not _contains_end_of_stream(exc):
+            raise

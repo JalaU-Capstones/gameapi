@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import json
 import logging
@@ -428,6 +429,83 @@ async def _handle_message(
     return current_game_id
 
 
+ABANDON_GRACE_SECONDS = 20.0
+_HANDOVER_REASONS = {"session_handover", "session_replaced"}
+_pending_abandons: dict[str, asyncio.Task[None]] = {}
+
+
+async def _abandon_game(user_id: str, game_id: str) -> None:
+    async with PostgresDatabase.session_factory()() as session:
+        engine_service = GameEngineService(
+            GameplayService(session), UserService(session), event_bus
+        )
+        try:
+            await engine_service.leave_game(game_id, player_id=user_id)
+            await session.commit()
+        except DomainError:
+            await session.rollback()
+            return
+
+        gameplay = await engine_service.gameplay_service.get_by_id(game_id)
+        if not (gameplay and gameplay.match_result and "abandon" in gameplay.match_result):
+            return
+
+        opponent_id = (
+            gameplay.guest_player if user_id == gameplay.host_player else gameplay.host_player
+        )
+        board = json.loads(gameplay.current_positions)["board"]
+        await set_players_status([user_id, opponent_id], playing=False)
+        logger.info(
+            "Game ended",
+            extra={
+                "event_type": "game_ended",
+                "player_id": user_id,
+                "gameplay_id": game_id,
+                "metadata": {"game_id": game_id, "winner": str(opponent_id), "reason": "abandon"},
+            },
+        )
+        await event_bus.publish(
+            game_id,
+            {
+                "event": "game_ended",
+                "payload": {
+                    "game_id": game_id,
+                    "board": board,
+                    "winner": opponent_id,
+                    "reason": "abandon",
+                    "winner_line": None,
+                },
+            },
+        )
+
+
+def _cancel_pending_abandon(user_id: str) -> None:
+    task = _pending_abandons.pop(user_id, None)
+    if task is not None:
+        task.cancel()
+
+
+def _schedule_abandon(user_id: str, game_id: str) -> None:
+    """Give another tab of the same user time to take over the game before abandoning it."""
+    _cancel_pending_abandon(user_id)
+
+    async def _abandon_if_not_resumed() -> None:
+        try:
+            await asyncio.sleep(ABANDON_GRACE_SECONDS)
+            if gameplays_manager.is_online(user_id) and event_bus.is_subscribed(game_id, user_id):
+                return
+            await _abandon_game(user_id, game_id)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("Deferred abandon failed for game '%s'", game_id)
+        finally:
+            if _pending_abandons.get(user_id) is asyncio.current_task():
+                _pending_abandons.pop(user_id, None)
+
+    _pending_abandons[user_id] = asyncio.create_task(_abandon_if_not_resumed())
+
+
 @router.websocket("/gameplays")
 async def gameplays_websocket(websocket: WebSocket) -> None:
     user_id = await authenticate_websocket(websocket)
@@ -439,9 +517,11 @@ async def gameplays_websocket(websocket: WebSocket) -> None:
         return
 
     await gameplays_manager.connect(user_id, websocket)
+    _cancel_pending_abandon(user_id)
     await websocket.send_json({"event": "auth_ok", "payload": {"user_id": user_id}})
 
     current_game_id: str | None = None
+    is_handover = False
     async with PostgresDatabase.session_factory()() as session:
         gameplay_service = GameplayService(session)
         user_service = UserService(session)
@@ -456,60 +536,30 @@ async def gameplays_websocket(websocket: WebSocket) -> None:
                 current_game_id = await _handle_message(
                     user_id, message, websocket, current_game_id, engine_service, session
                 )
-        except WebSocketDisconnect:
+        except WebSocketDisconnect as exc:
+            is_handover = exc.code == 4409 or exc.reason in _HANDOVER_REASONS
             logger.info(
                 "WebSocket disconnected",
                 extra={
                     "event_type": "ws_disconnected",
                     "player_id": user_id,
-                    "metadata": {"user_id": user_id, "code": "disconnect"},
+                    "metadata": {
+                        "user_id": user_id,
+                        "code": exc.code,
+                        "reason": exc.reason or "disconnect",
+                    },
                 },
             )
         finally:
-            if current_game_id is not None:
-                try:
-                    await engine_service.leave_game(current_game_id, player_id=user_id)
-                    await session.commit()
-                    gameplay = await engine_service.gameplay_service.get_by_id(current_game_id)
-                    if gameplay and gameplay.match_result and "abandon" in gameplay.match_result:
-                        opponent_id = (
-                            gameplay.guest_player
-                            if user_id == gameplay.host_player
-                            else gameplay.host_player
-                        )
-                        board = json.loads(gameplay.current_positions)["board"]
-                        await set_players_status([user_id, opponent_id], playing=False)
-                        logger.info(
-                            "Game ended",
-                            extra={
-                                "event_type": "game_ended",
-                                "player_id": user_id,
-                                "gameplay_id": current_game_id,
-                                "metadata": {
-                                    "game_id": current_game_id,
-                                    "winner": str(opponent_id),
-                                    "reason": "abandon",
-                                },
-                            },
-                        )
-                        await event_bus.publish(
-                            current_game_id,
-                            {
-                                "event": "game_ended",
-                                "payload": {
-                                    "game_id": current_game_id,
-                                    "board": board,
-                                    "winner": opponent_id,
-                                    "reason": "abandon",
-                                    "winner_line": None,
-                                },
-                            },
-                        )
-                        event_bus.unsubscribe(current_game_id, user_id)
-                except DomainError:
-                    await session.rollback()
-                event_bus.unsubscribe(current_game_id, user_id)
-
             with contextlib.suppress(Exception):
                 await session.rollback()
-            gameplays_manager.disconnect(user_id, websocket)
+
+    owns_subscription = gameplays_manager.get_user_socket(user_id) in (None, websocket)
+    gameplays_manager.disconnect(user_id, websocket)
+    if current_game_id is not None:
+        if owns_subscription:
+            event_bus.unsubscribe(current_game_id, user_id)
+        if is_handover:
+            _schedule_abandon(user_id, current_game_id)
+        else:
+            await _abandon_game(user_id, current_game_id)

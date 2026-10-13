@@ -120,6 +120,9 @@ class EventBus:
         """Return the number of subscribers for a channel (for tests/metrics)."""
         return len(self._subscribers.get(channel_id, {}))
 
+    def is_subscribed(self, channel_id: str, subscriber_id: str) -> bool:
+        return subscriber_id in self._subscribers.get(channel_id, {})
+
     def active_channels(self) -> list[str]:
         """Return channel IDs with at least one subscriber (for tests/metrics)."""
         return [channel_id for channel_id, subscribers in self._subscribers.items() if subscribers]
