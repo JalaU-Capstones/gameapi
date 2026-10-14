@@ -166,7 +166,12 @@ jobs:
 
           docker run -d --name api-smoke --network gameapi-smoke -p 8080:8080 \
             -e POSTGRES_URI=postgresql+asyncpg://gameapi:gameapi@pg-smoke:5432/gameapi \
-            -e JWT_SECRET_KEY=Una_Clave_Secreta_Super_Segura_con_Minimo_32_Caracteres_123456789 \
+            -e JWT_SECRET_KEY="${{ env.JWT_SECRET_KEY }}" \
+            -e JWT_ALGORITHM="${{ env.JWT_ALGORITHM }}" \
+            -e JWT_ISSUER="${{ env.JWT_ISSUER }}" \
+            -e JWT_AUDIENCE="${{ env.JWT_AUDIENCE }}" \
+            -e JWT_EXPIRE_MINUTES="${{ env.JWT_EXPIRE_MINUTES }}" \
+            -e APP_ENV="${{ env.APP_ENV }}" \
             -e RATE_LIMIT_ENABLED=true \
             gameapi:ci
 
@@ -178,6 +183,12 @@ jobs:
             fi
             sleep 1
           done
+
+          if ! curl -sf http://localhost:8080/health > /dev/null 2>&1; then
+            echo "FAIL: API did not become ready within 30s"
+            docker logs api-smoke
+            exit 1
+          fi
 
           echo "--- Health check ---"
           curl -sf http://localhost:8080/health | tee /dev/stderr
