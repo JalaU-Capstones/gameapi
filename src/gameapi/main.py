@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from gameapi.api.deps import SessionDep
 from gameapi.api.v1.router import api_router as v1_router
@@ -18,6 +19,7 @@ from gameapi.api.v2.router import api_router as v2_router
 from gameapi.core.config import settings
 from gameapi.core.rate_limit import limiter
 from gameapi.db import PostgresDatabase
+from gameapi.repositories.gameplay_repository import GameplayRepository
 from gameapi.services.event_bus import event_bus
 from gameapi.services.game_engine_service import GameEngineService
 from gameapi.services.gameplay_service import GameplayService
@@ -26,9 +28,21 @@ from gameapi.services.invitation_expiry import (
     run_queued_expiry_loop,
 )
 from gameapi.services.log_service import LogService
+from gameapi.services.player_status import _playing_users
 from gameapi.services.user_service import UserService
 
 logger = logging.getLogger(__name__)
+
+
+async def rebuild_playing_cache(session_factory: async_sessionmaker[AsyncSession]) -> int:
+    """Populate the in-memory playing cache from active games in the DB."""
+    _playing_users.clear()
+    async with session_factory() as session:
+        rows = await GameplayRepository(session).list_active_game_user_ids()
+    for row in rows:
+        _playing_users.add(str(row))
+    logger.info("Rebuilt playing cache: %s active users", len(rows))
+    return len(rows)
 
 
 @asynccontextmanager
@@ -48,6 +62,8 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         gameplay_service = GameplayService(session)
         user_service = UserService(session)
         engine = GameEngineService(gameplay_service, user_service, event_bus)
+
+    await rebuild_playing_cache(PostgresDatabase.session_factory())
 
     pending_task = asyncio.create_task(run_pending_expiry_loop(engine))
     queued_task = asyncio.create_task(run_queued_expiry_loop(engine))

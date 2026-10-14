@@ -295,13 +295,13 @@ class GameEngineService:
                 "payload": {"board": new_board, "turn": next_turn, "last_move": last_move},
             }
 
-    async def leave_game(self, game_id: str, player_id: str) -> None:
+    async def leave_game(self, game_id: str, player_id: str) -> bool:
         gameplay = await self.gameplay_service.get_by_id(game_id)
         if not gameplay:
             raise GameplayNotFoundError(game_id)
 
         if player_id not in (gameplay.host_player, gameplay.guest_player):
-            raise NotAParticipantError(player_id, game_id)
+            return False
 
         if gameplay.invitation_state == "pending":
             reason = "host_left" if player_id == gameplay.host_player else "guest_left"
@@ -325,10 +325,10 @@ class GameEngineService:
                         "payload": {"game_id": game_id, "reason": reason},
                     },
                 )
-            return
+            return False
 
         if gameplay.invitation_state != "accepted" or gameplay.match_result is not None:
-            return
+            return False
 
         opponent_id = (
             gameplay.guest_player if player_id == gameplay.host_player else gameplay.host_player
@@ -343,3 +343,4 @@ class GameEngineService:
             await self._promote_next_queued_for_guest(str(gameplay.host_player))
         if gameplay.guest_player:
             await self._promote_next_queued_for_guest(str(gameplay.guest_player))
+        return True

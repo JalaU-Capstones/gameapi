@@ -7,8 +7,8 @@ REST API para gestión de usuarios y partidas de Tic-Tac-Toe.
 [![Render](https://img.shields.io/badge/Render-production-46E3B7?logo=render&logoColor=white)](https://gameapi-9vos.onrender.com/health)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg)](https://fastapi.tiangolo.com/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![Tests](https://img.shields.io/badge/tests-305%20passed-success.svg)](#pruebas)
-[![Coverage](https://img.shields.io/badge/coverage-95%25-brightgreen.svg)](#cobertura)
+[![Tests](https://img.shields.io/badge/tests-329%20passed-success.svg)](#pruebas)
+[![Coverage](https://img.shields.io/badge/coverage-93%25-brightgreen.svg)](#cobertura)
 
 **Stack:** Python 3.11+ · FastAPI · PostgreSQL 16 · SQLAlchemy 2.0 async · Pydantic v2 · JWT · WebSocket · uv · Docker
 
@@ -457,8 +457,11 @@ Errores:
 Eventos soportados:
 
 - `ping` → responde `pong`
-- `list_online_users` (presencia) → devuelve usuarios conectados
+- `list_online_users` (presencia) → devuelve `{"users": [...], "playing": [...]}` con usuarios online y usuarios en partida activa.
+- `user_status` (broadcast) → notifica cambios de estado de presencia para un usuario concreto: `{"user_id": "<uuid>", "status": "playing" | "available"}`.
 - Cualquier otro evento sin implementar devuelve `error`
+
+> `playing` es un estado derivado y no es la fuente de verdad: se reconstruye desde la base de datos en arranque y se actualiza cuando termina o inicia una partida activa. La verdad autoritativa sigue siendo el estado de juego aceptado en la BD.
 
 ### Ejemplos con `curl`
 
@@ -614,7 +617,7 @@ make test
 Salida esperada:
 
 ```
-314 passed in ~3m 20s
+329 passed in ~3m
 Required test coverage of 93.0% reached. Total coverage: 93%
 ```
 

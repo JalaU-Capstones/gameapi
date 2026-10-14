@@ -2,6 +2,7 @@ import asyncio
 import time
 import uuid
 from datetime import UTC, datetime, timedelta
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -85,6 +86,58 @@ async def test_gameplay_service_get_by_id_invalid_uuid(db_session) -> None:
     assert await service.get_by_id("not-a-uuid") is None
 
 
+async def test_gameplay_service_busy_checks_reject_invalid_uuid(db_session) -> None:
+    service = GameplayService(db_session)
+
+    assert await service.find_active_game_for_user("not-a-uuid") is None
+    assert await service.has_pending_or_queued_invitation("not-a-uuid") is False
+
+
+async def test_rebuild_playing_cache_from_active_games(
+    db_session,
+    db_engine,
+    registered_user_a: dict[str, object],
+    registered_user_b: dict[str, object],
+) -> None:
+    from sqlalchemy.ext.asyncio import async_sessionmaker
+
+    from gameapi.db.models.gameplay import Gameplay
+    from gameapi.main import rebuild_playing_cache
+    from gameapi.services.player_status import _playing_users
+
+    host_id = uuid.UUID(str(registered_user_a["id"]))
+    guest_id = uuid.UUID(str(registered_user_b["id"]))
+    db_session.add(
+        Gameplay(
+            current_positions={"board": [[0, 0, 0], [0, 0, 0], [0, 0, 0]]},
+            host_player=host_id,
+            guest_player=guest_id,
+            player_turn=host_id,
+            invitation_state="accepted",
+            match_result=None,
+        )
+    )
+    await db_session.commit()
+
+    rebuilt = await rebuild_playing_cache(async_sessionmaker(db_engine, expire_on_commit=False))
+
+    assert rebuilt == 2
+    assert _playing_users == {str(host_id), str(guest_id)}
+
+
+async def test_player_status_cache_tracks_playing_users() -> None:
+    from gameapi.services import player_status
+
+    player_status._playing_users.clear()
+    player_status._playing_users.update({"user-1", "user-2"})
+
+    assert player_status.is_playing("user-1") is True
+    assert player_status.is_playing("missing") is False
+    assert player_status.playing_user_ids() == []
+    player_status.reset_player_status()
+    assert player_status.is_playing("user-1") is False
+
+
 async def test_gameplay_service_list_by_player_invalid_uuid(db_session) -> None:
     service = GameplayService(db_session)
     assert await service.list_by_player("not-a-uuid") == []
@@ -94,6 +147,24 @@ async def test_gameplay_service_update_nonexistent_uuid(db_session) -> None:
     service = GameplayService(db_session)
     with pytest.raises(GameplayNotFoundError):
         await service.update(str(uuid.uuid4()), GameplayUpdate(match_result='{"winner": "X"}'))
+
+
+async def test_player_status_set_players_status_broadcasts_and_clears_cache(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from gameapi.services import player_status
+
+    player_status._playing_users.clear()
+    monkeypatch.setattr(player_status.presence_manager, "broadcast", AsyncMock())
+
+    await player_status.set_players_status(["a", "b", None], playing=True)
+    await player_status.set_players_status(["a"], playing=False)
+    await player_status.set_players_status([], playing=True)
+    await player_status.set_players_status(["missing"], playing=False)
+
+    assert player_status.is_playing("a") is False
+    assert player_status.is_playing("b") is True
+    assert player_status.presence_manager.broadcast.call_count == 3
 
 
 async def test_gameplay_service_delete_nonexistent_uuid(db_session) -> None:

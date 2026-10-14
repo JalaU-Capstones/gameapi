@@ -134,12 +134,24 @@ async def ws_client_factory(
 
 
 @pytest.fixture(autouse=True)
-def _clear_ws_managers() -> Iterator[None]:
-    from gameapi.api.v2.ws.manager import gameplays_manager, presence_manager
+def reset_process_state() -> Iterator[None]:
+    """Prevent module-level websocket and gameplay state from leaking between tests."""
+    from gameapi.api.v2.ws.gameplays import reset_pending_abandons
+    from gameapi.api.v2.ws.manager import (
+        gameplays_manager,
+        presence_manager,
+        reset_player_status,
+    )
 
+    def _reset() -> None:
+        gameplays_manager.reset()
+        presence_manager.reset()
+        reset_player_status()
+        reset_pending_abandons()
+
+    _reset()
     yield
-    gameplays_manager._connections.clear()
-    presence_manager._connections.clear()
+    _reset()
 
 
 @pytest.fixture(autouse=True)

@@ -143,6 +143,9 @@
         "online_users": {
           "$ref": "#/components/messages/online_users"
         },
+        "user_status": {
+          "$ref": "#/components/messages/user_status"
+        },
         "user_online": {
           "$ref": "#/components/messages/user_online"
         },
@@ -286,6 +289,9 @@
         },
         {
           "$ref": "#/channels/presence/messages/online_users"
+        },
+        {
+          "$ref": "#/channels/presence/messages/user_status"
         },
         {
           "$ref": "#/channels/presence/messages/user_online"
@@ -478,9 +484,17 @@
       "online_users": {
         "name": "online_users",
         "title": "Online users list",
-        "summary": "Current online users for the presence channel.",
+        "summary": "Current online users for the presence channel, including the derived playing subset.",
         "payload": {
           "$ref": "#/components/schemas/OnlineUsersPayload"
+        }
+      },
+      "user_status": {
+        "name": "user_status",
+        "title": "User status changed",
+        "summary": "Broadcast emitted when a user transitions between available and playing state.",
+        "payload": {
+          "$ref": "#/components/schemas/UserStatusPayload"
         }
       },
       "user_online": {
@@ -884,25 +898,49 @@
       "OnlineUsersPayload": {
         "type": "object",
         "required": [
-          "users"
+          "users",
+          "playing"
         ],
         "properties": {
           "users": {
             "type": "array",
             "items": {
-              "type": "object",
-              "required": [
-                "user_id"
-              ],
-              "properties": {
-                "user_id": {
-                  "type": "string",
-                  "format": "uuid",
-                  "description": "Identifier of an online user."
-                }
-              }
+              "type": "string",
+              "format": "uuid",
+              "description": "Identifier of an online user."
             },
             "description": "List of online user identifiers."
+          },
+          "playing": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Identifier of an online user who is currently in an accepted active game."
+            },
+            "description": "Derived subset of online users whose authoritative gameplay state is accepted and active in the database."
+          }
+        }
+      },
+      "UserStatusPayload": {
+        "type": "object",
+        "required": [
+          "user_id",
+          "status"
+        ],
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "User identifier whose status changed."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "playing",
+              "available"
+            ],
+            "description": "Derived availability state for the user. 'playing' means an accepted active game exists; 'available' means they are no longer in active gameplay."
           }
         }
       },

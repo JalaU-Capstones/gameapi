@@ -2,10 +2,16 @@ import uuid
 from collections.abc import Sequence
 from datetime import datetime
 
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from gameapi.db.models.gameplay import Gameplay
+
+# match_result may be SQL NULL or a JSONB 'null' literal (Python None is persisted as JSON null).
+_NO_RESULT = or_(
+    Gameplay.match_result.is_(None),
+    func.jsonb_typeof(Gameplay.match_result) == "null",
+)
 
 
 class GameplayRepository:
@@ -50,14 +56,9 @@ class GameplayRepository:
         result = await self._session.execute(
             select(Gameplay)
             .where(
-                or_(
-                    (Gameplay.host_player == user_id)
-                    & (Gameplay.invitation_state == "accepted")
-                    & (Gameplay.match_result.is_(None)),
-                    (Gameplay.guest_player == user_id)
-                    & (Gameplay.invitation_state == "accepted")
-                    & (Gameplay.match_result.is_(None)),
-                )
+                or_(Gameplay.host_player == user_id, Gameplay.guest_player == user_id),
+                Gameplay.invitation_state == "accepted",
+                _NO_RESULT,
             )
             .order_by(Gameplay.created_date.desc())
             .limit(1)
@@ -66,6 +67,30 @@ class GameplayRepository:
 
     async def get_active_game_for_user(self, user_id: uuid.UUID) -> Gameplay | None:
         return await self.find_active_game_for_user(user_id)
+
+    async def has_pending_or_queued_invitation(self, user_id: uuid.UUID) -> bool:
+        result = await self._session.execute(
+            select(Gameplay.id)
+            .where(
+                or_(Gameplay.host_player == user_id, Gameplay.guest_player == user_id),
+                or_(Gameplay.invitation_state == "pending", Gameplay.invitation_state == "queued"),
+            )
+            .limit(1)
+        )
+        return result.scalar() is not None
+
+    async def list_active_game_user_ids(self) -> Sequence[uuid.UUID]:
+        host_ids = select(Gameplay.host_player).where(
+            Gameplay.invitation_state == "accepted",
+            _NO_RESULT,
+        )
+        guest_ids = select(Gameplay.guest_player).where(
+            Gameplay.invitation_state == "accepted",
+            Gameplay.guest_player.is_not(None),
+            _NO_RESULT,
+        )
+        result = await self._session.execute(host_ids.union(guest_ids))
+        return [row for row in result.scalars().all() if row is not None]
 
     async def find_next_queued_for_guest(self, guest_id: uuid.UUID) -> Gameplay | None:
         result = await self._session.execute(

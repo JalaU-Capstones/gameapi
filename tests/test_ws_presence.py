@@ -90,7 +90,7 @@ async def test_ws_presence_list_online_users(
         await ws.send_json({"event": "list_online_users"})
         assert await ws.receive_json() == {
             "event": "online_users",
-            "payload": {"users": [str(registered_user["id"])]},
+            "payload": {"users": [str(registered_user["id"])], "playing": []},
         }
 
 
@@ -109,7 +109,7 @@ async def test_list_online_users_when_alone(
         await ws.send_json({"event": "list_online_users"})
         assert await ws.receive_json() == {
             "event": "online_users",
-            "payload": {"users": [str(registered_user["id"])]},
+            "payload": {"users": [str(registered_user["id"])], "playing": []},
         }
 
 

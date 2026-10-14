@@ -10,6 +10,10 @@ class ConnectionManager:
     def __init__(self) -> None:
         self._connections: dict[str, set[WebSocket]] = {}
 
+    def reset(self) -> None:
+        """Clear all registered sockets. TEST-ONLY. Production code must not call this."""
+        self._connections.clear()
+
     def get_user_socket(self, user_id: str) -> WebSocket | None:
         sockets = self._connections.get(user_id)
         if not sockets:
@@ -92,3 +96,10 @@ class ConnectionManager:
 
 gameplays_manager = ConnectionManager()
 presence_manager = ConnectionManager()
+
+
+def reset_player_status() -> None:
+    """Clear the playing cache for tests without coupling the manager to its owner."""
+    from gameapi.services.player_status import reset_player_status as reset
+
+    reset()
