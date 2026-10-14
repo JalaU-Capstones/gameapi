@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
 from typing import Any
 
 from fastapi import WebSocket
@@ -10,6 +9,10 @@ from fastapi.websockets import WebSocketDisconnect
 class ConnectionManager:
     def __init__(self) -> None:
         self._connections: dict[str, set[WebSocket]] = {}
+
+    def reset(self) -> None:
+        """Clear all registered sockets. TEST-ONLY. Production code must not call this."""
+        self._connections.clear()
 
     def get_user_socket(self, user_id: str) -> WebSocket | None:
         sockets = self._connections.get(user_id)
@@ -94,27 +97,9 @@ class ConnectionManager:
 gameplays_manager = ConnectionManager()
 presence_manager = ConnectionManager()
 
-_playing_users: set[str] = set()
 
+def reset_player_status() -> None:
+    """Clear the playing cache for tests without coupling the manager to its owner."""
+    from gameapi.services.player_status import reset_player_status as reset
 
-def is_playing(user_id: str) -> bool:
-    return user_id in _playing_users
-
-
-def playing_user_ids() -> list[str]:
-    return [user_id for user_id in _playing_users if presence_manager.is_online(user_id)]
-
-
-async def set_players_status(user_ids: Iterable[str | None], *, playing: bool) -> None:
-    """Mark players as playing/available and notify every lobby via presence."""
-    for user_id in {str(uid) for uid in user_ids if uid}:
-        if playing:
-            _playing_users.add(user_id)
-        else:
-            _playing_users.discard(user_id)
-        await presence_manager.broadcast(
-            {
-                "event": "user_status",
-                "payload": {"user_id": user_id, "status": "playing" if playing else "available"},
-            }
-        )
+    reset()

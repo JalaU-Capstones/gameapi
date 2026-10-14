@@ -6,7 +6,8 @@ from fastapi import APIRouter, WebSocket
 from fastapi.websockets import WebSocketDisconnect
 
 from gameapi.api.v2.ws.auth import authenticate_websocket
-from gameapi.api.v2.ws.manager import playing_user_ids, presence_manager
+from gameapi.api.v2.ws.manager import presence_manager
+from gameapi.services.player_status import playing_user_ids
 
 router = APIRouter()
 
