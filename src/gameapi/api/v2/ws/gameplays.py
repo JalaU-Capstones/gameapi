@@ -12,7 +12,7 @@ from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from gameapi.api.v2.ws.auth import authenticate_websocket
-from gameapi.api.v2.ws.manager import gameplays_manager, is_playing, set_players_status
+from gameapi.api.v2.ws.manager import gameplays_manager
 from gameapi.core.idempotency import lookup_ws_create_game, remember_ws_create_game
 from gameapi.db.session import PostgresDatabase
 from gameapi.schemas.ws_events import (
@@ -38,6 +38,7 @@ from gameapi.services.exceptions import (
 )
 from gameapi.services.game_engine_service import GameEngineService
 from gameapi.services.gameplay_service import GameplayService
+from gameapi.services.player_status import is_playing, set_players_status
 from gameapi.services.user_service import UserService
 
 logger = logging.getLogger(__name__)
@@ -216,21 +217,21 @@ async def _handle_message(
                 raise CannotInviteSelfError(user_id)
             if not gameplays_manager.is_online(payload.guest_id):
                 raise OpponentOfflineError(payload.guest_id)
-            if is_playing(payload.guest_id):
-                raise UserBusyError(payload.guest_id)
 
-            existing = await engine_service.gameplay_service.list_by_player(user_id)
-            if any(
-                item.invitation_state in {"pending", "queued"} or item.match_result is None
-                for item in existing
-                if item.host_player == user_id
-            ):
-                raise HostBusyError(user_id)
             guest_active_game = await engine_service.gameplay_service.find_active_game_for_user(
                 payload.guest_id
             )
-            if guest_active_game is not None and guest_active_game.host_player != user_id:
+            if guest_active_game is not None:
+                if not is_playing(payload.guest_id):
+                    await set_players_status([payload.guest_id], playing=True)
                 raise UserBusyError(payload.guest_id)
+
+            host_active = await engine_service.gameplay_service.find_active_game_for_user(user_id)
+            host_pending = await engine_service.gameplay_service.has_pending_or_queued_invitation(
+                user_id
+            )
+            if host_active is not None or host_pending:
+                raise HostBusyError(user_id)
 
             request_id = payload_raw.get("client_request_id") or payload_raw.get("request_id")
             if isinstance(request_id, str) and request_id:
@@ -375,8 +376,10 @@ async def _handle_message(
             payload_leave = LeaveGamePayload(**payload_raw)
             game_id = payload_leave.game_id
 
-            await engine_service.leave_game(game_id=game_id, player_id=user_id)
+            transitioned = await engine_service.leave_game(game_id=game_id, player_id=user_id)
             await session.commit()
+            if not transitioned:
+                return current_game_id
 
             gameplay = await engine_service.gameplay_service.get_by_id(game_id)
             opponent_id = None
@@ -388,7 +391,7 @@ async def _handle_message(
                     else gameplay.host_player
                 )
                 board = json.loads(gameplay.current_positions)["board"]
-            await set_players_status([user_id, opponent_id], playing=False)
+                await set_players_status([user_id, opponent_id], playing=False)
 
             logger.warning(
                 "Game abandoned",
@@ -434,20 +437,30 @@ _HANDOVER_REASONS = {"session_handover", "session_replaced"}
 _pending_abandons: dict[str, asyncio.Task[None]] = {}
 
 
+def reset_pending_abandons() -> None:
+    """Cancel and clear every pending abandon task. TEST-ONLY."""
+    for task in list(_pending_abandons.values()):
+        task.cancel()
+    _pending_abandons.clear()
+
+
 async def _abandon_game(user_id: str, game_id: str) -> None:
     async with PostgresDatabase.session_factory()() as session:
         engine_service = GameEngineService(
             GameplayService(session), UserService(session), event_bus
         )
         try:
-            await engine_service.leave_game(game_id, player_id=user_id)
+            transitioned = await engine_service.leave_game(game_id, player_id=user_id)
             await session.commit()
         except DomainError:
             await session.rollback()
             return
 
+        if not transitioned:
+            return
+
         gameplay = await engine_service.gameplay_service.get_by_id(game_id)
-        if not (gameplay and gameplay.match_result and "abandon" in gameplay.match_result):
+        if not gameplay:
             return
 
         opponent_id = (

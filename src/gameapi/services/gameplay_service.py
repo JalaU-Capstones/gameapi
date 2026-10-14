@@ -100,6 +100,16 @@ class GameplayService:
     async def get_active_game_for_user(self, user_id: str) -> Gameplay | None:
         return await self.find_active_game_for_user(user_id)
 
+    async def has_pending_or_queued_invitation(self, user_id: str) -> bool:
+        try:
+            parsed_id = uuid.UUID(user_id)
+        except ValueError:
+            return False
+        return await self._repo.has_pending_or_queued_invitation(parsed_id)
+
+    async def list_active_game_user_ids(self) -> list[str]:
+        return [str(user_id) for user_id in await self._repo.list_active_game_user_ids()]
+
     async def find_next_queued_for_guest(self, guest_id: str) -> Gameplay | None:
         try:
             parsed_id = uuid.UUID(guest_id)

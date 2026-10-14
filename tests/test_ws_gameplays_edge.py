@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable
+from unittest.mock import AsyncMock
 
 import pytest
 from anyio import EndOfStream
 from httpx import AsyncClient
 from httpx_ws import aconnect_ws
+
+from gameapi.api.v2.ws import gameplays
 
 
 async def _send_recv(ws: object, event_dict: dict[str, object]) -> dict[str, object]:
@@ -20,6 +23,153 @@ def _contains_end_of_stream(exc: BaseException) -> bool:
     if isinstance(exc, BaseExceptionGroup):
         return any(_contains_end_of_stream(sub) for sub in exc.exceptions)
     return False
+
+
+async def test_schedule_abandon_abandons_when_player_does_not_resume(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    abandon = AsyncMock()
+    monkeypatch.setattr(gameplays, "ABANDON_GRACE_SECONDS", 0)
+    monkeypatch.setattr(gameplays, "_abandon_game", abandon)
+
+    gameplays._schedule_abandon("user-id", "game-id")
+    await gameplays._pending_abandons["user-id"]
+
+    abandon.assert_awaited_once_with("user-id", "game-id")
+    assert "user-id" not in gameplays._pending_abandons
+
+
+async def test_reset_pending_abandons_cancels_scheduled_task(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    abandon = AsyncMock()
+    monkeypatch.setattr(gameplays, "ABANDON_GRACE_SECONDS", 60)
+    monkeypatch.setattr(gameplays, "_abandon_game", abandon)
+
+    gameplays._schedule_abandon("user-id", "game-id")
+    task = gameplays._pending_abandons["user-id"]
+    await asyncio.sleep(0)
+    gameplays.reset_pending_abandons()
+
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    abandon.assert_not_awaited()
+    assert gameplays._pending_abandons == {}
+
+
+async def test_schedule_abandon_logs_failure_and_clears_task(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    abandon = AsyncMock(side_effect=RuntimeError("database unavailable"))
+    monkeypatch.setattr(gameplays, "ABANDON_GRACE_SECONDS", 0)
+    monkeypatch.setattr(gameplays, "_abandon_game", abandon)
+
+    gameplays._schedule_abandon("user-id", "game-id")
+    await gameplays._pending_abandons["user-id"]
+
+    abandon.assert_awaited_once_with("user-id", "game-id")
+    assert "user-id" not in gameplays._pending_abandons
+
+
+async def test_schedule_abandon_keeps_game_when_player_resumes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    abandon = AsyncMock()
+    monkeypatch.setattr(gameplays, "ABANDON_GRACE_SECONDS", 0)
+    monkeypatch.setattr(gameplays, "_abandon_game", abandon)
+    monkeypatch.setattr(gameplays.gameplays_manager, "is_online", lambda _: True)
+    monkeypatch.setattr(gameplays.event_bus, "is_subscribed", lambda *_: True)
+
+    gameplays._schedule_abandon("user-id", "game-id")
+    await gameplays._pending_abandons["user-id"]
+
+    abandon.assert_not_awaited()
+    assert "user-id" not in gameplays._pending_abandons
+
+
+async def test_schedule_abandon_replaces_previous_task(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(gameplays, "ABANDON_GRACE_SECONDS", 60)
+    gameplays._schedule_abandon("user-id", "first-game")
+    previous_task = gameplays._pending_abandons["user-id"]
+
+    gameplays._schedule_abandon("user-id", "second-game")
+    current_task = gameplays._pending_abandons["user-id"]
+    await asyncio.sleep(0)
+
+    with pytest.raises(asyncio.CancelledError):
+        await previous_task
+    gameplays.reset_pending_abandons()
+    with pytest.raises(asyncio.CancelledError):
+        await current_task
+
+
+async def test_create_game_uses_database_for_busy_checks(
+    ws_client_factory: Callable[[], AsyncClient],
+    db_session,
+    registered_user: dict[str, object],
+    registered_user_a: dict[str, object],
+    registered_user_b: dict[str, object],
+    auth_token: str,
+    auth_token_a: str,
+    auth_token_b: str,
+) -> None:
+    import uuid
+
+    from gameapi.db.models.gameplay import Gameplay
+    from gameapi.services.player_status import is_playing
+
+    host_id = uuid.UUID(str(registered_user_a["id"]))
+    busy_guest_id = uuid.UUID(str(registered_user_b["id"]))
+    db_session.add(
+        Gameplay(
+            current_positions={"board": [[0, 0, 0], [0, 0, 0], [0, 0, 0]]},
+            host_player=host_id,
+            guest_player=busy_guest_id,
+            player_turn=host_id,
+            invitation_state="accepted",
+            match_result=None,
+        )
+    )
+    await db_session.commit()
+
+    async with (
+        ws_client_factory() as host_client,
+        aconnect_ws("ws://test/api/v2/ws/gameplays", client=host_client) as host_ws,
+        ws_client_factory() as busy_guest_client,
+        aconnect_ws(
+            "ws://test/api/v2/ws/gameplays",
+            client=busy_guest_client,
+        ) as busy_guest_ws,
+        ws_client_factory() as available_guest_client,
+        aconnect_ws(
+            "ws://test/api/v2/ws/gameplays",
+            client=available_guest_client,
+        ) as available_guest_ws,
+    ):
+        await host_ws.send_json({"event": "auth", "payload": {"token": auth_token_a}})
+        await host_ws.receive_json()
+        await busy_guest_ws.send_json({"event": "auth", "payload": {"token": auth_token_b}})
+        await busy_guest_ws.receive_json()
+        await available_guest_ws.send_json({"event": "auth", "payload": {"token": auth_token}})
+        await available_guest_ws.receive_json()
+
+        busy_guest_response = await _send_recv(
+            available_guest_ws,
+            {"event": "create_game", "payload": {"guest_id": str(busy_guest_id)}},
+        )
+        assert busy_guest_response["payload"]["code"] == "USER_BUSY"
+        assert is_playing(str(busy_guest_id))
+
+        host_busy_response = await _send_recv(
+            host_ws,
+            {
+                "event": "create_game",
+                "payload": {"guest_id": str(registered_user["id"])},
+            },
+        )
+        assert host_busy_response["payload"]["code"] == "HOST_BUSY"
 
 
 @pytest.mark.asyncio

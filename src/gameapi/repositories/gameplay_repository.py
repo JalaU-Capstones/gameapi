@@ -68,6 +68,30 @@ class GameplayRepository:
     async def get_active_game_for_user(self, user_id: uuid.UUID) -> Gameplay | None:
         return await self.find_active_game_for_user(user_id)
 
+    async def has_pending_or_queued_invitation(self, user_id: uuid.UUID) -> bool:
+        result = await self._session.execute(
+            select(Gameplay.id)
+            .where(
+                or_(Gameplay.host_player == user_id, Gameplay.guest_player == user_id),
+                or_(Gameplay.invitation_state == "pending", Gameplay.invitation_state == "queued"),
+            )
+            .limit(1)
+        )
+        return result.scalar() is not None
+
+    async def list_active_game_user_ids(self) -> Sequence[uuid.UUID]:
+        host_ids = select(Gameplay.host_player).where(
+            Gameplay.invitation_state == "accepted",
+            _NO_RESULT,
+        )
+        guest_ids = select(Gameplay.guest_player).where(
+            Gameplay.invitation_state == "accepted",
+            Gameplay.guest_player.is_not(None),
+            _NO_RESULT,
+        )
+        result = await self._session.execute(host_ids.union(guest_ids))
+        return [row for row in result.scalars().all() if row is not None]
+
     async def find_next_queued_for_guest(self, guest_id: uuid.UUID) -> Gameplay | None:
         result = await self._session.execute(
             select(Gameplay)
