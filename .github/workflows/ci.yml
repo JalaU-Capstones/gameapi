@@ -147,6 +147,13 @@ jobs:
 
       - name: Smoke test image
         run: |
+          cleanup() {
+            echo "--- Cleanup ---"
+            docker rm -f api-smoke pg-smoke || true
+            docker network rm gameapi-smoke || true
+          }
+          trap cleanup EXIT
+
           docker network create gameapi-smoke || true
 
           docker run -d --name pg-smoke --network gameapi-smoke \
@@ -163,6 +170,19 @@ jobs:
             fi
             sleep 1
           done
+
+          echo "Running database migrations..."
+          docker run --rm --network gameapi-smoke \
+            -e POSTGRES_URI=postgresql+asyncpg://gameapi:gameapi@pg-smoke:5432/gameapi \
+            -e JWT_SECRET_KEY="${{ env.JWT_SECRET_KEY }}" \
+            -e JWT_ALGORITHM="${{ env.JWT_ALGORITHM }}" \
+            -e JWT_ISSUER="${{ env.JWT_ISSUER }}" \
+            -e JWT_AUDIENCE="${{ env.JWT_AUDIENCE }}" \
+            -e JWT_EXPIRE_MINUTES="${{ env.JWT_EXPIRE_MINUTES }}" \
+            -e APP_ENV="${{ env.APP_ENV }}" \
+            -e RATE_LIMIT_ENABLED=true \
+            gameapi:ci alembic upgrade head
+          echo "Migrations applied successfully"
 
           docker run -d --name api-smoke --network gameapi-smoke -p 8080:8080 \
             -e POSTGRES_URI=postgresql+asyncpg://gameapi:gameapi@pg-smoke:5432/gameapi \
@@ -206,7 +226,3 @@ jobs:
               exit 1
             fi
           done
-
-          echo "--- Cleanup ---"
-          docker rm -f api-smoke pg-smoke || true
-          docker network rm gameapi-smoke || true
