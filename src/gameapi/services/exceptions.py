@@ -84,3 +84,9 @@ class InvitationNotPendingError(DomainError):
     def __init__(self, game_id: str) -> None:
         self.game_id = game_id
         super().__init__(f"Invitation not pending for game: {game_id}")
+
+
+class UserHasOpenGameplaysError(DomainError):
+    def __init__(self, user_id: str) -> None:
+        self.user_id = user_id
+        super().__init__(f"User {user_id} has an active game or a pending invitation")

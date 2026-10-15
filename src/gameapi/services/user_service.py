@@ -6,9 +6,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from gameapi.core.security import hash_password
 from gameapi.db.models.user import User
+from gameapi.repositories.gameplay_repository import GameplayRepository
 from gameapi.repositories.user_repository import UserRepository
 from gameapi.schemas.user import UserCreate, UserResponse, UserUpdate
-from gameapi.services.exceptions import EmailAlreadyExistsError, UserNotFoundError
+from gameapi.services.exceptions import (
+    EmailAlreadyExistsError,
+    UserHasOpenGameplaysError,
+    UserNotFoundError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -119,6 +124,11 @@ class UserService:
         user = await self._repo.get_by_id(parsed_id)
         if user is None:
             raise UserNotFoundError(user_id)
+        gameplays = GameplayRepository(self._session)
+        if await gameplays.find_active_game_for_user(
+            user.id
+        ) is not None or await gameplays.has_pending_or_queued_invitation(user.id):
+            raise UserHasOpenGameplaysError(user_id)
         await self._repo.delete(user)
         logger.info(
             "User deleted",

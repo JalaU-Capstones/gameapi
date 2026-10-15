@@ -1,5 +1,6 @@
 import json
 
+import pytest
 from httpx import AsyncClient
 
 VALID_BOARD = '{"board": [[0,0,0],[0,0,0],[0,0,0]], "lastMove": null}'
@@ -67,3 +68,65 @@ async def test_host_can_delete_account_and_guest_keeps_the_game(
     body = response.json()
     assert body["hostPlayer"] is None
     assert body["guestPlayer"] == registered_user_b["id"]
+
+
+@pytest.mark.parametrize(
+    ("invitation_state", "deleter"),
+    [("accepted", "guest"), ("pending", "guest"), ("queued", "guest"), ("pending", "host")],
+)
+async def test_cannot_delete_account_with_an_open_game_or_invitation(
+    client: AsyncClient,
+    registered_user_a: dict,
+    registered_user_b: dict,
+    auth_token_a: str,
+    auth_token_b: str,
+    invitation_state: str,
+    deleter: str,
+) -> None:
+    created = await client.post(
+        "/api/v1/gameplays",
+        json={
+            "currentPositions": VALID_BOARD,
+            "hostPlayer": registered_user_a["id"],
+            "guestPlayer": registered_user_b["id"],
+            "playerTurn": registered_user_a["id"],
+            "invitationState": invitation_state,
+        },
+        headers=_bearer(auth_token_a),
+    )
+    assert created.status_code == 201, created.text
+
+    user, token = (
+        (registered_user_b, auth_token_b)
+        if deleter == "guest"
+        else (registered_user_a, auth_token_a)
+    )
+    deleted = await client.delete(f"/api/v2/users/{user['id']}", headers=_bearer(token))
+    assert deleted.status_code == 409, deleted.text
+
+    still_there = await client.get(f"/api/v2/users/{user['id']}", headers=_bearer(token))
+    assert still_there.status_code == 200, still_there.text
+
+async def test_v1_delete_also_refuses_with_an_active_game(
+    client: AsyncClient,
+    registered_user_a: dict,
+    registered_user_b: dict,
+    auth_token_a: str,
+    auth_token_b: str,
+) -> None:
+    created = await client.post(
+        "/api/v1/gameplays",
+        json={
+            "currentPositions": VALID_BOARD,
+            "hostPlayer": registered_user_a["id"],
+            "guestPlayer": registered_user_b["id"],
+            "playerTurn": registered_user_a["id"],
+        },
+        headers=_bearer(auth_token_a),
+    )
+    assert created.status_code == 201, created.text
+
+    deleted = await client.delete(
+        f"/api/v1/users/{registered_user_b['id']}", headers=_bearer(auth_token_b)
+    )
+    assert deleted.status_code == 409, deleted.text

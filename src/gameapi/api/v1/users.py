@@ -16,7 +16,7 @@ from gameapi.core.security import create_access_token, verify_password
 from gameapi.db.models.user import User
 from gameapi.schemas.token import LoginRequest, LoginResponse
 from gameapi.schemas.user import PublicUserResponse, UserCreate, UserResponse, UserUpdate
-from gameapi.services import EmailAlreadyExistsError, UserNotFoundError
+from gameapi.services import EmailAlreadyExistsError, UserHasOpenGameplaysError, UserNotFoundError
 
 logger = logging.getLogger(__name__)
 
@@ -184,6 +184,11 @@ async def delete_user(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found",
+        ) from exc
+    except UserHasOpenGameplaysError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="You have an active game or a pending invitation. Finish or cancel it first.",
         ) from exc
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
