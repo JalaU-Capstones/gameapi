@@ -152,6 +152,9 @@
         "user_offline": {
           "$ref": "#/components/messages/user_offline"
         },
+        "user_updated": {
+          "$ref": "#/components/messages/user_updated"
+        },
         "error": {
           "$ref": "#/components/messages/error"
         }
@@ -298,6 +301,9 @@
         },
         {
           "$ref": "#/channels/presence/messages/user_offline"
+        },
+        {
+          "$ref": "#/channels/presence/messages/user_updated"
         },
         {
           "$ref": "#/channels/presence/messages/error"
@@ -513,6 +519,14 @@
           "$ref": "#/components/schemas/UserIdPayload"
         }
       },
+      "user_updated": {
+        "name": "user_updated",
+        "title": "User profile updated",
+        "summary": "Broadcast emitted when a user changes their public name. Clients should reload the public user data.",
+        "payload": {
+          "$ref": "#/components/schemas/UserIdPayload"
+        }
+      },
       "error": {
         "name": "error",
         "title": "Error",
@@ -549,9 +563,7 @@
     "schemas": {
       "AuthPayload": {
         "type": "object",
-        "required": [
-          "token"
-        ],
+        "required": ["token"],
         "properties": {
           "token": {
             "type": "string",
@@ -561,9 +573,7 @@
       },
       "AuthOkPayload": {
         "type": "object",
-        "required": [
-          "user_id"
-        ],
+        "required": ["user_id"],
         "properties": {
           "user_id": {
             "type": "string",
@@ -574,9 +584,7 @@
       },
       "AuthErrorPayload": {
         "type": "object",
-        "required": [
-          "reason"
-        ],
+        "required": ["reason"],
         "properties": {
           "reason": {
             "type": "string",
@@ -592,9 +600,7 @@
       },
       "CreateGamePayload": {
         "type": "object",
-        "required": [
-          "guest_id"
-        ],
+        "required": ["guest_id"],
         "properties": {
           "guest_id": {
             "type": "string",
@@ -605,9 +611,7 @@
       },
       "GameIdPayload": {
         "type": "object",
-        "required": [
-          "game_id"
-        ],
+        "required": ["game_id"],
         "properties": {
           "game_id": {
             "type": "string",
@@ -618,11 +622,7 @@
       },
       "PlayMovePayload": {
         "type": "object",
-        "required": [
-          "game_id",
-          "row",
-          "col"
-        ],
+        "required": ["game_id", "row", "col"],
         "properties": {
           "game_id": {
             "type": "string",
@@ -645,9 +645,7 @@
       },
       "UserIdPayload": {
         "type": "object",
-        "required": [
-          "user_id"
-        ],
+        "required": ["user_id"],
         "properties": {
           "user_id": {
             "type": "string",
@@ -666,22 +664,14 @@
           "maxItems": 3,
           "items": {
             "type": "integer",
-            "enum": [
-              0,
-              1,
-              2
-            ]
+            "enum": [0, 1, 2]
           }
         },
         "description": "3x3 board representing the current game state. 0 = empty, 1 = host, 2 = guest."
       },
       "LastMove": {
         "type": "object",
-        "required": [
-          "row",
-          "col",
-          "player"
-        ],
+        "required": ["row", "col", "player"],
         "properties": {
           "row": {
             "type": "integer",
@@ -697,22 +687,14 @@
           },
           "player": {
             "type": "string",
-            "enum": [
-              "host",
-              "guest"
-            ],
+            "enum": ["host", "guest"],
             "description": "Player who made the last move."
           }
         }
       },
       "GameCreatedPayload": {
         "type": "object",
-        "required": [
-          "game_id",
-          "guest_id",
-          "board",
-          "turn"
-        ],
+        "required": ["game_id", "guest_id", "board", "turn"],
         "properties": {
           "game_id": {
             "type": "string",
@@ -737,10 +719,7 @@
       },
       "InvitationReceivedPayload": {
         "type": "object",
-        "required": [
-          "game_id",
-          "host"
-        ],
+        "required": ["game_id", "host"],
         "properties": {
           "game_id": {
             "type": "string",
@@ -749,10 +728,7 @@
           },
           "host": {
             "type": "object",
-            "required": [
-              "id",
-              "name"
-            ],
+            "required": ["id", "name"],
             "properties": {
               "id": {
                 "type": "string",
@@ -770,11 +746,7 @@
       },
       "InvitationAcceptedPayload": {
         "type": "object",
-        "required": [
-          "game_id",
-          "board",
-          "turn"
-        ],
+        "required": ["game_id", "board", "turn"],
         "properties": {
           "game_id": {
             "type": "string",
@@ -794,10 +766,7 @@
       },
       "InvitationRejectedPayload": {
         "type": "object",
-        "required": [
-          "game_id",
-          "guest_id"
-        ],
+        "required": ["game_id", "guest_id"],
         "properties": {
           "game_id": {
             "type": "string",
@@ -813,11 +782,7 @@
       },
       "BoardUpdatedPayload": {
         "type": "object",
-        "required": [
-          "board",
-          "turn",
-          "last_move"
-        ],
+        "required": ["board", "turn", "last_move"],
         "properties": {
           "board": {
             "$ref": "#/components/schemas/Board",
@@ -836,12 +801,7 @@
       },
       "GameEndedPayload": {
         "type": "object",
-        "required": [
-          "game_id",
-          "board",
-          "winner",
-          "reason"
-        ],
+        "required": ["game_id", "board", "winner", "reason"],
         "properties": {
           "game_id": {
             "type": "string",
@@ -868,19 +828,11 @@
           },
           "reason": {
             "type": "string",
-            "enum": [
-              "line",
-              "draw",
-              "abandon",
-              "rejected"
-            ],
+            "enum": ["line", "draw", "abandon", "rejected"],
             "description": "Why the game ended: line, draw, abandon, or rejected invitation."
           },
           "winner_line": {
-            "type": [
-              "array",
-              "null"
-            ],
+            "type": ["array", "null"],
             "description": "Three coordinates in row/column format for the winning line, or null when no line exists.",
             "items": {
               "type": "array",
@@ -897,10 +849,7 @@
       },
       "OnlineUsersPayload": {
         "type": "object",
-        "required": [
-          "users",
-          "playing"
-        ],
+        "required": ["users", "playing"],
         "properties": {
           "users": {
             "type": "array",
@@ -924,10 +873,7 @@
       },
       "UserStatusPayload": {
         "type": "object",
-        "required": [
-          "user_id",
-          "status"
-        ],
+        "required": ["user_id", "status"],
         "properties": {
           "user_id": {
             "type": "string",
@@ -936,20 +882,14 @@
           },
           "status": {
             "type": "string",
-            "enum": [
-              "playing",
-              "available"
-            ],
+            "enum": ["playing", "available"],
             "description": "Derived availability state for the user. 'playing' means an accepted active game exists; 'available' means they are no longer in active gameplay."
           }
         }
       },
       "ErrorPayload": {
         "type": "object",
-        "required": [
-          "code",
-          "message"
-        ],
+        "required": ["code", "message"],
         "properties": {
           "code": {
             "type": "string",
@@ -979,10 +919,7 @@
       },
       "InvitationQueuedPayload": {
         "type": "object",
-        "required": [
-          "game_id",
-          "reason"
-        ],
+        "required": ["game_id", "reason"],
         "properties": {
           "game_id": {
             "type": "string",
@@ -991,20 +928,14 @@
           },
           "reason": {
             "type": "string",
-            "enum": [
-              "target_busy",
-              "host_busy"
-            ],
+            "enum": ["target_busy", "host_busy"],
             "description": "Why the invitation was queued."
           }
         }
       },
       "InvitationExpiredPayload": {
         "type": "object",
-        "required": [
-          "game_id",
-          "reason"
-        ],
+        "required": ["game_id", "reason"],
         "properties": {
           "game_id": {
             "type": "string",
@@ -1013,20 +944,14 @@
           },
           "reason": {
             "type": "string",
-            "enum": [
-              "timeout",
-              "target_busy"
-            ],
+            "enum": ["timeout", "target_busy"],
             "description": "Expiration reason."
           }
         }
       },
       "InvitationCanceledPayload": {
         "type": "object",
-        "required": [
-          "game_id",
-          "reason"
-        ],
+        "required": ["game_id", "reason"],
         "properties": {
           "game_id": {
             "type": "string",
@@ -1035,10 +960,7 @@
           },
           "reason": {
             "type": "string",
-            "enum": [
-              "host_left",
-              "guest_left"
-            ],
+            "enum": ["host_left", "guest_left"],
             "description": "Why the invitation was canceled."
           }
         }
