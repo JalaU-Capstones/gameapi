@@ -1868,7 +1868,14 @@
             "title": "Currentpositions"
           },
           "hostPlayer": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Hostplayer"
           },
           "guestPlayer": {
@@ -1883,7 +1890,14 @@
             "title": "Guestplayer"
           },
           "playerTurn": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Playerturn"
           },
           "invitationState": {

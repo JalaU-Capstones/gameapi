@@ -49,9 +49,9 @@ class GameplayService:
                 if gameplay.current_positions
                 else ""
             ),
-            host_player=str(gameplay.host_player),
+            host_player=str(gameplay.host_player) if gameplay.host_player is not None else None,
             guest_player=str(gameplay.guest_player) if gameplay.guest_player is not None else None,
-            player_turn=str(gameplay.player_turn),
+            player_turn=str(gameplay.player_turn) if gameplay.player_turn is not None else None,
             invitation_state=gameplay.invitation_state,
             match_result=(
                 _legacy_json_string(gameplay.match_result)

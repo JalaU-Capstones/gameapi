@@ -21,20 +21,20 @@ class Gameplay(Base):
         default=uuid.uuid4,
     )
     current_positions: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
-    host_player: Mapped[uuid.UUID] = mapped_column(
+    host_player: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("users.id", ondelete="CASCADE"),
-        nullable=False,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
     )
     guest_player: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
     )
-    player_turn: Mapped[uuid.UUID] = mapped_column(
+    player_turn: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("users.id"),
-        nullable=False,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
     )
     invitation_state: Mapped[str] = mapped_column(
         default="accepted",
@@ -53,7 +53,7 @@ class Gameplay(Base):
         nullable=False,
     )
 
-    host: Mapped["User"] = relationship(
+    host: Mapped["User | None"] = relationship(
         "User",
         foreign_keys=[host_player],
         back_populates="hosted_gameplays",

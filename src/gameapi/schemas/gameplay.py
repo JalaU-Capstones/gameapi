@@ -46,9 +46,9 @@ class GameplayUpdate(ApiModel):
 class GameplayResponse(ApiModel):
     id: ObjectIdStr
     current_positions: str
-    host_player: str
+    host_player: str | None
     guest_player: str | None
-    player_turn: str
+    player_turn: str | None
     invitation_state: str
     match_result: str | None
     created_date: datetime

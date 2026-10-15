@@ -330,15 +330,16 @@ async def _handle_message(
             await session.commit()
 
             gameplay = await engine_service.gameplay_service.get_by_id(game_id)
-            host_id = gameplay.host_player if gameplay else ""
+            host_id = gameplay.host_player if gameplay else None
 
-            await gameplays_manager.send_to(
-                host_id,
-                {
-                    "event": "invitation_rejected",
-                    "payload": {"game_id": game_id, "guest_id": user_id},
-                },
-            )
+            if host_id is not None:
+                await gameplays_manager.send_to(
+                    host_id,
+                    {
+                        "event": "invitation_rejected",
+                        "payload": {"game_id": game_id, "guest_id": user_id},
+                    },
+                )
             return current_game_id
 
         if event == "play_move":
