@@ -1,11 +1,58 @@
 import asyncio
+from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
+from fastapi import Request, Response
 from fastapi.websockets import WebSocketDisconnect
 from httpx import AsyncClient
 
-from gameapi.api.v2.ws.manager import ConnectionManager
+from gameapi.api.v2.auth import takeover_session
+from gameapi.api.v2.ws.manager import (
+    ConnectionManager,
+    chat_manager,
+    gameplays_manager,
+    presence_manager,
+)
+
+
+@pytest.mark.asyncio
+async def test_takeover_revokes_chat_socket_too() -> None:
+    gameplay_socket = AsyncMock()
+    presence_socket = AsyncMock()
+    chat_socket = AsyncMock()
+
+    await gameplays_manager.connect("user", gameplay_socket)
+    await presence_manager.connect("user", presence_socket)
+    await chat_manager.connect("user", chat_socket)
+
+    request = Request(
+        {
+            "type": "http",
+            "method": "POST",
+            "path": "/api/v2/auth/session/takeover",
+            "headers": [],
+            "query_string": b"",
+            "scheme": "http",
+            "server": ("testserver", 80),
+            "client": ("testclient", 50000),
+            "root_path": "",
+        }
+    )
+
+    response = await takeover_session(
+        request=request,
+        response=Response(),
+        current_user=SimpleNamespace(id="user"),
+    )
+
+    assert response.status_code == 204
+    gameplay_socket.close.assert_awaited_once_with(code=4409, reason="session_replaced")
+    presence_socket.close.assert_awaited_once_with(code=4409, reason="session_replaced")
+    chat_socket.close.assert_awaited_once_with(code=4409, reason="session_replaced")
+    assert not gameplays_manager.is_online("user")
+    assert not presence_manager.is_online("user")
+    assert not chat_manager.is_online("user")
 
 
 @pytest.mark.asyncio
