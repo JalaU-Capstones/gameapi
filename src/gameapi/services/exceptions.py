@@ -90,3 +90,20 @@ class UserHasOpenGameplaysError(DomainError):
     def __init__(self, user_id: str) -> None:
         self.user_id = user_id
         super().__init__(f"User {user_id} has an active game or a pending invitation")
+
+
+class ChatMessageTooLongError(DomainError):
+    def __init__(self, max_length: int) -> None:
+        self.max_length = max_length
+        super().__init__(f"Chat message exceeds {max_length} characters")
+
+
+class ChatEmptyMessageError(DomainError):
+    def __init__(self) -> None:
+        super().__init__("Chat message is empty after sanitization")
+
+
+class ChatRateLimitedError(DomainError):
+    def __init__(self, retry_after_seconds: int) -> None:
+        self.retry_after_seconds = retry_after_seconds
+        super().__init__(f"Chat rate limit exceeded; retry after {retry_after_seconds}s")
