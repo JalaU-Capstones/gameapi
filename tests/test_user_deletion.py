@@ -107,6 +107,7 @@ async def test_cannot_delete_account_with_an_open_game_or_invitation(
     still_there = await client.get(f"/api/v2/users/{user['id']}", headers=_bearer(token))
     assert still_there.status_code == 200, still_there.text
 
+
 async def test_v1_delete_also_refuses_with_an_active_game(
     client: AsyncClient,
     registered_user_a: dict,
