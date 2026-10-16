@@ -2,8 +2,8 @@
   "asyncapi": "3.1.0",
   "info": {
     "title": "GameAPI WebSocket Contract",
-    "version": "2.1.0",
-    "description": "Real-time contract for Tic-Tac-Toe gameplay, user presence, and the global in-memory chat. The three channels share a common envelope {event, payload}; the chat buffer is non-persistent and rate-limited per user.",
+    "version": "2.2.0",
+    "description": "Real-time contract for Tic-Tac-Toe gameplay, user presence, and the global in-memory chat. The three channels share a common envelope {event, payload}; the gameplay channel also carries the invitation lifecycle events retry_invitation, invitation_replaced, invitation_promoted, and invitation_retry_accepted.",
     "contact": {
       "name": "The Three Musketeers",
       "url": "https://gitlab.com/jala-university1/cohort-5/ES.CO.CSNT-245.GA.T2.26.M2/SD/capstone/the-three-musketeers"
@@ -109,6 +109,18 @@
         },
         "invitation_canceled": {
           "$ref": "#/components/messages/invitation_canceled"
+        },
+        "retry_invitation": {
+          "$ref": "#/components/messages/retry_invitation"
+        },
+        "invitation_replaced": {
+          "$ref": "#/components/messages/invitation_replaced"
+        },
+        "invitation_promoted": {
+          "$ref": "#/components/messages/invitation_promoted"
+        },
+        "invitation_retry_accepted": {
+          "$ref": "#/components/messages/invitation_retry_accepted"
         }
       }
     },
@@ -231,6 +243,9 @@
           "$ref": "#/channels/gameplays/messages/play_move"
         },
         {
+          "$ref": "#/channels/gameplays/messages/retry_invitation"
+        },
+        {
           "$ref": "#/channels/gameplays/messages/leave_game"
         },
         {
@@ -278,6 +293,15 @@
         },
         {
           "$ref": "#/channels/gameplays/messages/invitation_rejected"
+        },
+        {
+          "$ref": "#/channels/gameplays/messages/invitation_replaced"
+        },
+        {
+          "$ref": "#/channels/gameplays/messages/invitation_promoted"
+        },
+        {
+          "$ref": "#/channels/gameplays/messages/invitation_retry_accepted"
         },
         {
           "$ref": "#/channels/gameplays/messages/board_updated"
@@ -689,6 +713,38 @@
         "summary": "Scoped error for the chat channel. The generic error event is not emitted on this channel.",
         "payload": {
           "$ref": "#/components/schemas/ChatErrorPayload"
+        }
+      },
+      "retry_invitation": {
+        "name": "retry_invitation",
+        "title": "Retry invitation",
+        "summary": "Reuse an existing gameplay whose invitation is in a terminal-but-recoverable state (rejected, expired, or canceled). Resets the board and re-emits invitation_received to the guest. Rate-limited per (host, guest) pair.",
+        "payload": {
+          "$ref": "#/components/schemas/RetryInvitationPayload"
+        }
+      },
+      "invitation_replaced": {
+        "name": "invitation_replaced",
+        "title": "Invitation replaced",
+        "summary": "The host's pending invitation was displaced because the guest accepted a different invitation from another host. Distinct from invitation_expired, which fires on TTL.",
+        "payload": {
+          "$ref": "#/components/schemas/InvitationReplacedPayload"
+        }
+      },
+      "invitation_promoted": {
+        "name": "invitation_promoted",
+        "title": "Invitation promoted",
+        "summary": "A queued invitation was promoted to pending because the preceding invitation was rejected, expired, or replaced. Payload shape matches invitation_received.",
+        "payload": {
+          "$ref": "#/components/schemas/InvitationPromotedPayload"
+        }
+      },
+      "invitation_retry_accepted": {
+        "name": "invitation_retry_accepted",
+        "title": "Invitation retry accepted",
+        "summary": "Acknowledgment sent to the host after a retry_invitation event. Includes the attempt number, remaining attempts in the window, and whether the call was a no-op.",
+        "payload": {
+          "$ref": "#/components/schemas/InvitationRetryAcceptedPayload"
         }
       }
     },
@@ -1113,13 +1169,20 @@
               "OPPONENT_OFFLINE",
               "UNKNOWN_ERROR",
               "HOST_BUSY",
-              "USER_BUSY"
+              "USER_BUSY",
+              "RETRY_LIMIT_EXCEEDED",
+              "CREATE_GAME_RATE_LIMITED"
             ],
             "description": "Machine-readable error code for the problem."
           },
           "message": {
             "type": "string",
             "description": "Human-readable description of the error."
+          },
+          "retry_after_seconds": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Only present when the error is rate-limited (RETRY_LIMIT_EXCEEDED or CREATE_GAME_RATE_LIMITED). Number of seconds the client must wait before retrying."
           }
         }
       },
@@ -1298,6 +1361,94 @@
             "type": "integer",
             "minimum": 1,
             "description": "Number of seconds the client must wait before sending another chat message after a rate-limit block."
+          }
+        }
+      },
+      "RetryInvitationPayload": {
+        "type": "object",
+        "required": [
+          "game_id"
+        ],
+        "properties": {
+          "game_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "InvitationReplacedPayload": {
+        "type": "object",
+        "required": [
+          "game_id",
+          "reason"
+        ],
+        "properties": {
+          "game_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "target_busy"
+            ],
+            "description": "The guest accepted a different invitation."
+          }
+        }
+      },
+      "InvitationPromotedPayload": {
+        "type": "object",
+        "required": [
+          "game_id",
+          "host"
+        ],
+        "properties": {
+          "game_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "host": {
+            "type": "object",
+            "required": [
+              "id",
+              "name"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "name": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "InvitationRetryAcceptedPayload": {
+        "type": "object",
+        "required": [
+          "game_id",
+          "attempt",
+          "remaining_attempts",
+          "idempotent"
+        ],
+        "properties": {
+          "game_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "attempt": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "remaining_attempts": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "idempotent": {
+            "type": "boolean",
+            "description": "True when the gameplay was already pending and no server-side state changed."
           }
         }
       }
