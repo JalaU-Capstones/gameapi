@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Callable
+from typing import Any
 
 import pytest
 from anyio import EndOfStream
@@ -14,6 +16,12 @@ def _contains_end_of_stream(exc: BaseException) -> bool:
     if isinstance(exc, BaseExceptionGroup):
         return any(_contains_end_of_stream(sub) for sub in exc.exceptions)
     return False
+
+
+async def _send_recv(ws: Any, event_dict: dict) -> dict:
+    """Send a JSON message and wait for the immediate response."""
+    await ws.send_json(event_dict)
+    return await ws.receive_json()
 
 
 async def test_ws_gameplays_auth_timeout(
@@ -102,6 +110,60 @@ async def test_ws_gameplays_valid_auth(
             "event": "auth_ok",
             "payload": {"user_id": str(registered_user["id"])},
         }
+
+
+async def test_ws_gameplays_queued_invitation_does_not_send_invitation_received(
+    ws_client_factory: Callable[[], AsyncClient],
+    registered_user_a: dict[str, object],
+    registered_user_b: dict[str, object],
+    auth_token_a: str,
+    auth_token_b: str,
+    client: AsyncClient,
+) -> None:
+    payload = {
+        "name": "User C",
+        "email": "c@example.com",
+        "password": "password123",
+    }
+    response = await client.post("/api/v1/users", json=payload)
+    assert response.status_code == 201, response.text
+    user_c = response.json()
+
+    login = await client.post(
+        "/api/v1/users/login",
+        json={"email": payload["email"], "password": payload["password"]},
+    )
+    assert login.status_code == 200, login.text
+    token_c = str(login.json()["token"])
+
+    async with (
+        ws_client_factory() as client_a,
+        aconnect_ws("ws://test/api/v2/ws/gameplays", client=client_a) as ws_a,
+        ws_client_factory() as client_b,
+        aconnect_ws("ws://test/api/v2/ws/gameplays", client=client_b) as ws_b,
+        ws_client_factory() as client_c,
+        aconnect_ws("ws://test/api/v2/ws/gameplays", client=client_c) as ws_c,
+    ):
+        await _send_recv(ws_a, {"event": "auth", "payload": {"token": auth_token_a}})
+        await _send_recv(ws_b, {"event": "auth", "payload": {"token": auth_token_b}})
+        await _send_recv(ws_c, {"event": "auth", "payload": {"token": token_c}})
+
+        first_game = await _send_recv(
+            ws_a,
+            {"event": "create_game", "payload": {"guest_id": str(user_c["id"])}},
+        )
+        assert first_game["event"] == "game_created"
+        first_invite = await ws_c.receive_json()
+        assert first_invite["event"] == "invitation_received"
+
+        second_game = await _send_recv(
+            ws_b,
+            {"event": "create_game", "payload": {"guest_id": str(user_c["id"])}},
+        )
+        assert second_game["event"] == "game_created"
+
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(ws_c.receive_json(), timeout=0.25)
 
 
 async def test_ws_gameplays_rejects_duplicate_user_session(
