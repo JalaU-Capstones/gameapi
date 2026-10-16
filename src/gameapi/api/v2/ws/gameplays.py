@@ -185,32 +185,6 @@ async def _handle_message(
                 return None
             return current_game_id
 
-        if event == "broadcast_to_game":
-            payload_broadcast = payload_raw if isinstance(payload_raw, dict) else {}
-            game_id = payload_broadcast.get("game_id")
-            payload_message = payload_broadcast.get("message")
-            if not isinstance(game_id, str) or not game_id or not isinstance(payload_message, str):
-                await websocket.send_json(
-                    {
-                        "event": "error",
-                        "payload": {
-                            "code": "INVALID_PAYLOAD",
-                            "message": "Missing 'game_id' field",
-                        },
-                    }
-                )
-                return current_game_id
-
-            await event_bus.publish(
-                game_id,
-                {
-                    "event": "game_message",
-                    "payload": {"from": user_id, "message": payload_message},
-                },
-            )
-            await websocket.send_json({"event": "broadcast_sent", "payload": {"game_id": game_id}})
-            return current_game_id
-
         if event == "create_game":
             payload = CreateGamePayload(**payload_raw)
             if payload.guest_id == user_id:
@@ -420,6 +394,17 @@ async def _handle_message(
             if current_game_id == game_id:
                 return None
             return current_game_id
+
+        await websocket.send_json(
+            {
+                "event": "error",
+                "payload": {
+                    "code": "NOT_IMPLEMENTED",
+                    "message": f"Event not implemented yet: {event}",
+                },
+            }
+        )
+        return current_game_id
 
     except ValidationError as e:
         await websocket.send_json(
