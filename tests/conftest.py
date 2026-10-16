@@ -168,10 +168,16 @@ def _reset_rate_limiter() -> Iterator[None]:
 @pytest.fixture(autouse=True)
 def _reset_ws_rate_limit() -> Iterator[None]:
     from gameapi.api.v2.ws.auth import _ws_attempts
+    from gameapi.core.ws_rate_limit import create_game_limiter
+    from gameapi.services.invitation_retry import invitation_retry_tracker
 
     _ws_attempts.clear()
+    invitation_retry_tracker.reset()
+    create_game_limiter.reset()
     yield
     _ws_attempts.clear()
+    invitation_retry_tracker.reset()
+    create_game_limiter.reset()
 
 
 @pytest_asyncio.fixture(autouse=True)

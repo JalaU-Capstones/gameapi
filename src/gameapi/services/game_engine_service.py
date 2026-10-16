@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
 
 from gameapi.api.v2.ws.manager import gameplays_manager
+from gameapi.core.config import settings
 from gameapi.schemas.gameplay import GameplayCreate, GameplayUpdate
 from gameapi.services.event_bus import EventBus
 from gameapi.services.exceptions import (
@@ -26,6 +27,7 @@ from gameapi.services.game_engine import (
     is_valid_move,
 )
 from gameapi.services.gameplay_service import GameplayService
+from gameapi.services.invitation_retry import invitation_retry_tracker
 from gameapi.services.user_service import UserService
 
 logger = logging.getLogger(__name__)
@@ -158,6 +160,70 @@ class GameEngineService:
         )
         await self.gameplay_service.update(game_id, update_data)
         await self._promote_next_queued_for_guest(guest_id, reason="previous_rejected")
+
+    async def retry_invitation(self, game_id: str, host_id: str) -> dict[str, Any]:
+        gameplay = await self.gameplay_service.get_by_id(game_id)
+        if not gameplay:
+            raise GameplayNotFoundError(game_id)
+
+        if gameplay.host_player != host_id:
+            raise NotAParticipantError(host_id, game_id)
+
+        if gameplay.invitation_state == "pending":
+            return {
+                "game_id": game_id,
+                "attempt": 0,
+                "remaining_attempts": settings.invitation.pair_max_attempts,
+                "idempotent": True,
+            }
+
+        if gameplay.invitation_state == "accepted":
+            raise GameNotActiveError(game_id)
+
+        if gameplay.invitation_state not in {"rejected", "expired", "canceled"}:
+            raise InvitationNotPendingError(game_id)
+
+        guest_id = str(gameplay.guest_player)
+        attempt, remaining = invitation_retry_tracker.check_and_record(host_id, guest_id)
+
+        await self.gameplay_service.update(
+            game_id,
+            GameplayUpdate(
+                invitation_state="pending",
+                match_result="null",
+                current_positions=json.dumps({"board": empty_board(), "last_move": None}),
+                player_turn=host_id,
+            ),
+        )
+
+        host = await self.user_service.get_by_id(host_id)
+        host_name = host.name if host is not None else "Unknown"
+        event = {
+            "event": "invitation_received",
+            "payload": {"game_id": game_id, "host": {"id": host_id, "name": host_name}},
+        }
+        await self.event_bus.publish(game_id, event)
+        await gameplays_manager.send_to(guest_id, event)
+
+        logger.info(
+            "Invitation retried",
+            extra={
+                "event_type": "invitation_retried",
+                "player_id": host_id,
+                "gameplay_id": game_id,
+                "metadata": {
+                    "attempt": attempt,
+                    "remaining_attempts": remaining,
+                    "guest_id": guest_id,
+                },
+            },
+        )
+        return {
+            "game_id": game_id,
+            "attempt": attempt,
+            "remaining_attempts": remaining,
+            "idempotent": False,
+        }
 
     async def _replace_displaced_invitations(self, guest_id: str, accepted_game_id: str) -> int:
         """Replace the guest's other pending/queued invitations and notify their hosts.

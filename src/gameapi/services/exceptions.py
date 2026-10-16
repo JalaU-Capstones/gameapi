@@ -107,3 +107,20 @@ class ChatRateLimitedError(DomainError):
     def __init__(self, retry_after_seconds: int) -> None:
         self.retry_after_seconds = retry_after_seconds
         super().__init__(f"Chat rate limit exceeded; retry after {retry_after_seconds}s")
+
+
+class InvitationRetryLimitExceededError(DomainError):
+    def __init__(self, host_id: str, guest_id: str, retry_after_seconds: int) -> None:
+        self.host_id = host_id
+        self.guest_id = guest_id
+        self.retry_after_seconds = retry_after_seconds
+        super().__init__(
+            f"Invitation retry limit exceeded for host {host_id} and guest {guest_id}; "
+            f"retry after {retry_after_seconds}s"
+        )
+
+
+class CreateGameRateLimitedError(DomainError):
+    def __init__(self, retry_after_seconds: int) -> None:
+        self.retry_after_seconds = retry_after_seconds
+        super().__init__(f"Create game rate limit exceeded; retry after {retry_after_seconds}s")

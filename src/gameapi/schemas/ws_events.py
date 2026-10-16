@@ -19,6 +19,10 @@ class RejectInvitationPayload(BaseModel):
     game_id: str
 
 
+class RetryInvitationPayload(BaseModel):
+    game_id: str
+
+
 class PlayMovePayload(BaseModel):
     game_id: str
     row: int = Field(ge=0, le=2)
