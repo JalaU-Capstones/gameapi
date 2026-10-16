@@ -130,28 +130,63 @@ Guárdala en tu gestor de contraseñas del equipo. La usarás en el paso 4.
 
 ## Paso 4 — Configurar variables de entorno
 
-En el dashboard del Web Service, ve a **Environment** y agrega las siguientes variables:
+En el dashboard del Web Service, ve a **Environment** y agrega todas las variables que usa la app. En Render Free, el servicio se suspende tras 15 minutos de inactividad, la memoria está limitada a 512 MB, la CPU a 0.1 y la base de datos tiene cuotas pequeñas. Por eso conviene mantener los valores conservadores, no usar Redis y evitar cachés o logs demasiado agresivos.
 
-| Variable | Valor | Cómo obtenerlo |
+> La app consume estas variables en `src/gameapi/core/config.py` y en `.env.example`. La tabla siguiente resume los valores recomendados para una instancia en Render Free.
+
+| Variable | Valor recomendado | Racional |
 |---|---|---|
-| `POSTGRES_URI` | `postgresql://gameapi:...` | El **Internal Database URL** del paso 2 |
-| `JWT_SECRET_KEY` | _(tu clave del paso 1)_ | `openssl rand -base64 48` |
-| `JWT_ALGORITHM` | `HS256` | Constante |
-| `JWT_ISSUER` | `GameAPI` | Constante |
-| `JWT_AUDIENCE` | `GameAPI` | Constante |
-| `JWT_EXPIRE_MINUTES` | `60` | Constante |
-| `AUTH_COOKIE_SECURE` | `true` | Constante |
-| `AUTH_COOKIE_SAMESITE` | `lax` | Constante |
-| `AUTH_COOKIE_DOMAIN` | _(vacío o dominio)_ | Opcional |
-| `LOG_ADMIN_EMAILS` | `admin@gameapi.local` | Equipo |
-| `APP_ENV` | `production` | Constante |
-| `APP_HOST` | `0.0.0.0` | Constante |
-| `CORS_ORIGINS` | `https://app.example.com` | Dominio(s) de frontend |
-| `RATE_LIMIT_ENABLED` | `true` | Constante |
-| `RATE_LIMIT_STORAGE_URI` | `memory://` | Constante |
-| `LOG_BUFFER_SIZE` | `100` | Constante |
-| `LOG_FLUSH_INTERVAL_SECONDS` | `5.0` | Constante |
-| `LOG_RETENTION_DAYS` | `30` | Constante |
+| `POSTGRES_URI` | `postgresql://gameapi:...` | Usa la URL interna de la base de datos de Render. La app normaliza `postgres://` y `postgresql://` a `postgresql+asyncpg://` automáticamente. |
+| `POSTGRES_USER` | `gameapi` | Usuario de la base de datos creada en Render. |
+| `POSTGRES_PASSWORD` | _valor secreto del rol_ | Debe venir de la DB creada en Render; no lo guardes en el repositorio. |
+| `POSTGRES_DB` | `gameapi` | Nombre de la base de datos. |
+| `GAMEAPI_APP_PASSWORD` | `gameapi_app_dev` o valor equivalente | Solo se usa al inicializar PostgreSQL local en Docker. En Render no es necesario a menos que repitas un entorno local. |
+| `JWT_SECRET_KEY` | `openssl rand -base64 48` | Debe ser único y largo. En producción no se acepta el valor por defecto. |
+| `JWT_ALGORITHM` | `HS256` | Algoritmo estándar para JWT en este proyecto. |
+| `JWT_ISSUER` | `GameAPI` | Identificador del emisor utilizado por la app. |
+| `JWT_AUDIENCE` | `GameAPI` | Identificador del público esperado por la app. |
+| `JWT_EXPIRE_MINUTES` | `60` | Vale para sesiones de acceso razonables sin forzar re-login. |
+| `AUTH_ACCESS_COOKIE_NAME` | `gameapi_at` | Nombre del cookie de acceso; mantén el valor por defecto para que el frontend y la API coincidan. |
+| `AUTH_REFRESH_COOKIE_NAME` | `gameapi_rt` | Nombre del cookie de refresh; debe mantenerse estable. |
+| `AUTH_ACCESS_TOKEN_EXPIRE_MINUTES` | `15` | Reduce la ventana de robo de tokens y respeta la experiencia de sesión web. |
+| `AUTH_REFRESH_TOKEN_EXPIRE_DAYS` | `7` | Balance razonable para sesiones persistentes en producción. |
+| `AUTH_COOKIE_SECURE` | `true` | Render usa HTTPS; esta opción evita cookies sobre texto plano. |
+| `AUTH_COOKIE_SAMESITE` | `lax` | Es el valor más seguro y compatible para un frontend en dominio separado. |
+| `AUTH_COOKIE_DOMAIN` | `""` o vacío | En Render, normalmente no necesitas fijar este valor salvo un dominio específico. |
+| `AUTH_REFRESH_COOKIE_PATH` | `/api/v2/auth` | Coincide con la ruta real de refresh en la API. |
+| `AUTH_ACCESS_COOKIE_PATH` | `/` | Permite que la sesión principal se use en toda la app. |
+| `INVITATION_PENDING_TTL_SECONDS` | `60` | Mantiene el flujo de invitación vivo pero evita esperas indefinidas. |
+| `INVITATION_QUEUED_TTL_SECONDS` | `300` | Da margen para que el invitado responda sin que la invitación expire demasiado pronto. |
+| `INVITATION_EXPIRY_INTERVAL_SECONDS` | `10.0` | Tarea periódica de expiración ligera; es suficiente para el plan gratuito. |
+| `INVITATION_QUEUED_EXPIRY_INTERVAL_SECONDS` | `30.0` | Reduce la frecuencia de comprobación para ahorrar CPU. |
+| `ABANDON_GRACE_SECONDS` | `5.0` | Aporta un pequeño margen para manejar desconexiones pausadas sin penalizar a jugadores activos. |
+| `INVITATION_PAIR_MAX_ATTEMPTS` | `3` | Limita los reintentos por par de usuarios. |
+| `INVITATION_PAIR_WINDOW_SECONDS` | `180` | Ventana corta para evitar reintentos abusivos sin bloquear tráfico normal. |
+| `CHAT_RATE_MAX_MESSAGES` | `10` | Evita spam en la sala de chat con una tasa conservadora. |
+| `CHAT_RATE_WINDOW_SECONDS` | `10.0` | Ventana corta y útil para detectar abuso; no penaliza mucho el uso normal. |
+| `CHAT_RATE_BLOCK_SECONDS` | `30.0` | Penalización razonable para evitar reintentos agresivos. |
+| `APP_ENV` | `production` | Debe ser `production` para activar validaciones de seguridad y evitar valores de desarrollo. |
+| `APP_HOST` | `0.0.0.0` | Render inyecta el host real; este valor es el estándar para servicios HTTP. |
+| `APP_PORT` | `8080` | Puerto esperado por el contenedor y la configuración del servicio. |
+| `CORS_ORIGINS` | `https://app.example.com` | En producción, evita `*` porque los cookies con `SameSite=lax` y credenciales requieren orígenes explícitos. |
+| `LOG_BUFFER_SIZE` | `100` | Mantiene el lote de logs pequeño para no saturar memoria ni CPU. |
+| `LOG_FLUSH_INTERVAL_SECONDS` | `5.0` | Frecuencia suficiente para evitar pérdida masiva de logs sin forzar I/O excesivo. |
+| `LOG_RETENTION_DAYS` | `30` | Es un valor prudente para la cuota de almacenamiento de la base de datos. |
+| `LOG_QUEUE_MAXSIZE` | `1000` | Evita que la cola de eventos crezca sin control cuando el servicio está inactivo. |
+| `LOG_ADMIN_EMAILS` | `admin@gameapi.local` | Lista de administradores para consulta de logs; en prod conviene usar correos reales del equipo. |
+| `RATE_LIMIT_ENABLED` | `true` | Habilita protección contra abuso en un servicio público. |
+| `RATE_LIMIT_STORAGE_URI` | `memory://` | En Render Free no hay Redis. `memory://` es la elección correcta y evita fallos de infraestructura. |
+| `RATE_LIMIT_LOGIN` | `5/minute` | Límite razonable para prevenir fuerza bruta. |
+| `RATE_LIMIT_REGISTER` | `3/minute` | Limita alta frecuencia de creación de cuentas. |
+| `RATE_LIMIT_REFRESH` | `10/minute` | Mantiene las rotaciones de token bajo control. |
+| `RATE_LIMIT_ANONYMOUS_DEFAULT` | `60/minute` | Suficiente para clientes normales sin permitir abuso extremo. |
+| `RATE_LIMIT_AUTHENTICATED_DEFAULT` | `60/minute` | Valor conservador para usuarios autenticados. |
+| `RATE_LIMIT_AUTH_ME` | `60/minute` | Límite de la consulta de perfil; evita abuso de polling. |
+| `RATE_LIMIT_LOGS_ME` | `30/minute` | Reduce la presión sobre el endpoint de logs personales. |
+| `RATE_LIMIT_LOGS_ADMIN` | `300/minute` | Permite a administradores consultar logs sin abrir una ventana demasiado amplia. |
+| `RATE_LIMIT_CREATE_GAME` | `5/minute` | Compatibiliza la creación de partidas con los límites de invitación y evita spikes de carga. |
+| `RATE_LIMIT_WS_HANDSHAKE` | `10/minute` | Protege los WebSockets de conexiones repetitivas y rotativas. |
+| `RATE_LIMIT_SESSION_TAKEOVER` | `3/minute` | Limita intentos de takeover de sesión. |
 
 > **Sobre el formato de `POSTGRES_URI`**
 >
@@ -167,8 +202,18 @@ En el dashboard del Web Service, ve a **Environment** y agrega las siguientes va
 > manualmente el sufijo:
 >
 > ```
-> postgresql+asyncpg://gameapi:password@dpg-xxxxx-a/gameapi
+> postgres://<user>:<password>@<host>:5432/<db>
 > ```
+>
+> y dejar que el código lo convierta a `postgresql+asyncpg://...`.
+
+> **Caveats de Render Free**
+>
+> - El servicio entra en suspensión tras 15 minutos de inactividad; la primera petición puede tardar 30–60 segundos.
+> - La memoria máxima es 512 MB y la CPU 0.1, así que mantén los buffers y logs pequeños.
+> - No existe Redis en el plan gratuito; usa `RATE_LIMIT_STORAGE_URI=memory://` y no dependas de un broker externo.
+> - La base de datos PostgreSQL tiene una cuota de almacenamiento limitada; revisa el tamaño de `logs` y el tamaño de tablas si el servicio tarda en crecer.
+> - El `cold start` obliga a mantener tiempos de expiración cortos y límites de tarifa razonables para evitar que la primera petición falle por saturación.
 
 ## Paso 5 — Configurar GitHub Actions y Render deploy hook
 

@@ -8,8 +8,9 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from fastapi.responses import JSONResponse
 
 from gameapi.api.deps import CurrentUser, UserServiceDep, get_current_user
+from gameapi.api.v2.ws.manager import presence_manager
 from gameapi.schemas.user import PublicUserResponse, UserUpdate
-from gameapi.services import EmailAlreadyExistsError, UserNotFoundError
+from gameapi.services import EmailAlreadyExistsError, UserHasOpenGameplaysError, UserNotFoundError
 
 router = APIRouter(
     prefix="/users",
@@ -79,6 +80,8 @@ async def update_user(
         raise HTTPException(404, "User not found") from exc
     except EmailAlreadyExistsError as exc:
         raise HTTPException(409, "Email is currently registered") from exc
+    if payload.name is not None:
+        await presence_manager.broadcast({"event": "user_updated", "payload": {"user_id": user_id}})
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -94,4 +97,8 @@ async def delete_user(
         await service.delete(user_id)
     except UserNotFoundError as exc:
         raise HTTPException(404, "User not found") from exc
+    except UserHasOpenGameplaysError as exc:
+        raise HTTPException(
+            409, "You have an active game or a pending invitation. Finish or cancel it first."
+        ) from exc
     return Response(status_code=status.HTTP_204_NO_CONTENT)

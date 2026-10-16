@@ -19,6 +19,10 @@ class RejectInvitationPayload(BaseModel):
     game_id: str
 
 
+class RetryInvitationPayload(BaseModel):
+    game_id: str
+
+
 class PlayMovePayload(BaseModel):
     game_id: str
     row: int = Field(ge=0, le=2)
@@ -27,6 +31,11 @@ class PlayMovePayload(BaseModel):
 
 class LeaveGamePayload(BaseModel):
     game_id: str
+
+
+class ChatSendPayload(BaseModel):
+    # The service owns the business limits; the schema only validates the shape.
+    content: str
 
 
 class GameEndedPayload(BaseModel):

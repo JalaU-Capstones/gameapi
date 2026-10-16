@@ -65,8 +65,20 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
     await rebuild_playing_cache(PostgresDatabase.session_factory())
 
-    pending_task = asyncio.create_task(run_pending_expiry_loop(engine))
-    queued_task = asyncio.create_task(run_queued_expiry_loop(engine))
+    pending_task = asyncio.create_task(
+        run_pending_expiry_loop(
+            engine,
+            interval_seconds=settings.invitation.expiry_interval_seconds,
+            ttl_seconds=settings.invitation.pending_ttl_seconds,
+        )
+    )
+    queued_task = asyncio.create_task(
+        run_queued_expiry_loop(
+            engine,
+            interval_seconds=settings.invitation.queued_expiry_interval_seconds,
+            ttl_seconds=settings.invitation.queued_ttl_seconds,
+        )
+    )
 
     root_logger = logging.getLogger()
     root_logger.addHandler(log_service.get_handler())

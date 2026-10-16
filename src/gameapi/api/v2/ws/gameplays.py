@@ -13,7 +13,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from gameapi.api.v2.ws.auth import authenticate_websocket
 from gameapi.api.v2.ws.manager import gameplays_manager
+from gameapi.core.config import settings
 from gameapi.core.idempotency import lookup_ws_create_game, remember_ws_create_game
+from gameapi.core.ws_rate_limit import create_game_limiter
 from gameapi.db.session import PostgresDatabase
 from gameapi.schemas.ws_events import (
     AcceptInvitationPayload,
@@ -21,16 +23,19 @@ from gameapi.schemas.ws_events import (
     LeaveGamePayload,
     PlayMovePayload,
     RejectInvitationPayload,
+    RetryInvitationPayload,
 )
 from gameapi.services.event_bus import event_bus
 from gameapi.services.exceptions import (
     CannotInviteSelfError,
+    CreateGameRateLimitedError,
     DomainError,
     GameNotActiveError,
     GameplayNotFoundError,
     HostBusyError,
     InvalidMoveError,
     InvitationNotPendingError,
+    InvitationRetryLimitExceededError,
     NotAParticipantError,
     NotYourTurnError,
     OpponentOfflineError,
@@ -59,6 +64,10 @@ def _map_domain_error(exc: DomainError) -> str:
         return "NOT_A_PARTICIPANT"
     if isinstance(exc, InvitationNotPendingError):
         return "INVITATION_NOT_PENDING"
+    if isinstance(exc, InvitationRetryLimitExceededError):
+        return "RETRY_LIMIT_EXCEEDED"
+    if isinstance(exc, CreateGameRateLimitedError):
+        return "CREATE_GAME_RATE_LIMITED"
     if isinstance(exc, CannotInviteSelfError):
         return "CANNOT_INVITE_SELF"
     if isinstance(exc, OpponentOfflineError):
@@ -185,46 +194,24 @@ async def _handle_message(
                 return None
             return current_game_id
 
-        if event == "broadcast_to_game":
-            payload_broadcast = payload_raw if isinstance(payload_raw, dict) else {}
-            game_id = payload_broadcast.get("game_id")
-            payload_message = payload_broadcast.get("message")
-            if not isinstance(game_id, str) or not game_id or not isinstance(payload_message, str):
-                await websocket.send_json(
-                    {
-                        "event": "error",
-                        "payload": {
-                            "code": "INVALID_PAYLOAD",
-                            "message": "Missing 'game_id' field",
-                        },
-                    }
-                )
-                return current_game_id
-
-            await event_bus.publish(
-                game_id,
-                {
-                    "event": "game_message",
-                    "payload": {"from": user_id, "message": payload_message},
-                },
-            )
-            await websocket.send_json({"event": "broadcast_sent", "payload": {"game_id": game_id}})
-            return current_game_id
-
         if event == "create_game":
-            payload = CreateGamePayload(**payload_raw)
-            if payload.guest_id == user_id:
+            allowed, retry_after = create_game_limiter.check_and_record(user_id)
+            if not allowed:
+                raise CreateGameRateLimitedError(retry_after)
+
+            create_payload = CreateGamePayload(**payload_raw)
+            if create_payload.guest_id == user_id:
                 raise CannotInviteSelfError(user_id)
-            if not gameplays_manager.is_online(payload.guest_id):
-                raise OpponentOfflineError(payload.guest_id)
+            if not gameplays_manager.is_online(create_payload.guest_id):
+                raise OpponentOfflineError(create_payload.guest_id)
 
             guest_active_game = await engine_service.gameplay_service.find_active_game_for_user(
-                payload.guest_id
+                create_payload.guest_id
             )
             if guest_active_game is not None:
-                if not is_playing(payload.guest_id):
-                    await set_players_status([payload.guest_id], playing=True)
-                raise UserBusyError(payload.guest_id)
+                if not is_playing(create_payload.guest_id):
+                    await set_players_status([create_payload.guest_id], playing=True)
+                raise UserBusyError(create_payload.guest_id)
 
             host_active = await engine_service.gameplay_service.find_active_game_for_user(user_id)
             host_pending = await engine_service.gameplay_service.has_pending_or_queued_invitation(
@@ -239,7 +226,10 @@ async def _handle_message(
                 if cached is not None:
                     return cached
 
-            game_id = await engine_service.create_game(host_id=user_id, guest_id=payload.guest_id)
+            game_id = await engine_service.create_game(
+                host_id=user_id,
+                guest_id=create_payload.guest_id,
+            )
             if isinstance(request_id, str) and request_id:
                 remember_ws_create_game(host_id=user_id, request_id=request_id, game_id=game_id)
             await session.commit()
@@ -257,7 +247,7 @@ async def _handle_message(
                     "metadata": {
                         "game_id": game_id,
                         "host_id": user_id,
-                        "guest_id": payload.guest_id,
+                        "guest_id": create_payload.guest_id,
                     },
                 },
             )
@@ -266,23 +256,26 @@ async def _handle_message(
                     "event": "game_created",
                     "payload": {
                         "game_id": game_id,
-                        "guest_id": payload.guest_id,
+                        "guest_id": create_payload.guest_id,
                         "board": [[0, 0, 0], [0, 0, 0], [0, 0, 0]],
                         "turn": user_id,
                     },
                 }
             )
 
-            host = await engine_service.user_service.get_by_id(user_id)
-            host_name = host.name if host else "Unknown"
+            created_gameplay = await engine_service.gameplay_service.get_by_id(game_id)
+            invitation_state = created_gameplay.invitation_state if created_gameplay else "pending"
+            if invitation_state == "pending":
+                host = await engine_service.user_service.get_by_id(user_id)
+                host_name = host.name if host else "Unknown"
 
-            await gameplays_manager.send_to(
-                payload.guest_id,
-                {
-                    "event": "invitation_received",
-                    "payload": {"game_id": game_id, "host": {"id": user_id, "name": host_name}},
-                },
-            )
+                await gameplays_manager.send_to(
+                    create_payload.guest_id,
+                    {
+                        "event": "invitation_received",
+                        "payload": {"game_id": game_id, "host": {"id": user_id, "name": host_name}},
+                    },
+                )
             return game_id
 
         if event == "accept_invitation":
@@ -330,15 +323,54 @@ async def _handle_message(
             await session.commit()
 
             gameplay = await engine_service.gameplay_service.get_by_id(game_id)
-            host_id = gameplay.host_player if gameplay else ""
+            host_id = gameplay.host_player if gameplay else None
 
-            await gameplays_manager.send_to(
-                host_id,
-                {
-                    "event": "invitation_rejected",
-                    "payload": {"game_id": game_id, "guest_id": user_id},
-                },
+            if host_id is not None:
+                await gameplays_manager.send_to(
+                    host_id,
+                    {
+                        "event": "invitation_rejected",
+                        "payload": {"game_id": game_id, "guest_id": user_id},
+                    },
+                )
+            return current_game_id
+
+        if event == "retry_invitation":
+            payload_retry = RetryInvitationPayload(**payload_raw)
+            result = await engine_service.retry_invitation(
+                game_id=payload_retry.game_id,
+                host_id=user_id,
             )
+            await session.commit()
+
+            await websocket.send_json(
+                {
+                    "event": "invitation_retry_accepted",
+                    "payload": {
+                        "game_id": result["game_id"],
+                        "attempt": result["attempt"],
+                        "remaining_attempts": result["remaining_attempts"],
+                        "idempotent": result["idempotent"],
+                    },
+                }
+            )
+
+            if not result["idempotent"]:
+                gameplay = await engine_service.gameplay_service.get_by_id(payload_retry.game_id)
+                guest_id = gameplay.guest_player if gameplay else None
+                if guest_id is not None:
+                    host = await engine_service.user_service.get_by_id(user_id)
+                    host_name = host.name if host else "Unknown"
+                    await gameplays_manager.send_to(
+                        guest_id,
+                        {
+                            "event": "invitation_received",
+                            "payload": {
+                                "game_id": payload_retry.game_id,
+                                "host": {"id": user_id, "name": host_name},
+                            },
+                        },
+                    )
             return current_game_id
 
         if event == "play_move":
@@ -420,19 +452,32 @@ async def _handle_message(
                 return None
             return current_game_id
 
+        await websocket.send_json(
+            {
+                "event": "error",
+                "payload": {
+                    "code": "NOT_IMPLEMENTED",
+                    "message": f"Event not implemented yet: {event}",
+                },
+            }
+        )
+        return current_game_id
+
     except ValidationError as e:
         await websocket.send_json(
             {"event": "error", "payload": {"code": "INVALID_PAYLOAD", "message": str(e)}}
         )
     except DomainError as e:
-        await websocket.send_json(
-            {"event": "error", "payload": {"code": _map_domain_error(e), "message": str(e)}}
-        )
+        error_payload: dict[str, Any] = {"code": _map_domain_error(e), "message": str(e)}
+        retry_after_seconds = getattr(e, "retry_after_seconds", None)
+        if retry_after_seconds is not None:
+            error_payload["retry_after_seconds"] = retry_after_seconds
+        await websocket.send_json({"event": "error", "payload": error_payload})
 
     return current_game_id
 
 
-ABANDON_GRACE_SECONDS = 20.0
+ABANDON_GRACE_SECONDS: float | None = None
 _HANDOVER_REASONS = {"session_handover", "session_replaced"}
 _pending_abandons: dict[str, asyncio.Task[None]] = {}
 
@@ -499,12 +544,15 @@ def _cancel_pending_abandon(user_id: str) -> None:
 
 
 def _schedule_abandon(user_id: str, game_id: str) -> None:
-    """Give another tab of the same user time to take over the game before abandoning it."""
+    # The abandon grace window is configuration-driven and defaults to 5 seconds.
     _cancel_pending_abandon(user_id)
+    grace_seconds = globals().get("ABANDON_GRACE_SECONDS")
+    if grace_seconds is None:
+        grace_seconds = settings.invitation.abandon_grace_seconds
 
     async def _abandon_if_not_resumed() -> None:
         try:
-            await asyncio.sleep(ABANDON_GRACE_SECONDS)
+            await asyncio.sleep(float(grace_seconds))
             if gameplays_manager.is_online(user_id) and event_bus.is_subscribed(game_id, user_id):
                 return
             await _abandon_game(user_id, game_id)

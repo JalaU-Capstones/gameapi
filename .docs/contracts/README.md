@@ -60,10 +60,11 @@ python -c "import json; json.load(open('.docs/contracts/openapi/openapi.json'))"
 
 ## AsyncAPI (WebSocket)
 
-Contrato manual para los endpoints WebSocket. Cubre dos canales:
+Contrato manual para los endpoints WebSocket. Cubre tres canales:
 
 - `/api/v2/ws/gameplays` — eventos de partida (invitaciones, turnos, victorias).
 - `/api/v2/ws/presence` — presencia de usuarios (online/offline).
+- `/api/v2/ws/chat` — chat global in-memory con historial, conteo de usuarios y rate limiting por usuario.
 
 ### Regenerar
 
@@ -88,7 +89,14 @@ Usa el AsyncAPI CLI para verificar que el documento cumple con la especificació
 |---|---|---|
 | REST v1 | 1.0.0 | 🔒 Congelado |
 | REST v2 | 2.0.0 | 🟢 Activo |
-| WebSocket v2 | 2.0.0 | 🟢 Activo |
+| WebSocket v2 | 2.2.0 | 🟢 Activo |
+
+### Changelog
+
+| Versión | Cambio |
+|---|---|
+| 2.1.0 | Se agrega el canal global `chat` a AsyncAPI y se documenta la integración con `chat_manager` y el takeover de sesión; se eliminan referencias a `game_message` / `broadcast_to_game` del gameplay channel. |
+| 2.2.0 | Se documentan los eventos de ciclo de vida de invitación (`retry_invitation`, `invitation_replaced`, `invitation_promoted`, `invitation_retry_accepted`) y el nuevo rate-limit del host para `create_game`, junto con la advertencia `retry_after_seconds` en errores del gameplay channel. |
 
 Política de cambios:
 

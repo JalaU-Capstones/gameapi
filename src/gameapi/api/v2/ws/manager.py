@@ -96,6 +96,7 @@ class ConnectionManager:
 
 gameplays_manager = ConnectionManager()
 presence_manager = ConnectionManager()
+chat_manager = ConnectionManager()
 
 
 def reset_player_status() -> None:

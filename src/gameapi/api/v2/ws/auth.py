@@ -17,7 +17,7 @@ WS_CLOSE_SESSION_CONFLICT = 4409
 _ws_attempts: dict[str, deque[float]] = defaultdict(deque)
 
 
-def _parse_limit(limit: str) -> tuple[int, float]:
+def parse_limit(limit: str) -> tuple[int, float]:
     count_str, period_str = limit.split("/", 1)
     count = int(count_str)
     period = {
@@ -29,9 +29,12 @@ def _parse_limit(limit: str) -> tuple[int, float]:
     return count, period
 
 
+_parse_limit = parse_limit
+
+
 def _check_ws_rate_limit(user_id: str) -> bool:
     limit_str = settings.rate_limit.ws_handshake
-    count, period = _parse_limit(limit_str)
+    count, period = parse_limit(limit_str)
     now = monotonic()
     window_start = now - period
 

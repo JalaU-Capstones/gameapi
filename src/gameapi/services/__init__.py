@@ -5,6 +5,7 @@ from gameapi.services.exceptions import (
     GameplayNotFoundError,
     InvalidCredentialsError,
     InvalidRefreshTokenError,
+    UserHasOpenGameplaysError,
     UserNotFoundError,
 )
 from gameapi.services.gameplay_service import GameplayService
@@ -20,6 +21,7 @@ __all__ = [
     "InvalidCredentialsError",
     "InvalidRefreshTokenError",
     "LogService",
+    "UserHasOpenGameplaysError",
     "UserNotFoundError",
     "UserService",
 ]

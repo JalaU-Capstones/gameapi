@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Cookie, HTTPException, Request, Response, status
 
 from gameapi.api.deps import AuthServiceDep, CurrentUser
-from gameapi.api.v2.ws.manager import gameplays_manager, presence_manager
+from gameapi.api.v2.ws.manager import chat_manager, gameplays_manager, presence_manager
 from gameapi.core.config import settings
 from gameapi.core.idempotency import (
     normalize_registration_identity,
@@ -247,7 +247,7 @@ async def takeover_session(
 ) -> Response:
     del request
     revoked = 0
-    for manager in (gameplays_manager, presence_manager):
+    for manager in (gameplays_manager, presence_manager, chat_manager):
         revoked += int(await manager.revoke_all_user_sockets(current_user.id))
 
     logger = __import__("logging").getLogger(__name__)

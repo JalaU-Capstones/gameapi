@@ -7,8 +7,8 @@ REST API para gestión de usuarios y partidas de Tic-Tac-Toe.
 [![Render](https://img.shields.io/badge/Render-production-46E3B7?logo=render&logoColor=white)](https://gameapi-9vos.onrender.com/health)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg)](https://fastapi.tiangolo.com/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![Tests](https://img.shields.io/badge/tests-329%20passed-success.svg)](#pruebas)
-[![Coverage](https://img.shields.io/badge/coverage-93%25-brightgreen.svg)](#cobertura)
+[![Tests](https://img.shields.io/badge/tests-391%20passed-success.svg)](#pruebas)
+[![Coverage](https://img.shields.io/badge/coverage-92.53%25-orange.svg)](#cobertura)
 
 **Stack:** Python 3.11+ · FastAPI · PostgreSQL 16 · SQLAlchemy 2.0 async · Pydantic v2 · JWT · WebSocket · uv · Docker
 
@@ -212,6 +212,17 @@ Todas las variables se leen desde `.env` (ver `.env.example`):
 | `AUTH_COOKIE_DOMAIN`               | Dominio opcional para cookies                       | *(vacío)*                                                     |
 | `AUTH_REFRESH_COOKIE_PATH`         | Path del refresh cookie                             | `/api/v2/auth`                                                |
 | `AUTH_ACCESS_COOKIE_PATH`          | Path del access cookie                              | `/`                                                           |
+| `INVITATION_PENDING_TTL_SECONDS`    | TTL de invitaciones pendientes                     | `60`                                                          |
+| `INVITATION_QUEUED_TTL_SECONDS`     | TTL de invitaciones en cola                        | `300`                                                         |
+| `INVITATION_EXPIRY_INTERVAL_SECONDS`| Intervalo de expiración de invitaciones            | `10.0`                                                        |
+| `INVITATION_QUEUED_EXPIRY_INTERVAL_SECONDS` | Intervalo de expiración en cola | `30.0`                                      |
+| `ABANDON_GRACE_SECONDS`             | Grace period antes de abandonar partida            | `5.0`                                                          |
+| `INVITATION_PAIR_MAX_ATTEMPTS`      | Máximo de reintentos por par `(host, guest)`       | `3`                                                            |
+| `INVITATION_PAIR_WINDOW_SECONDS`    | Ventana de reintentos por par `(host, guest)`     | `180`                                                          |
+| `CHAT_RATE_MAX_MESSAGES`            | Mensajes máximos por ventana de chat              | `10`                                                           |
+| `CHAT_RATE_WINDOW_SECONDS`          | Ventana de chat en segundos                        | `10.0`                                                         |
+| `CHAT_RATE_BLOCK_SECONDS`           | Bloqueo tras exceder el rate limit de chat         | `30.0`                                                         |
+| `RATE_LIMIT_CREATE_GAME`            | Límite de creación de partidas por host            | `5/minute`                                                     |
 
 ---
 
@@ -404,16 +415,31 @@ Los endpoints WebSocket operan bajo `/api/v2/ws` y requieren autenticación JWT 
 |------------------------|-----------------------------------------------------------------------------------|
 | `/api/v2/ws/gameplays` | Canal de eventos de partidas. Requiere el evento `auth` con `{ "token": "..." }`. |
 | `/api/v2/ws/presence`  | Canal de presencia en línea. Requiere el evento `auth` con `{ "token": "..." }`.  |
+| `/api/v2/ws/chat`      | Canal global de chat. Requiere el evento `auth` con `{ "token": "..." }`.       |
 
 **Eventos soportados actualmente (B3):**
 
-**Cliente → Servidor:**
+**Cliente → Servidor (chat global):**
+- `auth` — primer mensaje obligatorio con el JWT.
+- `ping` — keepalive.
+- `chat_send` — publica un mensaje del usuario autenticado. Payload: `{"content": "..."}`.
+
+**Servidor → Cliente (chat global):**
+- `auth_ok` — confirmación de autenticación con `user_id`.
+- `chat_history` — historial reciente y conteo activo.
+- `chat_message` — mensaje nuevo publicado al canal.
+- `chat_users_count` — conteo actualizado de usuarios conectados al chat.
+- `chat_error` — validación, vacío, demasiado largo o rate limit.
+- `pong` — respuesta a `ping`.
+
+**Cliente → Servidor (gameplays):**
 - `auth` — primer mensaje obligatorio con el JWT.
 - `ping` — keepalive.
 - `create_game` — crear partida e invitar. Payload: `{"guest_id": "<uuid>"}`.
 - `accept_invitation` — aceptar invitación. Payload: `{"game_id": "<uuid>"}`.
 - `reject_invitation` — rechazar invitación. Payload: `{"game_id": "<uuid>"}`.
 - `play_move` — jugar. Payload: `{"game_id": "<uuid>", "row": 0-2, "col": 0-2}`.
+- `retry_invitation` — reintentar una invitación rechazada o expirada reutilizando el mismo `game_id`. Payload: `{"game_id": "<uuid>"}`.
 - `leave_game` — abandonar partida activa. Payload: `{"game_id": "<uuid>"}`.
 - `subscribe_game` — unirse al canal de una partida.
 - `unsubscribe_game` — salir del canal.
@@ -425,16 +451,19 @@ Los endpoints WebSocket operan bajo `/api/v2/ws` y requieren autenticación JWT 
 - `invitation_received` — invitación entrante (al guest).
 - `invitation_accepted` — el guest aceptó; partida comienza (a ambos).
 - `invitation_rejected` — el guest rechazó (al host).
+- `invitation_replaced` — el guest aceptó otra invitación y el host desplazado queda fuera del flujo. Payload: `{"game_id": "<uuid>", "reason": "target_busy"}`.
+- `invitation_promoted` — una invitación en cola pasó a `pending`. Payload idéntico a `invitation_received`.
+- `invitation_retry_accepted` — ack del `retry_invitation`. Payload: `{"game_id": "<uuid>", "attempt": 1, "remaining_attempts": 2, "idempotent": false}`.
 - `board_updated` — jugada realizada. Incluye `board`, `turn` y `last_move`.
 - `game_ended` — partida terminada. Incluye `game_id`, `board`, `winner`, `reason`, y `winner_line` (`null` para empate/abandono, una lista de coordenadas para victoria).
 - `subscribed` / `unsubscribed` — confirmación de suscripción al canal.
-- `error` — error de validación. Incluye `code` y `message`.
+- `error` — error de validación. Incluye `code`, `message` y, cuando aplica, `retry_after_seconds`.
 
 **Códigos de error soportados:**
 
 `NOT_YOUR_TURN`, `INVALID_MOVE`, `GAME_NOT_FOUND`, `GAME_NOT_ACTIVE`,
 `NOT_A_PARTICIPANT`, `INVITATION_NOT_PENDING`, `CANNOT_INVITE_SELF`,
-`OPPONENT_OFFLINE`, `INVALID_PAYLOAD`, `INVALID_EVENT`, `NOT_IMPLEMENTED`.
+`OPPONENT_OFFLINE`, `INVALID_PAYLOAD`, `INVALID_EVENT`, `NOT_IMPLEMENTED`, `RETRY_LIMIT_EXCEEDED`, `CREATE_GAME_RATE_LIMITED`. Estos errores aportan `retry_after_seconds` cuando el cliente debe esperar para volver a intentarlo.
 
 #### Protocolo de autenticación WS
 
@@ -617,8 +646,8 @@ make test
 Salida esperada:
 
 ```
-329 passed in ~3m
-Required test coverage of 93.0% reached. Total coverage: 93%
+364 passed in 226.98s
+Required test coverage of 93.0% not reached. Total coverage: 91.00%
 ```
 
 Los tests usan **PostgreSQL** de dos formas según el entorno:
@@ -671,11 +700,24 @@ se orquesta desde `services/game_engine_service.py` (persistencia + broadcast).
 | `null`                               | no nulo       | En curso             |
 | `{"winner": "...", "reason": "..."}` | cualquiera    | Finalizado           |
 
+### Ciclo de vida de la invitación
+
+El flujo de invitaciones sigue una secuencia simple: la invitación queda `pending`, pasa a `queued` cuando existe otra espera del mismo guest, y puede reanudarse con `retry_invitation` si termina por rechazo, expiración o cancelación. El host puede reutilizar el mismo `game_id` para reabrir la conversación con el guest; el guest recibe una nueva `invitation_received` si el reintento se acepta.
+
+| Estado inicial | Evento | Resultado | Notificación |
+|---|---|---|---|
+| `pending` | timeout TTL | `expired` (`reason: timeout`) | Host: `invitation_expired` |
+| `pending` | guest rechaza | `rejected` | Host: `invitation_rejected` |
+| `pending` | host se va | `canceled` (`host_left`) | Guest: `invitation_canceled` |
+| `pending` | otro host gana al guest | `expired` (`target_busy`) | Host desplazado: `invitation_replaced` |
+| `queued` | invitación previa termina | `pending` | Guest: `invitation_promoted` |
+| `rejected` / `expired` / `canceled` | `retry_invitation` del host | `pending` (mismo `game_id`) | Guest: `invitation_received` |
+
 ### Cobertura
 
 **Umbral mínimo:** 93% (configurado en `pyproject.toml` → `[tool.coverage.report] fail_under`).
 
-**Cobertura actual:** 94.64% (reporte medido con `coverage report --precision=2`).
+**Cobertura actual:** 91.00% (reporte medido con `pytest-cov` en esta sesión; redondeado a 91% en el badge).
 
 | Archivo                                  | Tests | Qué cubre                                                                   |
 |------------------------------------------|-------|-----------------------------------------------------------------------------|
@@ -851,6 +893,7 @@ gameapi/
 │   ├── services/                      # Lógica de negocio
 │   │   ├── __init__.py
 │   │   ├── auth_service.py
+│   │   ├── chat_service.py           # Chat global in-memory con historia y rate limit
 │   │   ├── event_bus.py               # Pub/sub por canal en memoria
 │   │   ├── exceptions.py
 │   │   ├── game_engine.py             # Reglas puras del juego (sin I/O)
@@ -877,6 +920,7 @@ gameapi/
 │           └── ws/                   # Endpoints WebSocket
 │               ├── __init__.py
 │               ├── auth.py
+│               ├── chat.py
 │               ├── gameplays.py
 │               ├── manager.py
 │               ├── presence.py
@@ -974,6 +1018,8 @@ La conversión es **automática** vía `pydantic.alias_generators.to_camel` en `
 - CORS configurable por entorno.
 - `JWT_SECRET_KEY` mínimo 32 caracteres (validado en el arranque).
 - Límite de tasa por cliente y ruta con SlowAPI para mitigar fuerza bruta e intentos de abuso; ver [Rate limiting](./.docs/rate-limiting/README.md).
+- Chat global en memoria con sanitización, historial efímero y rate limiting por usuario para evitar spam y abuso de mensajes.
+- Reintentos de invitación limitados por par `(host, guest)` con una ventana deslizante configurable (`INVITATION_PAIR_MAX_ATTEMPTS` / `INVITATION_PAIR_WINDOW_SECONDS`). `create_game` también está limitado por host (`RATE_LIMIT_CREATE_GAME`).
 
 ### Endurecimiento en producción
 

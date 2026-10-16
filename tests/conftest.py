@@ -138,6 +138,7 @@ def reset_process_state() -> Iterator[None]:
     """Prevent module-level websocket and gameplay state from leaking between tests."""
     from gameapi.api.v2.ws.gameplays import reset_pending_abandons
     from gameapi.api.v2.ws.manager import (
+        chat_manager,
         gameplays_manager,
         presence_manager,
         reset_player_status,
@@ -146,6 +147,7 @@ def reset_process_state() -> Iterator[None]:
     def _reset() -> None:
         gameplays_manager.reset()
         presence_manager.reset()
+        chat_manager.reset()
         reset_player_status()
         reset_pending_abandons()
 
@@ -166,10 +168,16 @@ def _reset_rate_limiter() -> Iterator[None]:
 @pytest.fixture(autouse=True)
 def _reset_ws_rate_limit() -> Iterator[None]:
     from gameapi.api.v2.ws.auth import _ws_attempts
+    from gameapi.core.ws_rate_limit import create_game_limiter
+    from gameapi.services.invitation_retry import invitation_retry_tracker
 
     _ws_attempts.clear()
+    invitation_retry_tracker.reset()
+    create_game_limiter.reset()
     yield
     _ws_attempts.clear()
+    invitation_retry_tracker.reset()
+    create_game_limiter.reset()
 
 
 @pytest_asyncio.fixture(autouse=True)
@@ -178,6 +186,15 @@ async def _reset_event_bus() -> AsyncIterator[None]:
 
     yield
     await event_bus.shutdown()
+
+
+@pytest.fixture(autouse=True)
+def _reset_chat_service() -> Iterator[None]:
+    from gameapi.services.chat_service import chat_service
+
+    chat_service.reset()
+    yield
+    chat_service.reset()
 
 
 @pytest_asyncio.fixture
