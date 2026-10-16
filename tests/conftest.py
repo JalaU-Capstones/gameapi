@@ -180,6 +180,15 @@ async def _reset_event_bus() -> AsyncIterator[None]:
     await event_bus.shutdown()
 
 
+@pytest.fixture(autouse=True)
+def _reset_chat_service() -> Iterator[None]:
+    from gameapi.services.chat_service import chat_service
+
+    chat_service.reset()
+    yield
+    chat_service.reset()
+
+
 @pytest_asyncio.fixture
 async def registered_user(client: AsyncClient) -> dict[str, object]:
     payload = {
