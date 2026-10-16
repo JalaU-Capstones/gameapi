@@ -7,8 +7,8 @@ REST API para gestión de usuarios y partidas de Tic-Tac-Toe.
 [![Render](https://img.shields.io/badge/Render-production-46E3B7?logo=render&logoColor=white)](https://gameapi-9vos.onrender.com/health)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg)](https://fastapi.tiangolo.com/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![Tests](https://img.shields.io/badge/tests-329%20passed-success.svg)](#pruebas)
-[![Coverage](https://img.shields.io/badge/coverage-93%25-brightgreen.svg)](#cobertura)
+[![Tests](https://img.shields.io/badge/tests-362%20passed-success.svg)](#pruebas)
+[![Coverage](https://img.shields.io/badge/coverage-94%25-brightgreen.svg)](#cobertura)
 
 **Stack:** Python 3.11+ · FastAPI · PostgreSQL 16 · SQLAlchemy 2.0 async · Pydantic v2 · JWT · WebSocket · uv · Docker
 
@@ -404,10 +404,24 @@ Los endpoints WebSocket operan bajo `/api/v2/ws` y requieren autenticación JWT 
 |------------------------|-----------------------------------------------------------------------------------|
 | `/api/v2/ws/gameplays` | Canal de eventos de partidas. Requiere el evento `auth` con `{ "token": "..." }`. |
 | `/api/v2/ws/presence`  | Canal de presencia en línea. Requiere el evento `auth` con `{ "token": "..." }`.  |
+| `/api/v2/ws/chat`      | Canal global de chat. Requiere el evento `auth` con `{ "token": "..." }`.       |
 
 **Eventos soportados actualmente (B3):**
 
-**Cliente → Servidor:**
+**Cliente → Servidor (chat global):**
+- `auth` — primer mensaje obligatorio con el JWT.
+- `ping` — keepalive.
+- `chat_send` — publica un mensaje del usuario autenticado. Payload: `{"content": "..."}`.
+
+**Servidor → Cliente (chat global):**
+- `auth_ok` — confirmación de autenticación con `user_id`.
+- `chat_history` — historial reciente y conteo activo.
+- `chat_message` — mensaje nuevo publicado al canal.
+- `chat_users_count` — conteo actualizado de usuarios conectados al chat.
+- `chat_error` — validación, vacío, demasiado largo o rate limit.
+- `pong` — respuesta a `ping`.
+
+**Cliente → Servidor (gameplays):**
 - `auth` — primer mensaje obligatorio con el JWT.
 - `ping` — keepalive.
 - `create_game` — crear partida e invitar. Payload: `{"guest_id": "<uuid>"}`.
@@ -617,8 +631,8 @@ make test
 Salida esperada:
 
 ```
-329 passed in ~3m
-Required test coverage of 93.0% reached. Total coverage: 93%
+362 passed in 239.59s
+Required test coverage of 93.0% reached. Total coverage: 93.68%
 ```
 
 Los tests usan **PostgreSQL** de dos formas según el entorno:
@@ -675,7 +689,7 @@ se orquesta desde `services/game_engine_service.py` (persistencia + broadcast).
 
 **Umbral mínimo:** 93% (configurado en `pyproject.toml` → `[tool.coverage.report] fail_under`).
 
-**Cobertura actual:** 94.64% (reporte medido con `coverage report --precision=2`).
+**Cobertura actual:** 93.68% (reporte medido con `pytest-cov` en esta sesión; redondeado a 94% en el badge).
 
 | Archivo                                  | Tests | Qué cubre                                                                   |
 |------------------------------------------|-------|-----------------------------------------------------------------------------|
@@ -851,6 +865,7 @@ gameapi/
 │   ├── services/                      # Lógica de negocio
 │   │   ├── __init__.py
 │   │   ├── auth_service.py
+│   │   ├── chat_service.py           # Chat global in-memory con historia y rate limit
 │   │   ├── event_bus.py               # Pub/sub por canal en memoria
 │   │   ├── exceptions.py
 │   │   ├── game_engine.py             # Reglas puras del juego (sin I/O)
@@ -877,6 +892,7 @@ gameapi/
 │           └── ws/                   # Endpoints WebSocket
 │               ├── __init__.py
 │               ├── auth.py
+│               ├── chat.py
 │               ├── gameplays.py
 │               ├── manager.py
 │               ├── presence.py
@@ -974,6 +990,7 @@ La conversión es **automática** vía `pydantic.alias_generators.to_camel` en `
 - CORS configurable por entorno.
 - `JWT_SECRET_KEY` mínimo 32 caracteres (validado en el arranque).
 - Límite de tasa por cliente y ruta con SlowAPI para mitigar fuerza bruta e intentos de abuso; ver [Rate limiting](./.docs/rate-limiting/README.md).
+- Chat global en memoria con sanitización, historial efímero y rate limiting por usuario para evitar spam y abuso de mensajes.
 
 ### Endurecimiento en producción
 
