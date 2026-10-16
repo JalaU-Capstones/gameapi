@@ -29,6 +29,11 @@ class LeaveGamePayload(BaseModel):
     game_id: str
 
 
+class ChatSendPayload(BaseModel):
+    # The service owns the business limits; the schema only validates the shape.
+    content: str
+
+
 class GameEndedPayload(BaseModel):
     game_id: str
     board: list[list[int]]
