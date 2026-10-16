@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from gameapi.api.v2.ws.auth import authenticate_websocket
 from gameapi.api.v2.ws.manager import gameplays_manager
+from gameapi.core.config import settings
 from gameapi.core.idempotency import lookup_ws_create_game, remember_ws_create_game
 from gameapi.db.session import PostgresDatabase
 from gameapi.schemas.ws_events import (
@@ -418,7 +419,7 @@ async def _handle_message(
     return current_game_id
 
 
-ABANDON_GRACE_SECONDS = 20.0
+ABANDON_GRACE_SECONDS: float | None = None
 _HANDOVER_REASONS = {"session_handover", "session_replaced"}
 _pending_abandons: dict[str, asyncio.Task[None]] = {}
 
@@ -485,12 +486,15 @@ def _cancel_pending_abandon(user_id: str) -> None:
 
 
 def _schedule_abandon(user_id: str, game_id: str) -> None:
-    """Give another tab of the same user time to take over the game before abandoning it."""
+    # The abandon grace window is configuration-driven and defaults to 5 seconds.
     _cancel_pending_abandon(user_id)
+    grace_seconds = globals().get("ABANDON_GRACE_SECONDS")
+    if grace_seconds is None:
+        grace_seconds = settings.invitation.abandon_grace_seconds
 
     async def _abandon_if_not_resumed() -> None:
         try:
-            await asyncio.sleep(ABANDON_GRACE_SECONDS)
+            await asyncio.sleep(float(grace_seconds))
             if gameplays_manager.is_online(user_id) and event_bus.is_subscribed(game_id, user_id):
                 return
             await _abandon_game(user_id, game_id)
