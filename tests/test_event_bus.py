@@ -114,6 +114,45 @@ async def test_event_bus_failing_subscriber_does_not_block_others() -> None:
     await bus.shutdown()
 
 
+async def test_event_bus_publish_logs_warning_when_queue_is_full(caplog) -> None:
+    bus = EventBus()
+
+    async def callback(_event: dict[str, object]) -> None:
+        return None
+
+    bus.subscribe("game-1", "user-1", callback)
+    queue = bus._queues["game-1"]
+    for _ in range(queue.maxsize):
+        queue.put_nowait({"event": "fill", "payload": {}})
+
+    with caplog.at_level("WARNING"):
+        await bus.publish("game-1", {"event": "overflow", "payload": {}})
+
+    assert "Event queue for channel 'game-1' is full; dropping event" in caplog.text
+    await bus.shutdown()
+
+
+async def test_event_bus_deliver_event_logs_interrupted_and_failing_callbacks(caplog) -> None:
+    bus = EventBus()
+
+    async def cancelled_callback(_event: dict[str, object]) -> None:
+        raise asyncio.CancelledError()
+
+    async def runtime_callback(_event: dict[str, object]) -> None:
+        raise RuntimeError("interrupted")
+
+    async def failing_callback(_event: dict[str, object]) -> None:
+        raise ValueError("boom")
+
+    with caplog.at_level("WARNING"):
+        await bus._deliver_event(cancelled_callback, {"event": "test", "payload": {}})
+        await bus._deliver_event(runtime_callback, {"event": "test", "payload": {}})
+        await bus._deliver_event(failing_callback, {"event": "test", "payload": {}})
+
+    assert caplog.text.count("Subscriber callback was interrupted for event") >= 2
+    assert "Subscriber callback raised an exception for event" in caplog.text
+
+
 async def test_subscribe_idempotent_same_subscriber_id() -> None:
     bus = EventBus()
 
