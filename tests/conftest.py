@@ -138,6 +138,7 @@ def reset_process_state() -> Iterator[None]:
     """Prevent module-level websocket and gameplay state from leaking between tests."""
     from gameapi.api.v2.ws.gameplays import reset_pending_abandons
     from gameapi.api.v2.ws.manager import (
+        chat_manager,
         gameplays_manager,
         presence_manager,
         reset_player_status,
@@ -146,6 +147,7 @@ def reset_process_state() -> Iterator[None]:
     def _reset() -> None:
         gameplays_manager.reset()
         presence_manager.reset()
+        chat_manager.reset()
         reset_player_status()
         reset_pending_abandons()
 
