@@ -62,7 +62,7 @@ For these reasons, Insomnia is the reference tool for testing the **entire** API
 - User CRUD operations with ownership permissions.
 - Gameplay CRUD operations with host / guest permissions.
 
-**WebSockets are not included** for the reasons described above. Adding WebSocket endpoints to the collection can make it fail after reimport.
+**WebSockets are not included** for the reasons described above; for gameplay, presence, and chat flows, use the Insomnia collection instead.
 
 **Import:**
 
@@ -94,7 +94,7 @@ For these reasons, Insomnia is the reference tool for testing the **entire** API
 
 - All REST requests from the Postman collection.
 - The v2 auth endpoints, including the HttpOnly cookie flow.
-- Both WebSocket endpoints: `/api/v2/ws/presence` and `/api/v2/ws/gameplays`.
+- The v2 WebSocket endpoints: `/api/v2/ws/gameplays`, `/api/v2/ws/presence`, and `/api/v2/ws/chat`.
 
 **Import:**
 
@@ -154,7 +154,7 @@ The execution order is the same for either tool:
    ```json
    {"event":"auth_ok","payload":{"user_id":"..."}}
    ```
-5. You can then send `ping`, `list_online_users`, `subscribe_game`, `broadcast_to_game`, and other events.
+5. You can then send `ping`, `list_online_users`, `subscribe_game`, `play_move`, `leave_game`, and other supported events.
 
 ### Test WebSocket without Insomnia
 
