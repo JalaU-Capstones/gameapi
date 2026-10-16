@@ -17,6 +17,8 @@ dist/
 .env
 .env.local
 .env.*.local
+# Local observability stack secrets
+.env.monitoring
 
 .vscode/
 .idea/
