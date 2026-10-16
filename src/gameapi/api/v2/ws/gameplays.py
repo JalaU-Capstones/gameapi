@@ -248,16 +248,19 @@ async def _handle_message(
                 }
             )
 
-            host = await engine_service.user_service.get_by_id(user_id)
-            host_name = host.name if host else "Unknown"
+            created_gameplay = await engine_service.gameplay_service.get_by_id(game_id)
+            invitation_state = created_gameplay.invitation_state if created_gameplay else "pending"
+            if invitation_state == "pending":
+                host = await engine_service.user_service.get_by_id(user_id)
+                host_name = host.name if host else "Unknown"
 
-            await gameplays_manager.send_to(
-                payload.guest_id,
-                {
-                    "event": "invitation_received",
-                    "payload": {"game_id": game_id, "host": {"id": user_id, "name": host_name}},
-                },
-            )
+                await gameplays_manager.send_to(
+                    payload.guest_id,
+                    {
+                        "event": "invitation_received",
+                        "payload": {"game_id": game_id, "host": {"id": user_id, "name": host_name}},
+                    },
+                )
             return game_id
 
         if event == "accept_invitation":
