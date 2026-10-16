@@ -193,31 +193,10 @@ async def test_ws_gameplays_missing_event_field(
         }
 
 
-async def test_ws_gameplays_subscribe_game_and_broadcast(
+async def test_ws_gameplays_rejects_legacy_broadcast_event(
     ws_client_factory: Callable[[], AsyncClient],
-    client: AsyncClient,
     auth_token: str,
-    registered_user: dict[str, object],
 ) -> None:
-    from gameapi.services.event_bus import event_bus
-
-    other_payload = {
-        "name": "Gameplay User B",
-        "email": "gameplay-b@example.com",
-        "password": "password123",
-    }
-    response = await client.post("/api/v1/users", json=other_payload)
-    assert response.status_code == 201, response.text
-    other_user_id = str(response.json()["id"])
-    other_token = str(
-        (
-            await client.post(
-                "/api/v1/users/login",
-                json={"email": other_payload["email"], "password": other_payload["password"]},
-            )
-        ).json()["token"]
-    )
-
     async with (
         ws_client_factory() as client,
         aconnect_ws(
@@ -226,44 +205,21 @@ async def test_ws_gameplays_subscribe_game_and_broadcast(
         ) as ws,
     ):
         await ws.send_json({"event": "auth", "payload": {"token": auth_token}})
-        assert await ws.receive_json() == {
-            "event": "auth_ok",
-            "payload": {"user_id": str(registered_user["id"])},
-        }
+        await ws.receive_json()
 
-        await ws.send_json({"event": "subscribe_game", "payload": {"game_id": "game-123"}})
+        await ws.send_json(
+            {
+                "event": "broadcast_to_game",
+                "payload": {"game_id": "game-123", "message": "hello"},
+            }
+        )
         assert await ws.receive_json() == {
-            "event": "subscribed",
-            "payload": {"game_id": "game-123"},
+            "event": "error",
+            "payload": {
+                "code": "NOT_IMPLEMENTED",
+                "message": "Event not implemented yet: broadcast_to_game",
+            },
         }
-        assert event_bus.channel_subscriber_count("game-123") == 1
-
-        async with (
-            ws_client_factory() as client_2,
-            aconnect_ws(
-                "ws://test/api/v2/ws/gameplays",
-                client=client_2,
-            ) as ws_2,
-        ):
-            await ws_2.send_json({"event": "auth", "payload": {"token": other_token}})
-            assert await ws_2.receive_json() == {
-                "event": "auth_ok",
-                "payload": {"user_id": other_user_id},
-            }
-            await ws_2.send_json(
-                {
-                    "event": "broadcast_to_game",
-                    "payload": {"game_id": "game-123", "message": "hello"},
-                }
-            )
-            assert await ws_2.receive_json() == {
-                "event": "broadcast_sent",
-                "payload": {"game_id": "game-123"},
-            }
-            assert await ws.receive_json() == {
-                "event": "game_message",
-                "payload": {"from": other_user_id, "message": "hello"},
-            }
 
 
 async def test_ws_gameplays_unsubscribe_game(
