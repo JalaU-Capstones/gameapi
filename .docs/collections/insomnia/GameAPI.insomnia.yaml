@@ -1385,9 +1385,10 @@ resources:
     \ `ws://{{ _.baseUrl }}/api/v2/ws/gameplays`\n- **Auth**: JWT sent as the first\
     \ message (see Step 1)\n\n## Complete event list\n\n| Direction | Events |\n|-----------|--------|\n\
     | Client \u2192 server | `auth`, `ping`, `create_game`, `accept_invitation`, `reject_invitation`,\
-    \ `play_move`, `leave_game`, `subscribe_game`, `unsubscribe_game` |\n| Server\
-    \ \u2192 client | `auth_ok`, `auth_error`, `pong`, `error`, `game_created`, `invitation_received`,\
-    \ `invitation_accepted`, `invitation_rejected`, `board_updated`, `game_ended`,\
+    \ `play_move`, `retry_invitation`, `leave_game`, `subscribe_game`, `unsubscribe_game`\
+    \ |\n| Server \u2192 client | `auth_ok`, `auth_error`, `pong`, `error`, `game_created`,\
+    \ `invitation_received`, `invitation_accepted`, `invitation_rejected`, `invitation_replaced`,\
+    \ `invitation_promoted`, `invitation_retry_accepted`, `board_updated`, `game_ended`,\
     \ `subscribed`, `unsubscribed` |\n\n## Envelope\n\nEvery message \u2014 client\
     \ \u2192 server and server \u2192 client \u2014 uses the same structure:\n\n```json\n\
     {\"event\": \"<event_name>\", \"payload\": { ... }}\n```\n\n## Two-socket setup\n\
@@ -1460,10 +1461,67 @@ resources:
     \ pending |\n| `NOT_A_PARTICIPANT` | Caller is neither host nor guest |\n| `INVITATION_NOT_PENDING`\
     \ | Accept/reject called on a game that is not pending |\n| `CANNOT_INVITE_SELF`\
     \ | `guest_id` equals the host |\n| `OPPONENT_OFFLINE` | Guest is not connected\
-    \ via WebSocket |\n| `UNKNOWN_ERROR` | Any other domain error |\n\n## Disconnect\
+    \ via WebSocket |\n| `RETRY_LIMIT_EXCEEDED` | The host exceeded the per-pair retry\
+    \ window |\n| `CREATE_GAME_RATE_LIMITED` | The host exceeded the `create_game`\
+    \ sliding window |\n| `UNKNOWN_ERROR` | Any other domain error |\n\n## Disconnect\
     \ behavior\n\n- Closing the socket while a game is active \u2192 the opponent\
     \ receives `game_ended` with `reason: \"abandon\"`.\n- Closing the socket removes\
-    \ the user from the online list (presence channel) and cancels all subscriptions."
+    \ the user from the online list (presence channel) and cancels all subscriptions.\n\
+    \n## Invitation lifecycle\n\nInvitations are not a one-shot handshake: they move\
+    \ through a guest decision, a host retry window, and a pair-level retry budget.\
+    \ This section covers the terminal transitions that matter for frontend state\
+    \ handling, including retries, displacement, promotion, and rate limiting.\n\n\
+    ### Retry a rejected or expired invitation\n\nThe client can retry a previously\
+    \ rejected or expired invitation by sending the same flow again with the existing\
+    \ `game_id`:\n\n```json\n{\"event\":\"retry_invitation\",\"payload\":{\"game_id\"\
+    :\"{{ _.gameplayId }}\"}}\n```\n\nThe server acknowledges the retry with the same\
+    \ gameplay id, an incremented attempt counter, and the remaining retry budget:\n\
+    \n```json\n{\"event\":\"invitation_retry_accepted\",\"payload\":{\"game_id\":\"\
+    {{ _.gameplayId }}\",\"attempt\":1,\"remaining_attempts\":2,\"idempotent\":false}}\n\
+    ```\n\nThe board is reset and the guest receives a fresh `invitation_received`\
+    \ event. The same `game_id` is reused, so the client should keep its current gameplay\
+    \ state and swap the board back to a fresh pending match. When the gameplay was\
+    \ already `pending`, the server may return `idempotent: true`; in that case the\
+    \ client should skip the waiting spinner because the pair is already in the retry\
+    \ flow.\n\n### Retry limit reached\n\nWhen the host exceeds the pair-level retry\
+    \ window, the server emits an `error` frame such as:\n\n```json\n{\"event\":\"\
+    error\",\"payload\":{\"code\":\"RETRY_LIMIT_EXCEEDED\",\"message\":\"Retry limit\
+    \ exceeded for this host/guest pair\",\"retry_after_seconds\":180}}\n```\n\nThis\
+    \ is enforced per pair over the window defined by `INVITATION_PAIR_MAX_ATTEMPTS`\
+    \ and `INVITATION_PAIR_WINDOW_SECONDS`. Only the host may trigger a retry; the\
+    \ guest can only accept or reject the active invitation.\n\n### Host displaced\n\
+    \nIf the guest accepts a different invitation while this one is still pending,\
+    \ the original invitation is superseded and the host receives a replacement signal:\n\
+    \n```json\n{\"event\":\"invitation_replaced\",\"payload\":{\"game_id\":\"{{ _.gameplayId\
+    \ }}\",\"reason\":\"target_busy\"}}\n```\n\nThis is distinct from `invitation_expired`,\
+    \ which fires when the invitation TTL expires naturally. `invitation_replaced`\
+    \ means the guest accepted another host before the current invitation could complete.\n\
+    \n### Guest promoted\n\nWhen the guest is promoted into the active gameplay, the\
+    \ server emits a payload shaped exactly like `invitation_received` so the frontend\
+    \ can reuse the same handler logic:\n\n```json\n{\"event\":\"invitation_promoted\"\
+    ,\"payload\":{\"game_id\":\"{{ _.gameplayId }}\",\"host\":{\"id\":\"8df1c70b-...\"\
+    ,\"name\":\"Sandra Dee\"}}}\n```\n\nThe frontend can treat `invitation_promoted`\
+    \ the same as the original invite notification and surface the appropriate UI\
+    \ state without branching on a different schema.\n\n### create_game rate limit\n\
+    \nThe host may also receive an error if the `create_game` sliding window is exceeded:\n\
+    \n```json\n{\"event\":\"error\",\"payload\":{\"code\":\"CREATE_GAME_RATE_LIMITED\"\
+    ,\"message\":\"create_game rate limit exceeded\",\"retry_after_seconds\":60}}\n\
+    ```\n\nThis limit is controlled by `RATE_LIMIT_CREATE_GAME` and includes the same\
+    \ `retry_after_seconds` contract used by other rate-limited events.\n\n## Invitation\
+    \ state transitions\n\n| From | Event | To | Notes |\n|------|-------|----|-------|\n\
+    | `pending` | guest accepts | `active` | Gameplay becomes active and both sockets\
+    \ receive the board state. |\n| `pending` | guest rejects | `rejected` | Host\
+    \ receives `invitation_rejected`; the invite ends without a match. |\n| `pending`\
+    \ | TTL expires | `expired` | Host and guest both see the expiry path; no retry\
+    \ is allowed without a new invitation. |\n| `pending` | host retries | `pending`\
+    \ | Same `game_id` is reused, and the board is reset for the pair. |\n| `pending`\
+    \ | guest accepts another host | `replaced` | `invitation_replaced` fires with\
+    \ `reason: \"target_busy\"`. |\n| `pending` | retry window exhausted | `blocked`\
+    \ | `RETRY_LIMIT_EXCEEDED` is emitted with a `retry_after_seconds` payload. |\n\
+    | `pending` | create_game limit exceeded | `rate_limited` | `CREATE_GAME_RATE_LIMITED`\
+    \ is emitted with a `retry_after_seconds` payload. |\n\n> Both new error codes\
+    \ carry `retry_after_seconds` in the payload so the client can schedule a UI cooldown\
+    \ without polling."
   metaSortKey: -1790553600002
   isPrivate: false
   _type: websocket_request
