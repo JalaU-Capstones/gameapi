@@ -1,0 +1,26 @@
+# Observability overlay for local development.
+#
+# This file is NOT included in the default stack. Enable it explicitly:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.monitoring.yml up -d
+#
+# It is never deployed to Render and must not be referenced from render.yaml.
+#
+# Scope: Prometheus, Grafana, cAdvisor, postgres-exporter, and blackbox-exporter
+# live on a dedicated `monitoring` bridge network. Only Grafana publishes a
+# port, and only on 127.0.0.1. No monitoring container joins the `frontend`
+# network.
+
+networks:
+  monitoring:
+    driver: bridge
+    # Not internal: Prometheus needs outbound access to scrape the API and
+    # resolve DNS names in the other project networks. The isolation comes
+    # from the fact that no monitoring container joins `frontend` and from
+    # the absence of published ports on every service except Grafana.
+
+volumes:
+  prometheus_data:
+    name: gameapi_prometheus_data
+  grafana_data:
+    name: gameapi_grafana_data
