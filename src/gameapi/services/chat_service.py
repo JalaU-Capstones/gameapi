@@ -134,7 +134,7 @@ class ChatService:
         if blocked_until is not None:
             if blocked_until > now:
                 remaining = blocked_until - now
-                raise ChatRateLimitedError(int(ceil(remaining)))
+                raise ChatRateLimitedError(ceil(remaining))
             del self._blocked_until[user_id]
 
         window = self._rate_windows.setdefault(user_id, deque())
