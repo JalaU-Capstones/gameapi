@@ -149,6 +149,79 @@ class AuthSettings(BaseSettings):
         return self
 
 
+class InvitationSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="INVITATION_", env_file=".env", extra="ignore")
+
+    pending_ttl_seconds: int = Field(
+        default=60,
+        gt=0,
+        validation_alias=AliasChoices("INVITATION_PENDING_TTL_SECONDS", "pending_ttl_seconds"),
+    )
+    queued_ttl_seconds: int = Field(
+        default=300,
+        gt=0,
+        validation_alias=AliasChoices("INVITATION_QUEUED_TTL_SECONDS", "queued_ttl_seconds"),
+    )
+    expiry_interval_seconds: float = Field(
+        default=10.0,
+        gt=0,
+        validation_alias=AliasChoices(
+            "INVITATION_EXPIRY_INTERVAL_SECONDS", "expiry_interval_seconds"
+        ),
+    )
+    queued_expiry_interval_seconds: float = Field(
+        default=30.0,
+        gt=0,
+        validation_alias=AliasChoices(
+            "INVITATION_QUEUED_EXPIRY_INTERVAL_SECONDS",
+            "queued_expiry_interval_seconds",
+        ),
+    )
+    abandon_grace_seconds: float = Field(
+        default=5.0,
+        ge=0,
+        validation_alias=AliasChoices(
+            "INVITATION_ABANDON_GRACE_SECONDS",
+            "ABANDON_GRACE_SECONDS",
+            "abandon_grace_seconds",
+        ),
+    )
+    # Pairing settings are declared here for Prompt 3; they are not used in this prompt.
+    pair_max_attempts: int = Field(
+        default=3,
+        gt=0,
+        validation_alias=AliasChoices("INVITATION_PAIR_MAX_ATTEMPTS", "pair_max_attempts"),
+    )
+    pair_window_seconds: int = Field(
+        default=180,
+        gt=0,
+        validation_alias=AliasChoices(
+            "INVITATION_PAIR_WINDOW_SECONDS",
+            "pair_window_seconds",
+        ),
+    )
+
+
+class ChatSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="CHAT_", env_file=".env", extra="ignore")
+
+    rate_max_messages: int = Field(
+        default=10,
+        gt=0,
+        validation_alias=AliasChoices("CHAT_RATE_MAX_MESSAGES", "rate_max_messages"),
+    )
+    rate_window_seconds: float = Field(
+        default=10.0,
+        gt=0,
+        validation_alias=AliasChoices("CHAT_RATE_WINDOW_SECONDS", "rate_window_seconds"),
+    )
+    rate_block_seconds: float = Field(
+        default=30.0,
+        ge=0,
+        validation_alias=AliasChoices("CHAT_RATE_BLOCK_SECONDS", "rate_block_seconds"),
+    )
+
+
 class RateLimitSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="RATE_LIMIT_", env_file=".env", extra="ignore")
 
@@ -168,6 +241,10 @@ class RateLimitSettings(BaseSettings):
     logs_me: str = "30/minute"
     logs_admin: str = "300/minute"
 
+    create_game: str = Field(
+        default="5/minute",
+        validation_alias=AliasChoices("RATE_LIMIT_CREATE_GAME", "create_game"),
+    )
     ws_handshake: str = "10/minute"
     session_takeover: str = Field(
         default="3/minute",
@@ -187,6 +264,8 @@ class Settings(BaseSettings):
     app: AppSettings = Field(default_factory=AppSettings)
     log: LogSettings = Field(default_factory=LogSettings)
     auth: AuthSettings = Field(default_factory=AuthSettings)
+    invitation: InvitationSettings = Field(default_factory=InvitationSettings)
+    chat: ChatSettings = Field(default_factory=ChatSettings)
     rate_limit: RateLimitSettings = Field(default_factory=RateLimitSettings)
 
     @property
