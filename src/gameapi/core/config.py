@@ -222,6 +222,19 @@ class ChatSettings(BaseSettings):
     )
 
 
+class MetricsSettings(BaseSettings):
+    """Prometheus metrics exposure.
+
+    Disabled by default. The production deployment does not run a Prometheus
+    scraper and must not expose the /metrics endpoint. Local observability
+    opts in via METRICS_ENABLED=true.
+    """
+
+    model_config = SettingsConfigDict(env_prefix="METRICS_", env_file=".env", extra="ignore")
+
+    enabled: bool = Field(default=False)
+
+
 class RateLimitSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="RATE_LIMIT_", env_file=".env", extra="ignore")
 
@@ -266,6 +279,7 @@ class Settings(BaseSettings):
     auth: AuthSettings = Field(default_factory=AuthSettings)
     invitation: InvitationSettings = Field(default_factory=InvitationSettings)
     chat: ChatSettings = Field(default_factory=ChatSettings)
+    metrics: MetricsSettings = Field(default_factory=MetricsSettings)
     rate_limit: RateLimitSettings = Field(default_factory=RateLimitSettings)
 
     @property
