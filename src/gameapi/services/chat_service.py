@@ -18,6 +18,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from math import ceil
 
+from gameapi.core.config import settings
 from gameapi.services.exceptions import (
     ChatEmptyMessageError,
     ChatMessageTooLongError,
@@ -157,4 +158,8 @@ class ChatService:
         return removed
 
 
-chat_service = ChatService()
+chat_service = ChatService(
+    rate_max_messages=settings.chat.rate_max_messages,
+    rate_window_seconds=settings.chat.rate_window_seconds,
+    rate_block_seconds=settings.chat.rate_block_seconds,
+)
