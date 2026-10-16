@@ -1,4 +1,5 @@
 import json
+import logging
 import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
@@ -26,6 +27,35 @@ from gameapi.services.game_engine import (
 )
 from gameapi.services.gameplay_service import GameplayService
 from gameapi.services.user_service import UserService
+
+logger = logging.getLogger(__name__)
+
+
+def _invitation_replaced_event(game_id: str, reason: str) -> dict[str, Any]:
+    """Build a replacement notification for a displaced host.
+
+    The payload is intentionally a strict subset of the timeout-expired event, so
+    any handler that switches on the reason field continues to work unchanged.
+    """
+    return {
+        "event": "invitation_replaced",
+        "payload": {"game_id": game_id, "reason": reason},
+    }
+
+
+def _invitation_promoted_event(game_id: str, host_id: str, host_name: str) -> dict[str, Any]:
+    """Build a promotion notification for a queued invitation.
+
+    The payload is identical in shape to invitation_received, allowing the client to
+    treat a queued-to-pending promotion as a fresh invitation without special casing.
+    """
+    return {
+        "event": "invitation_promoted",
+        "payload": {
+            "game_id": game_id,
+            "host": {"id": host_id, "name": host_name},
+        },
+    }
 
 
 class GameEngineService:
@@ -90,7 +120,7 @@ class GameEngineService:
         gameplay = await self.gameplay_service.create(create_data)
         return gameplay.id
 
-    async def accept_invitation(self, game_id: str, guest_id: str) -> None:
+    async def accept_invitation(self, game_id: str, guest_id: str) -> int:
         gameplay = await self.gameplay_service.get_by_id(game_id)
         if not gameplay:
             raise GameplayNotFoundError(game_id)
@@ -107,17 +137,9 @@ class GameEngineService:
             match_result="null",
         )
         await self.gameplay_service.update(game_id, update_data)
-
-        guest_uuid = uuid.UUID(guest_id)
-        for pending_game in await self.gameplay_service._repo.list_by_player(guest_uuid):
-            if pending_game.id == gameplay.id:
-                continue
-            if pending_game.invitation_state in {"pending", "queued"}:
-                await self.gameplay_service.update_invitation_state(
-                    str(pending_game.id),
-                    "expired",
-                    match_result={"winner": None, "reason": "target_busy"},
-                )
+        await self._promote_next_queued_for_guest(guest_id, reason="previous_replaced")
+        displaced = await self._replace_displaced_invitations(guest_id, game_id)
+        return displaced
 
     async def reject_invitation(self, game_id: str, guest_id: str) -> None:
         gameplay = await self.gameplay_service.get_by_id(game_id)
@@ -135,21 +157,78 @@ class GameEngineService:
             match_result=json.dumps({"winner": None, "reason": "rejected"}),
         )
         await self.gameplay_service.update(game_id, update_data)
-        await self._promote_next_queued_for_guest(guest_id)
+        await self._promote_next_queued_for_guest(guest_id, reason="previous_rejected")
 
-    async def _promote_next_queued_for_guest(self, guest_id: str) -> None:
+    async def _replace_displaced_invitations(self, guest_id: str, accepted_game_id: str) -> int:
+        """Replace the guest's other pending/queued invitations and notify their hosts.
+
+        Idempotent: already-replaced invitations with reason='target_busy' are skipped.
+        """
+        guest_uuid = uuid.UUID(guest_id)
+        replaced = 0
+        for pending_game in await self.gameplay_service._repo.list_by_player(guest_uuid):
+            if str(pending_game.id) == accepted_game_id:
+                continue
+            if pending_game.invitation_state not in {"pending", "queued"}:
+                continue
+
+            match_result = pending_game.match_result
+            if isinstance(match_result, str):
+                try:
+                    match_result = json.loads(match_result)
+                except json.JSONDecodeError:
+                    match_result = None
+            if isinstance(match_result, dict) and match_result.get("reason") == "target_busy":
+                continue
+
+            await self.gameplay_service.update_invitation_state(
+                str(pending_game.id),
+                "expired",
+                match_result={"winner": None, "reason": "target_busy"},
+            )
+            host_id = str(pending_game.host_player)
+            event = _invitation_replaced_event(str(pending_game.id), "target_busy")
+            await self.event_bus.publish(str(pending_game.id), event)
+            if host_id:
+                await gameplays_manager.send_to(host_id, event)
+                logger.info(
+                    "Invitation replaced",
+                    extra={
+                        "event_type": "invitation_replaced",
+                        "player_id": host_id,
+                        "gameplay_id": str(pending_game.id),
+                        "metadata": {"reason": "target_busy", "replaced_by": accepted_game_id},
+                    },
+                )
+            replaced += 1
+        return replaced
+
+    async def _promote_next_queued_for_guest(
+        self, guest_id: str, *, reason: str = "previous_terminal"
+    ) -> None:
         next_game = await self.gameplay_service.find_next_queued_for_guest(guest_id)
-        if next_game is None:
+        if next_game is None or next_game.invitation_state != "queued":
             return
+
         await self.gameplay_service.update_invitation_state(
             str(next_game.id),
             "pending",
         )
-
-    async def _promote_next_queued_for_user(self, user_id: str) -> None:
-        next_game = await self.gameplay_service.find_next_queued_for_guest(user_id)
-        if next_game is not None:
-            await self.gameplay_service.update_invitation_state(str(next_game.id), "pending")
+        host_id = str(next_game.host_player)
+        host = await self.user_service.get_by_id(host_id) if host_id else None
+        host_name = host.name if host is not None else "Unknown"
+        event = _invitation_promoted_event(str(next_game.id), host_id, host_name)
+        await self.event_bus.publish(str(next_game.id), event)
+        await gameplays_manager.send_to(guest_id, event)
+        logger.info(
+            "Invitation promoted",
+            extra={
+                "event_type": "invitation_promoted",
+                "player_id": guest_id,
+                "gameplay_id": str(next_game.id),
+                "metadata": {"host_id": host_id, "reason": reason},
+            },
+        )
 
     async def expire_pending_invitations(self, older_than_seconds: int) -> int:
         cutoff = datetime.now(UTC) - timedelta(seconds=older_than_seconds)
@@ -167,6 +246,15 @@ class GameEngineService:
             )
             host_id = str(gameplay.host_player)
             guest_id = str(gameplay.guest_player) if gameplay.guest_player is not None else None
+            logger.info(
+                "Invitation expired",
+                extra={
+                    "event_type": "invitation_expired",
+                    "player_id": host_id,
+                    "gameplay_id": str(gameplay.id),
+                    "metadata": {"reason": "timeout"},
+                },
+            )
             await self.event_bus.publish(
                 str(gameplay.id),
                 {
@@ -183,7 +271,7 @@ class GameEngineService:
                     },
                 )
             if guest_id:
-                await self._promote_next_queued_for_guest(guest_id)
+                await self._promote_next_queued_for_guest(guest_id, reason="previous_expired")
             count += 1
         return count
 
@@ -202,6 +290,15 @@ class GameEngineService:
                 match_result={"winner": None, "reason": "expired"},
             )
             host_id = str(gameplay.host_player)
+            logger.info(
+                "Invitation expired",
+                extra={
+                    "event_type": "invitation_expired",
+                    "player_id": host_id,
+                    "gameplay_id": str(gameplay.id),
+                    "metadata": {"reason": "timeout"},
+                },
+            )
             await self.event_bus.publish(
                 str(gameplay.id),
                 {
@@ -216,6 +313,10 @@ class GameEngineService:
                     "payload": {"game_id": str(gameplay.id), "reason": "timeout"},
                 },
             )
+            if gameplay.guest_player is not None:
+                await self._promote_next_queued_for_guest(
+                    str(gameplay.guest_player), reason="previous_expired"
+                )
             count += 1
         return count
 
