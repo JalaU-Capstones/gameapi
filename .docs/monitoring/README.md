@@ -62,9 +62,11 @@ This removes only the Prometheus and Grafana volumes; PostgreSQL data is preserv
 
 - `README.md` — overview and commands for the monitoring stack.
 - `SECURITY.md` — threat model, trust boundaries, and hardening notes.
+- `DEMO.md` — step-by-step script for the class presentation.
 - `prometheus/` — Prometheus configuration and scrape targets.
-- `grafana/provisioning/` — Grafana datasource and dashboard provisioning.
-- `dashboards/` — versioned dashboard JSONs (empty for now).
+- `grafana/provisioning/datasources/` — Grafana datasource provisioning.
+- `grafana/provisioning/dashboards/` — Grafana dashboard provisioning and dashboard JSON files.
+- `blackbox/` — blackbox-exporter probe configuration.
 
 ## Environment variables
 
@@ -78,13 +80,26 @@ The file `.env.monitoring.example` is the source of truth for the local monitori
 | `PROMETHEUS_SCRAPE_INTERVAL` | Shared scrape interval for jobs. This is currently informational only; the effective interval is hard-coded in `prometheus.yml`. | `15s` | Prometheus |
 | `BLACKBOX_API_HEALTH_URL` | Health endpoint used by the blackbox exporter checks. | `http://api:8080/health` | blackbox-exporter in Prompt 4 |
 
+## Dashboards
+
+| Dashboard | UID | Panels | What it answers |
+|---|---|---|---|
+| GameAPI Overview | `gameapi-overview` | Request rate, error rate, latency percentiles, status distribution, uptime | "How is the API behaving right now?" |
+| GameAPI Containers | `gameapi-containers` | CPU, memory, network I/O, filesystem for available cAdvisor cgroups | "What resource activity does cAdvisor expose?" |
+| GameAPI PostgreSQL | `gameapi-postgres` | Connections, transactions, locks, cache hit ratio, live tuple counts | "Is the database healthy?" |
+| GameAPI Health | `gameapi-blackbox` | Probe status, duration, HTTP status, phase breakdown | "Is the API reachable from outside?" |
+
+All four dashboards are provisioned automatically. Editing a dashboard in the UI does **not** persist; edit its JSON file and wait 30 seconds for the provisioning interval.
+
+The live cAdvisor configuration has no Docker socket and currently exposes only the host root cgroup (`id="/"`), rather than individual container labels. The Containers dashboard reflects that available data and does not claim per-container measurements.
+
 ## Roadmap of the remaining prompts
 
 - ✅ Prompt 1 — Scaffolding.
 - ✅ Prompt 2 — API instrumentation (`METRICS_ENABLED` gating).
 - ✅ Prompt 3 — Prometheus + Grafana with provisioning.
 - ✅ Prompt 4 — Exporters (`cAdvisor`, `postgres-exporter`, `blackbox-exporter`).
-- ⏳ Prompt 5 — Dashboards and reporting assets.
+- ✅ Prompt 5 — Dashboards and demo assets.
 - ⏳ Prompt 6 — Optional packet-capture profile.
 
 ## First-run checklist
@@ -95,6 +110,7 @@ The file `.env.monitoring.example` is the source of truth for the local monitori
 4. Open `http://localhost:3001` and log in.
 5. Verify the Prometheus datasource is present under **Connections → Data sources**.
 6. Verify **Status → Targets** shows four jobs, all **UP**: `gameapi-api`, `cadvisor`, `postgres`, and `blackbox`.
+7. Open **Dashboards → GameAPI** and confirm the four provisioned dashboards are listed.
 
 ## Scrape targets
 

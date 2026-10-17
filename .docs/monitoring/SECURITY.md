@@ -76,6 +76,7 @@ The PostgreSQL exporter connects with the least-privilege `gameapi_app` runtime 
 | Editable datasource | Disabled | Grafana | Provisioned state cannot drift from the file |
 | Editable dashboards | Disabled | Grafana | Provisioned JSON is the source of truth |
 | Retention | 7 days | Prometheus | Caps disk usage for a laptop workflow |
+| Provisioned dashboards | JSON files, `allowUiUpdates: false` | Grafana | The repo is the source of truth; UI edits are ephemeral |
 
 ## Prompt 4 — Exporter hardening and deviations
 
@@ -94,6 +95,10 @@ The PostgreSQL exporter connects with the least-privilege `gameapi_app` runtime 
 | `sslmode=disable` | Yes | postgres-exporter | Acceptable on the isolated `backend` network; revisit if TLS is added |
 | Non-root user | `65534:65534` | postgres-exporter, blackbox-exporter | Runs exporters as an unprivileged user |
 | Healthcheck | Yes | All three | Detects early failures |
+
+## Prompt 5 — Dashboards
+
+The four dashboards are provisioned as JSON files under `.docs/monitoring/grafana/provisioning/dashboards/`. Grafana is configured with `allowUiUpdates: false`, so a dashboard edited through the UI will not persist. This is intentional: the JSON files are the single source of truth, which means a compromised Grafana session cannot silently alter the dashboards that will be restored on the next provisioning cycle.
 
 ## Hardening checklist
 
