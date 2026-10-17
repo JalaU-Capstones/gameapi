@@ -7,8 +7,8 @@ REST API para gestión de usuarios y partidas de Tic-Tac-Toe.
 [![Render](https://img.shields.io/badge/Render-production-46E3B7?logo=render&logoColor=white)](https://gameapi-9vos.onrender.com/health)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg)](https://fastapi.tiangolo.com/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![Tests](https://img.shields.io/badge/tests-402%20passed-success.svg)](#pruebas)
-[![Coverage](https://img.shields.io/badge/coverage-93%25-green.svg)](#cobertura)
+[![Tests](https://img.shields.io/badge/tests-421%20passed-success.svg)](#pruebas)
+[![Coverage](https://img.shields.io/badge/coverage-94%25-green.svg)](#cobertura)
 
 **Stack:** Python 3.11+ · FastAPI · PostgreSQL 16 · SQLAlchemy 2.0 async · Pydantic v2 · JWT · WebSocket · uv · Docker
 
@@ -121,7 +121,7 @@ Ejecuta `make help` para ver la lista completa.
 | Comando             | Descripción                                              |
 |---------------------|----------------------------------------------------------|
 | `make test`         | Ejecuta pytest                                           |
-| `make test-cov`     | Ejecuta pytest con cobertura y umbral del 93%            |
+| `make test-cov`     | Ejecuta pytest con cobertura y umbral del 94%            |
 | `make test-clean`   | Elimina contenedores residuales de testcontainers        |
 
 ### Migraciones
@@ -322,6 +322,16 @@ El login tradicional sigue devolviendo el access token en el body. Se puede usar
 | `POST` | `/api/v2/auth/refresh` | 🔄   | Rota el refresh token y emite nuevo access. |
 | `POST` | `/api/v2/auth/logout`  | 🔄   | Revoca refresh token y limpia cookies.      |
 | `GET`  | `/api/v2/auth/me`      | ✅   | Usuario actual (desde cookie o header).     |
+| `POST` | `/api/v2/auth/session/takeover` | ✅ | Revoca las otras sesiones activas del usuario. |
+
+#### Sesiones y takeover multi-navegador
+
+El login crea una sesión independiente por navegador o dispositivo. Para cerrar
+las demás sesiones activas y sus WebSockets sin desconectar la sesión actual,
+envía `POST /api/v2/auth/session/takeover` con un token ligado a una sesión.
+Los sockets reemplazados se cierran con el código `4409` y la razón
+`session_replaced`. El takeover responde `409 GAME_IN_PROGRESS` mientras haya
+una partida activa y `409 SESSION_REQUIRED` para tokens antiguos sin sesión.
 
 ### Variables de entorno relacionadas
 
@@ -647,9 +657,11 @@ make test
 Salida esperada:
 
 ```
-402 passed in 215.40s
-Required test coverage of 93.0% reached. Total coverage: 93.46%
+421 passed in ~237s
+Required test coverage of 94.0% reached. Total coverage: 94.0%
 ```
+
+> El gate de CI está en 94% desde las mejoras de sesiones y takeover.
 
 Los tests usan **PostgreSQL** de dos formas según el entorno:
 
@@ -716,10 +728,8 @@ El flujo de invitaciones sigue una secuencia simple: la invitación queda `pendi
 
 ### Cobertura
 
-**Umbral mínimo:** 93% (configurado en `pyproject.toml` → `[tool.coverage.report] fail_under`).
-
-**Cobertura actual:** 93% (93.46% medido con `pytest-cov`; redondeado hacia abajo en el badge).
-
+**Umbral mínimo:** 94% (configurado en `pyproject.toml` → `[tool.coverage.report] fail_under`).
+**Cobertura actual:** 94% (94.0% medido con `pytest-cov`).
 | Archivo                                  | Tests | Qué cubre                                                                   |
 |------------------------------------------|-------|-----------------------------------------------------------------------------|
 | `tests/test_security.py`                 | 4     | Hashing bcrypt, JWT create/decode, token manipulado.                        |
@@ -772,13 +782,13 @@ Hooks configurados: `ruff`, `ruff-format`, `mypy`, `trailing-whitespace`, `end-o
 
 - `quality`: ruff + mypy (Python 3.12).
 - `test`: matriz de compatibilidad **Python 3.11 / 3.12 / 3.13 / 3.14**, cada
-  versión ejecuta los tests con cobertura (`coverage run` + `--fail-under=93`)
+  versión ejecuta los tests con cobertura (`coverage run` + `--fail-under=94`)
   contra un servicio PostgreSQL 16. El reporte se sube a Codecov una sola vez
   desde Python 3.14.
 - `docker`: build de la imagen + smoke test con PostgreSQL en red dedicada.
 
 **GitLab CI** (`.gitlab-ci.yml`) — mismo esquema: `test:python` corre la matriz
-3.11–3.14 con cobertura y umbral del 93% aplicado en cada versión.
+3.11–3.14 con cobertura y umbral del 94% aplicado en cada versión.
 
 **Dependabot** (`.github/dependabot.yml`) — PR semanal para `uv.lock` y
 GitHub Actions.
@@ -896,12 +906,14 @@ gameapi/
 │   │       ├── gameplay.py
 │   │       ├── log_entry.py
 │   │       ├── refresh_token.py
+│   │       ├── session.py
 │   │       └── user.py
 │   ├── repositories/                  # Capa de acceso a datos
 │   │   ├── __init__.py
 │   │   ├── gameplay_repository.py
 │   │   ├── log_repository.py
 │   │   ├── refresh_token_repository.py
+│   │   ├── session_repository.py
 │   │   └── user_repository.py
 │   ├── schemas/                       # Contratos Pydantic (camelCase automático)
 │   │   ├── __init__.py
