@@ -9,10 +9,12 @@ from fastapi.websockets import WebSocketDisconnect
 class ConnectionManager:
     def __init__(self) -> None:
         self._connections: dict[str, set[WebSocket]] = {}
+        self._socket_sessions: dict[WebSocket, str | None] = {}
 
     def reset(self) -> None:
         """Clear all registered sockets. TEST-ONLY. Production code must not call this."""
         self._connections.clear()
+        self._socket_sessions.clear()
 
     def get_user_socket(self, user_id: str) -> WebSocket | None:
         sockets = self._connections.get(user_id)
@@ -20,17 +22,28 @@ class ConnectionManager:
             return None
         return next(iter(sockets))
 
-    async def connect(self, user_id: str, websocket: WebSocket) -> None:
+    async def connect(
+        self,
+        user_id: str,
+        websocket: WebSocket,
+        sid: str | None = None,
+    ) -> None:
         self._connections.setdefault(user_id, set()).add(websocket)
+        self._socket_sessions[websocket] = sid
 
     def disconnect(self, user_id: str, websocket: WebSocket | None = None) -> None:
         sockets = self._connections.get(user_id)
         if sockets is None:
+            if websocket is not None:
+                self._socket_sessions.pop(websocket, None)
             return
 
         if websocket is not None:
             sockets.discard(websocket)
+            self._socket_sessions.pop(websocket, None)
         else:
+            for socket in sockets:
+                self._socket_sessions.pop(socket, None)
             sockets.clear()
 
         if not sockets:
@@ -49,6 +62,7 @@ class ConnectionManager:
 
         closed = 0
         for websocket in list(sockets):
+            self._socket_sessions.pop(websocket, None)
             try:
                 await websocket.close(code=4409, reason=reason)
                 closed += 1
@@ -63,6 +77,24 @@ class ConnectionManager:
 
         closed = 0
         for websocket in list(sockets):
+            try:
+                await websocket.close(code=4409, reason="session_replaced")
+                closed += 1
+            except (WebSocketDisconnect, RuntimeError):
+                pass
+            finally:
+                self.disconnect(user_id, websocket)
+        return closed
+
+    async def close_sessions_except(self, user_id: str, sid: str) -> int:
+        sockets = self._connections.get(user_id)
+        if not sockets:
+            return 0
+
+        closed = 0
+        for websocket in list(sockets):
+            if self._socket_sessions.get(websocket) == sid:
+                continue
             try:
                 await websocket.close(code=4409, reason="session_replaced")
                 closed += 1
