@@ -57,9 +57,9 @@ async def presence_websocket(websocket: WebSocket) -> None:
         return
     user_id, sid = auth
 
-    if presence_manager.get_user_socket(user_id) is not None:
-        await websocket.close(code=4409, reason="session_already_active")
-        return
+    # `connect` evicts any existing socket for the same (user_id, sid) pair.
+    # A user can legitimately hold one socket per session, so no additional
+    # user-level check is needed here.
 
     await presence_manager.connect(user_id, websocket, sid)
     await websocket.send_json({"event": "auth_ok", "payload": {"user_id": user_id}})

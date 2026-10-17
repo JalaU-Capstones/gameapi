@@ -478,7 +478,7 @@ async def _handle_message(
 
 
 ABANDON_GRACE_SECONDS: float | None = None
-_HANDOVER_REASONS = {"session_handover", "session_replaced"}
+_HANDOVER_REASONS = {"session_handover", "session_replaced", "reconnected"}
 _pending_abandons: dict[str, asyncio.Task[None]] = {}
 
 
@@ -574,9 +574,9 @@ async def gameplays_websocket(websocket: WebSocket) -> None:
         return
     user_id, sid = auth
 
-    if gameplays_manager.get_user_socket(user_id) is not None:
-        await websocket.close(code=4409, reason="session_already_active")
-        return
+    # `connect` evicts any existing socket for the same (user_id, sid) pair.
+    # A user can legitimately hold one socket per session, so no additional
+    # user-level check is needed here.
 
     await gameplays_manager.connect(user_id, websocket, sid)
     _cancel_pending_abandon(user_id)
