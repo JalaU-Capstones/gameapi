@@ -38,3 +38,25 @@ async def test_get_current_user_rejects_deleted_account(monkeypatch: pytest.Monk
 
     assert exc.value.status_code == 401
     assert exc.value.detail == "User no longer exists"
+
+
+async def test_get_current_user_rejects_revoked_session(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        api.deps,
+        "decode_access_token",
+        lambda _: SimpleNamespace(sub="user-1", sid="00000000-0000-0000-0000-000000000001"),
+    )
+
+    class RevokedSessionRepo:
+        async def get_by_id(self, session_id):
+            assert str(session_id) == "00000000-0000-0000-0000-000000000001"
+            return SimpleNamespace(revoked_at="now", revoked_reason="session_replaced")
+
+    credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="valid-token")
+
+    with pytest.raises(HTTPException) as exc:
+        await get_current_user(credentials, SimpleNamespace(), RevokedSessionRepo())
+
+    assert exc.value.status_code == 401
+    assert exc.value.headers["WWW-Authenticate"] == "Bearer"
+    assert exc.value.detail == "Session ended"

@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from gameapi.db.models.log_entry import LogEntry
 from gameapi.repositories.log_repository import LogRepository
-from gameapi.services.log_service import LogService
+from gameapi.services.log_service import AsyncQueueHandler, LogService
 
 
 @pytest_asyncio.fixture
@@ -227,3 +227,72 @@ async def test_log_service_handler_is_thread_safe(
         root_logger.removeHandler(handler)
         root_logger.setLevel(previous_level)
         await service.stop()
+
+
+async def test_log_service_queue_handler_is_safe_when_loop_is_missing_or_queue_is_full() -> None:
+    handler = AsyncQueueHandler(asyncio.Queue(maxsize=1))
+    record = logging.LogRecord("demo", logging.INFO, __file__, 1, "hello world", (), None)
+
+    handler.emit(record)
+
+    loop = asyncio.get_running_loop()
+    handler.attach_loop(loop)
+    handler._queue.put_nowait({"payload": "occupied"})
+    handler._safe_put({"payload": "next"})
+
+    def _raise(*args, **kwargs):
+        raise RuntimeError("boom")
+
+    original = handler._queue.put_nowait
+    handler._queue.put_nowait = _raise  # type: ignore[assignment]
+    try:
+        handler._safe_put({"payload": "fallback"})
+    finally:
+        handler._queue.put_nowait = original  # type: ignore[assignment]
+
+    assert handler._queue.qsize() == 1
+
+
+async def test_log_service_retention_failure_returns_zero_and_logs(monkeypatch) -> None:
+    async def _boom(*args, **kwargs):
+        raise RuntimeError("retention boom")
+
+    class _FakeSessionFactory:
+        def __call__(self):
+            return _FakeSession()
+
+    class _FakeSession:
+        async def __aenter__(self):
+            return object()
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+    service = LogService(_FakeSessionFactory(), buffer_size=10, flush_interval=999)
+    monkeypatch.setattr("gameapi.services.log_service.LogRepository.delete_older_than", _boom)
+    logged = []
+    monkeypatch.setattr(
+        "gameapi.services.log_service.logger.exception", lambda *args, **kwargs: logged.append(args)
+    )
+
+    result = await service._run_retention_once()
+
+    assert result == 0
+    assert logged
+
+
+async def test_log_service_format_record_roundtrips_values() -> None:
+    service = LogService(session_factory=object(), buffer_size=10, flush_interval=999)
+
+    formatted = service._format_record(
+        {
+            "timestamp": "2024-01-01T00:00:00Z",
+            "level": "WARNING",
+            "event_type": "user_login_failed",
+            "message": "bad credentials",
+        }
+    )
+
+    assert "WARNING" in formatted
+    assert "user_login_failed" in formatted
+    assert "bad credentials" in formatted
