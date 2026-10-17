@@ -31,7 +31,7 @@
     "gameplays": {
       "address": "/gameplays",
       "title": "Gameplays channel",
-      "description": "Real-time gameplay events: invitations, moves, turn changes, game endings.",
+      "description": "Real-time gameplay events: invitations, moves, turn changes, and game endings. A session takeover closes sockets from other sessions with WebSocket close code 4409 and reason `session_replaced`.",
       "bindings": {
         "ws": {
           "method": "GET"
@@ -127,7 +127,7 @@
     "presence": {
       "address": "/presence",
       "title": "Presence channel",
-      "description": "Real-time user presence: online users, joins, and leaves.",
+      "description": "Real-time user presence: online users, joins, and leaves. A session takeover closes sockets from other sessions with WebSocket close code 4409 and reason `session_replaced`.",
       "bindings": {
         "ws": {
           "method": "GET"
@@ -175,7 +175,7 @@
     "chat": {
       "address": "/chat",
       "title": "Global chat channel",
-      "description": "Authenticated, single-room, in-memory global chat. History is not persisted; the buffer is lost on process restart. Rate-limited per user.",
+      "description": "Authenticated, single-room, in-memory global chat. History is not persisted; the buffer is lost on process restart. Rate-limited per user. A session takeover closes sockets from other sessions with WebSocket close code 4409 and reason `session_replaced`.",
       "bindings": {
         "ws": {
           "method": "GET"
@@ -524,7 +524,7 @@
       "auth_error": {
         "name": "auth_error",
         "title": "Auth failure",
-        "summary": "Sent before the socket is closed with code 4401 (invalid token) or 4408 (timeout).",
+        "summary": "Sent before the socket is closed with code 4401 (invalid token), 4408 (timeout), or 4409 (revoked session). Session takeover closes replaced sockets with code 4409 and reason `session_replaced`.",
         "payload": {
           "$ref": "#/components/schemas/AuthErrorPayload"
         }
@@ -786,9 +786,10 @@
               "invalid_token",
               "expired_token",
               "auth_timeout",
-              "expected_auth_event"
+              "expected_auth_event",
+              "session_replaced"
             ],
-            "description": "Reason the websocket authentication failed."
+            "description": "Reason websocket authentication failed; `session_replaced` is also sent when a previously authenticated session is revoked."
           }
         }
       },

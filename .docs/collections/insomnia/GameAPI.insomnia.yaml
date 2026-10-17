@@ -1333,7 +1333,12 @@ resources:
     \ a `user_offline` event.\n\n## Error events\n\n| Event | Reason | Cause |\n|-------|--------|-------|\n\
     | `auth_error` | `invalid_token` | Token malformed, expired, or wrong signature\
     \ |\n| `auth_timeout` (close) | \u2014 | `auth` not sent within the timeout window\
-    \ |\n| `error` | `unknown_event` | Event name not recognized |"
+    \ |\n| `error` | `unknown_event` | Event name not recognized |\n\n## Session\
+    \ takeover\n\n`POST /api/v2/auth/session/takeover` revokes other active sessions\
+    \ and closes their sockets with WebSocket code `4409` and reason `session_replaced`.\
+    \ The current session remains connected. Takeover returns `409 GAME_IN_PROGRESS`\
+    \ while a game is active and `409 SESSION_REQUIRED` for legacy tokens without\
+    \ a session ID."
   metaSortKey: -1790553600001
   isPrivate: false
   _type: websocket_request
@@ -1368,7 +1373,11 @@ resources:
     :30}}\n```\n\n## Notes\n\n- The chat room is in-memory only; the buffer resets\
     \ on process restart.\n- The server sanitizes content before storing it.\n- A\
     \ disconnect broadcasts the updated `chat_users_count` to the remaining connected\
-    \ clients.\n"
+    \ clients.\n\n## Session takeover\n\n`POST /api/v2/auth/session/takeover` revokes\
+    \ other active sessions and closes their sockets with WebSocket code `4409` and\
+    \ reason `session_replaced`. The current session remains connected. Takeover returns\
+    \ `409 GAME_IN_PROGRESS` while a game is active and `409 SESSION_REQUIRED` for\
+    \ legacy tokens without a session ID.\n"
   metaSortKey: -1790553600000
   isPrivate: false
   _type: websocket_request
@@ -1521,7 +1530,11 @@ resources:
     | `pending` | create_game limit exceeded | `rate_limited` | `CREATE_GAME_RATE_LIMITED`\
     \ is emitted with a `retry_after_seconds` payload. |\n\n> Both new error codes\
     \ carry `retry_after_seconds` in the payload so the client can schedule a UI cooldown\
-    \ without polling."
+    \ without polling.\n\n## Session takeover\n\n`POST /api/v2/auth/session/takeover`\
+    \ revokes other active sessions and closes their sockets with WebSocket code `4409`\
+    \ and reason `session_replaced`. The current session remains connected. Takeover\
+    \ returns `409 GAME_IN_PROGRESS` while a game is active and `409 SESSION_REQUIRED`\
+    \ for legacy tokens without a session ID."
   metaSortKey: -1790553600002
   isPrivate: false
   _type: websocket_request

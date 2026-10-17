@@ -1015,6 +1015,9 @@
           "401": {
             "description": "Not authenticated"
           },
+          "409": {
+            "description": "Takeover is unavailable while a game is in progress (GAME_IN_PROGRESS), or for legacy tokens without a session (SESSION_REQUIRED)."
+          },
           "429": {
             "description": "Rate limit exceeded"
           },
@@ -2329,6 +2332,11 @@
           },
           "user": {
             "$ref": "#/components/schemas/UserResponse"
+          },
+          "other_active_sessions": {
+            "type": "integer",
+            "title": "Other Active Sessions",
+            "default": 0
           }
         },
         "type": "object",
