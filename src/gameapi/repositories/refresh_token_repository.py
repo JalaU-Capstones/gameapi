@@ -17,6 +17,10 @@ class RefreshTokenRepository:
         await self._session.refresh(token)
         return token
 
+    async def update(self, token: RefreshToken) -> RefreshToken:
+        await self._session.flush()
+        return token
+
     async def get_by_hash(self, token_hash: str) -> RefreshToken | None:
         result = await self._session.execute(
             select(RefreshToken).where(RefreshToken.token_hash == token_hash)
