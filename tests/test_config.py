@@ -7,6 +7,7 @@ from gameapi.core.config import (
     AppSettings,
     AuthSettings,
     LogSettings,
+    MetricsSettings,
     PostgresSettings,
     RateLimitSettings,
     Settings,
@@ -141,3 +142,18 @@ def test_rate_limit_register_alias(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("RATE_LIMIT_REGISTER", "5/minute")
     settings = RateLimitSettings()
     assert settings.register_limit == "5/minute"
+
+
+def test_metrics_settings_default_is_disabled() -> None:
+    assert MetricsSettings().enabled is False
+
+
+def test_metrics_settings_can_be_enabled_from_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("METRICS_ENABLED", "true")
+    assert Settings().metrics.enabled is True
+
+
+def test_settings_normalizes_migrator_uri(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("POSTGRES_MIGRATOR_URI", "postgres://render-host:5432/gameapi")
+    settings = Settings()
+    assert settings.postgres_migrator_uri.startswith("postgresql+asyncpg://")

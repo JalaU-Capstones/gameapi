@@ -8,6 +8,7 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from gameapi.core.config import settings
 from gameapi.schemas.user import UserCreate
 from gameapi.services.event_bus import EventBus
 from gameapi.services.exceptions import (
@@ -442,3 +443,47 @@ async def test_expire_pending_and_queued_invitations_marks_them_expired(
     assert pending_after is not None and queued_after is not None
     assert pending_after.invitation_state == "expired"
     assert queued_after.invitation_state == "expired"
+
+
+async def test_retry_invitation_is_idempotent_for_pending_game(
+    engine_service: GameEngineService, db_session: AsyncSession
+) -> None:
+    host_id, guest_id = await _create_users(db_session)
+    game_id = await engine_service.create_game(host_id, guest_id)
+
+    result = await engine_service.retry_invitation(game_id, host_id)
+
+    assert result["idempotent"] is True
+    assert result["remaining_attempts"] == settings.invitation.pair_max_attempts
+    gameplay = await engine_service.gameplay_service.get_by_id(game_id)
+    assert gameplay is not None
+    assert gameplay.invitation_state == "pending"
+
+
+async def test_retry_invitation_restarts_rejected_invite_and_tracks_attempts(
+    engine_service: GameEngineService, db_session: AsyncSession
+) -> None:
+    host_id, guest_id = await _create_users(db_session)
+    game_id = await engine_service.create_game(host_id, guest_id)
+    await engine_service.reject_invitation(game_id, guest_id)
+
+    result = await engine_service.retry_invitation(game_id, host_id)
+
+    assert result["idempotent"] is False
+    assert result["attempt"] == 1
+    assert result["remaining_attempts"] == settings.invitation.pair_max_attempts - 1
+    gameplay = await engine_service.gameplay_service.get_by_id(game_id)
+    assert gameplay is not None
+    assert gameplay.invitation_state == "pending"
+    assert gameplay.player_turn == host_id
+
+
+async def test_retry_invitation_rejects_accepted_game(
+    engine_service: GameEngineService, db_session: AsyncSession
+) -> None:
+    host_id, guest_id = await _create_users(db_session)
+    game_id = await engine_service.create_game(host_id, guest_id)
+    await engine_service.accept_invitation(game_id, guest_id)
+
+    with pytest.raises(GameNotActiveError):
+        await engine_service.retry_invitation(game_id, host_id)

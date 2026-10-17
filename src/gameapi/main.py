@@ -1,3 +1,4 @@
+# mypy: disable-error-code=unused-ignore
 import asyncio
 import contextlib
 import logging
@@ -194,3 +195,33 @@ async def health(session: SessionDep) -> dict[str, str]:
 
 app.include_router(v1_router)
 app.include_router(v2_router)
+
+if settings.metrics.enabled:
+    from prometheus_fastapi_instrumentator import Instrumentator  # type: ignore[import-not-found]
+
+    Instrumentator(
+        should_group_status_codes=False,
+        should_ignore_untemplated=True,
+        should_respect_env_var=False,
+        excluded_handlers=["/metrics", "/health"],
+    ).instrument(app).expose(
+        app,
+        endpoint="/metrics",
+        include_in_schema=False,
+    )
+
+    logger.info(
+        "Prometheus metrics enabled",
+        extra={
+            "event_type": "metrics_state",
+            "metadata": {"enabled": True},
+        },
+    )
+else:
+    logger.info(
+        "Prometheus metrics disabled",
+        extra={
+            "event_type": "metrics_state",
+            "metadata": {"enabled": False},
+        },
+    )
