@@ -18,13 +18,15 @@ from gameapi.api.v2.ws.manager import (
 
 @pytest.mark.asyncio
 async def test_takeover_revokes_chat_socket_too() -> None:
+    user_id = "11111111-1111-1111-1111-111111111111"
+    current_sid = "22222222-2222-2222-2222-222222222222"
     gameplay_socket = AsyncMock()
     presence_socket = AsyncMock()
     chat_socket = AsyncMock()
 
-    await gameplays_manager.connect("user", gameplay_socket)
-    await presence_manager.connect("user", presence_socket)
-    await chat_manager.connect("user", chat_socket)
+    await gameplays_manager.connect(user_id, gameplay_socket, "old-session")
+    await presence_manager.connect(user_id, presence_socket, "old-session")
+    await chat_manager.connect(user_id, chat_socket, "old-session")
 
     request = Request(
         {
@@ -43,16 +45,22 @@ async def test_takeover_revokes_chat_socket_too() -> None:
     response = await takeover_session(
         request=request,
         response=Response(),
-        current_user=SimpleNamespace(id="user"),
+        current_user=SimpleNamespace(id=user_id),
+        current_sid=current_sid,
+        session_repo=AsyncMock(
+            get_by_id=AsyncMock(return_value=SimpleNamespace(revoked_at=None)),
+            revoke_all_for_user=AsyncMock(return_value=2),
+        ),
+        gameplay_service=AsyncMock(find_active_game_for_user=AsyncMock(return_value=None)),
     )
 
     assert response.status_code == 204
     gameplay_socket.close.assert_awaited_once_with(code=4409, reason="session_replaced")
     presence_socket.close.assert_awaited_once_with(code=4409, reason="session_replaced")
     chat_socket.close.assert_awaited_once_with(code=4409, reason="session_replaced")
-    assert not gameplays_manager.is_online("user")
-    assert not presence_manager.is_online("user")
-    assert not chat_manager.is_online("user")
+    assert not gameplays_manager.is_online(user_id)
+    assert not presence_manager.is_online(user_id)
+    assert not chat_manager.is_online(user_id)
 
 
 @pytest.mark.asyncio
@@ -106,6 +114,24 @@ async def test_manager_revoke_methods_close_every_socket_for_user() -> None:
     first.close.assert_awaited_with(code=4409, reason="session_replaced")
     second.close.assert_awaited_with(code=4409, reason="session_replaced")
     assert await manager.revoke_all_user_sockets("missing") == 0
+
+
+@pytest.mark.asyncio
+async def test_close_sessions_except_keeps_current_session_sockets() -> None:
+    manager = ConnectionManager()
+    old_socket = AsyncMock()
+    current_socket = AsyncMock()
+    await manager.connect("user", old_socket, "old-session")
+    await manager.connect("user", current_socket, "current-session")
+
+    assert await manager.close_sessions_except("user", "current-session") == 1
+
+    old_socket.close.assert_awaited_once_with(code=4409, reason="session_replaced")
+    current_socket.close.assert_not_awaited()
+    assert manager.get_user_socket("user") is current_socket
+    manager.disconnect("user", old_socket)
+    manager.disconnect("user", current_socket)
+    assert not manager.is_online("user")
 
 
 @pytest.mark.asyncio

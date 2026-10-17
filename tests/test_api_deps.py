@@ -20,7 +20,11 @@ async def test_get_session_yields_async_session(db_session: AsyncSession) -> Non
 
 
 async def test_get_current_user_rejects_deleted_account(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(api.deps, "decode_access_token", lambda _: SimpleNamespace(sub="deleted"))
+    monkeypatch.setattr(
+        api.deps,
+        "decode_access_token",
+        lambda _: SimpleNamespace(sub="deleted", sid=None),
+    )
 
     class MissingUserService:
         async def get_by_id(self, user_id: str) -> None:
@@ -30,7 +34,7 @@ async def test_get_current_user_rejects_deleted_account(monkeypatch: pytest.Monk
     credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="valid-token")
 
     with pytest.raises(HTTPException) as exc:
-        await get_current_user(credentials, MissingUserService())
+        await get_current_user(credentials, MissingUserService(), SimpleNamespace())
 
     assert exc.value.status_code == 401
     assert exc.value.detail == "User no longer exists"
