@@ -20,6 +20,9 @@ dist/
 # Local observability stack secrets
 .env.monitoring
 
+# Local packet captures may contain JWTs and credentials.
+capture/
+
 .vscode/
 .idea/
 *.swp
