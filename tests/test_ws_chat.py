@@ -112,12 +112,16 @@ async def test_ws_chat_rejects_duplicate_session(
             aconnect_ws("ws://test/api/v2/ws/chat", client=client_b) as ws_b,
         ):
             await ws_b.send_json({"event": "auth", "payload": {"token": auth_token}})
-            with pytest.raises(WebSocketDisconnect) as exc:
-                await ws_b.receive_json()
-            assert exc.value.code == 4409
+            await ws_b.receive_json()
+            await ws_b.receive_json()
 
-        await ws_a.send_json({"event": "ping"})
-        assert await ws_a.receive_json() == {"event": "pong", "payload": {}}
+            with pytest.raises(WebSocketDisconnect) as exc:
+                await ws_a.receive_json()
+            assert exc.value.code == 1000
+            assert exc.value.reason == "reconnected"
+
+            await ws_b.send_json({"event": "ping"})
+            assert await ws_b.receive_json() == {"event": "pong", "payload": {}}
 
 
 async def test_ws_chat_send_broadcasts_message_and_sanitization(

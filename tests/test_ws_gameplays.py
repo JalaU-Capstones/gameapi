@@ -182,12 +182,15 @@ async def test_ws_gameplays_rejects_duplicate_user_session(
             aconnect_ws("ws://test/api/v2/ws/gameplays", client=client_b) as ws_b,
         ):
             await ws_b.send_json({"event": "auth", "payload": {"token": auth_token}})
-            with pytest.raises(WebSocketDisconnect) as exc:
-                await ws_b.receive_json()
-            assert exc.value.code == 4409
+            assert (await ws_b.receive_json())["event"] == "auth_ok"
 
-        await ws_a.send_json({"event": "ping"})
-        assert await ws_a.receive_json() == {"event": "pong", "payload": {}}
+            with pytest.raises(WebSocketDisconnect) as exc:
+                await ws_a.receive_json()
+            assert exc.value.code == 1000
+            assert exc.value.reason == "reconnected"
+
+            await ws_b.send_json({"event": "ping"})
+            assert await ws_b.receive_json() == {"event": "pong", "payload": {}}
 
 
 async def test_ws_gameplays_ping_pong(

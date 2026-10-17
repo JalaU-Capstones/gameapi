@@ -102,16 +102,19 @@ async def test_manager_revoke_methods_close_every_socket_for_user() -> None:
     await manager.connect("user", first)
     await manager.connect("user", second)
 
+    first.close.assert_awaited_once_with(code=1000, reason="reconnected")
+    assert manager.get_user_socket("user") is second
+    assert manager.online_user_ids() == ["user"]
+
     assert await manager.revoke_user_socket("user", "session_replaced") is True
-    first.close.assert_awaited_once_with(code=4409, reason="session_replaced")
     second.close.assert_awaited_once_with(code=4409, reason="session_replaced")
     assert manager.online_user_ids() == []
     assert await manager.revoke_user_socket("missing", "session_replaced") is False
 
     await manager.connect("user", first)
     await manager.connect("user", second)
-    assert await manager.revoke_all_user_sockets("user") == 2
-    first.close.assert_awaited_with(code=4409, reason="session_replaced")
+    assert await manager.revoke_all_user_sockets("user") == 1
+    first.close.assert_awaited_with(code=1000, reason="reconnected")
     second.close.assert_awaited_with(code=4409, reason="session_replaced")
     assert await manager.revoke_all_user_sockets("missing") == 0
 
@@ -185,10 +188,10 @@ async def test_broadcast_uses_active_connections_only() -> None:
 
     await manager.broadcast({"event": "update"})
 
-    alive.send_json.assert_awaited_once_with({"event": "update"})
+    alive.send_json.assert_not_awaited()
     closed.send_json.assert_awaited_once_with({"event": "update"})
-    assert manager.online_user_ids() == ["user"]
-    assert manager.get_user_socket("user") is alive
+    assert manager.online_user_ids() == []
+    assert manager.get_user_socket("user") is None
 
 
 @pytest.mark.asyncio
