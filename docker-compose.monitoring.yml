@@ -23,6 +23,8 @@ volumes:
     name: gameapi_prometheus_data
   grafana_data:
     name: gameapi_grafana_data
+  capture_data:
+    name: gameapi_capture_data
 
 services:
   # ---------------------------------------------------------------------------
@@ -239,3 +241,47 @@ services:
       timeout: 5s
       retries: 5
       start_period: 15s
+
+  # ---------------------------------------------------------------------------
+  # tcpdump capture (OPT-IN, requires --profile capture).
+  #
+  # Shares the API network namespace to capture only its traffic. It does not
+  # use host networking, a Docker socket, or a host bind mount. The pcap may
+  # contain sensitive credentials; see SECURITY.md.
+  # ---------------------------------------------------------------------------
+  capture:
+    image: nicolaka/netshoot:v0.13
+    container_name: gameapi-capture
+    profiles:
+      - capture
+    depends_on:
+      api:
+        condition: service_started
+    network_mode: service:api
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    stop_grace_period: 3s
+    restart: "no"
+    volumes:
+      - type: volume
+        source: capture_data
+        target: /capture
+    command:
+      - "tcpdump"
+      - "-i"
+      - "any"
+      - "-w"
+      - "/capture/api.pcap"
+      - "-U"
+      - "-v"
+      - "-n"
+      - "port"
+      - "8080"
