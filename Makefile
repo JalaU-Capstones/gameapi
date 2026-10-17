@@ -21,7 +21,7 @@ help:
 	@echo "  make monitoring-up     Inicia la API + PostgreSQL + Prometheus + Grafana"
 	@echo "  make monitoring-down   Detiene la pila de monitoreo, conserva volúmenes"
 	@echo "  make monitoring-logs   Sigue los logs de Prometheus y Grafana"
-	@echo "  make monitoring-clean  Para la pila y borra los volúmenes de monitoreo"
+	@echo "  make monitoring-clean  Para la pila y borra solo volúmenes de monitoreo"
 	@echo "  make migrate     Aplica las migraciones de Alembic"
 	@echo "  make migrate-create Crea una migración de Alembic"
 
@@ -61,10 +61,16 @@ docker-reset:
 
 # ---------------------------------------------------------------------------
 # Observability stack (local only)
+#
+# The --env-file flag is mandatory: docker compose only auto-loads `.env`,
+# and the overlay uses a fail-fast interpolation on GRAFANA_ADMIN_PASSWORD
+# so a missing value aborts the command instead of starting Grafana with a
+# default password. Keep the flag on every target that runs `docker compose`
+# against the overlay.
 # ---------------------------------------------------------------------------
-COMPOSE_MONITORING = docker compose -f docker-compose.yml -f docker-compose.monitoring.yml
+COMPOSE_MONITORING = docker compose -f docker-compose.yml -f docker-compose.monitoring.yml --env-file .env.monitoring
 
-monitoring-up: ## Start the API + PostgreSQL + Prometheus + Grafana
+monitoring-up: ## Start the API + PostgreSQL + Prometheus + Grafana + exporters
 	$(COMPOSE_MONITORING) up -d
 
 monitoring-down: ## Stop the monitoring stack, keep volumes
@@ -73,8 +79,13 @@ monitoring-down: ## Stop the monitoring stack, keep volumes
 monitoring-logs: ## Tail logs from the monitoring containers
 	$(COMPOSE_MONITORING) logs -f prometheus grafana
 
-monitoring-clean: ## Stop the monitoring stack and wipe its volumes (destructive)
-	$(COMPOSE_MONITORING) down -v
+monitoring-clean: ## Stop the monitoring stack and wipe monitoring volumes only
+	$(COMPOSE_MONITORING) down
+	@for volume in gameapi_prometheus_data gameapi_grafana_data; do \
+		if docker volume inspect "$$volume" >/dev/null 2>&1; then \
+			docker volume rm "$$volume"; \
+		fi; \
+	done
 
 test:
 	uv run pytest -v
