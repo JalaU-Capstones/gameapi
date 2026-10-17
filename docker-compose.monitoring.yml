@@ -6,10 +6,9 @@
 #
 # It is never deployed to Render and must not be referenced from render.yaml.
 #
-# Scope: Prometheus, Grafana, cAdvisor, postgres-exporter, and blackbox-exporter
-# live on a dedicated `monitoring` bridge network. Only Grafana publishes a
-# port, and only on 127.0.0.1. No monitoring container joins the `frontend`
-# network.
+# Scope: Prometheus and Grafana live on a dedicated `monitoring` bridge network.
+# Only Grafana publishes a port, and only on 127.0.0.1. No monitoring container
+# joins the `frontend` network.
 
 networks:
   monitoring:
@@ -24,3 +23,100 @@ volumes:
     name: gameapi_prometheus_data
   grafana_data:
     name: gameapi_grafana_data
+
+services:
+  # ---------------------------------------------------------------------------
+  # API override: enable /metrics and join the monitoring network so Prometheus
+  # can scrape it. The base compose file keeps METRICS_ENABLED unset, which
+  # defaults to false.
+  # ---------------------------------------------------------------------------
+  api:
+    environment:
+      METRICS_ENABLED: "true"
+    networks:
+      - frontend
+      - backend
+      - monitoring
+
+  # ---------------------------------------------------------------------------
+  # Prometheus: scrape and store the API time series.
+  # No published port. Reachable only from the monitoring network.
+  # ---------------------------------------------------------------------------
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    container_name: gameapi-prometheus
+    restart: unless-stopped
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=${PROMETHEUS_RETENTION:-7d}"
+      - "--web.listen-address=0.0.0.0:9090"
+      - "--web.enable-lifecycle"
+    volumes:
+      - type: bind
+        source: ./.docs/monitoring/prometheus/prometheus.yml
+        target: /etc/prometheus/prometheus.yml
+        read_only: true
+      - type: volume
+        source: prometheus_data
+        target: /prometheus
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    networks:
+      - monitoring
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    user: "65534:65534"
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider -q http://localhost:9090/-/healthy || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ---------------------------------------------------------------------------
+  # Grafana: render Prometheus metrics for local developer dashboards.
+  # The only published port is the loopback bind for local access only.
+  # ---------------------------------------------------------------------------
+  grafana:
+    image: grafana/grafana:11.4.0
+    container_name: gameapi-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Set GRAFANA_ADMIN_PASSWORD in .env.monitoring}
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    ports:
+      - "127.0.0.1:3001:3000"
+    volumes:
+      - type: bind
+        source: ./.docs/monitoring/grafana/provisioning/datasources
+        target: /etc/grafana/provisioning/datasources
+        read_only: true
+      - type: bind
+        source: ./.docs/monitoring/grafana/provisioning/dashboards
+        target: /etc/grafana/provisioning/dashboards
+        read_only: true
+      - type: volume
+        source: grafana_data
+        target: /var/lib/grafana
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    networks:
+      - monitoring
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    user: "472:472"
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider -q http://localhost:3000/api/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
