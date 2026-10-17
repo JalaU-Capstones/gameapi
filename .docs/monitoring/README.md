@@ -25,12 +25,19 @@ graph TD
         subgraph NetMonitoring["📊 monitoring"]
             prometheus["🐳 prometheus"]
             grafana["🐳 grafana"]
+            cadvisor["🐳 cadvisor"]
+            postgres_exporter["🐳 postgres-exporter"]
+            blackbox["🐳 blackbox-exporter"]
         end
     end
 
     api -->|connects| postgres
     prometheus -->|scrape /metrics| api
+    prometheus -->|scrape| cadvisor
+    prometheus -->|scrape| postgres_exporter
+    prometheus -->|probe| blackbox
     grafana -->|query| prometheus
+    postgres_exporter -->|read-only metrics| postgres
 ```
 
 The existing stack still exposes the API on the `frontend` network and keeps PostgreSQL isolated on the `backend` network. The monitoring stack is deliberately separated onto a dedicated `monitoring` bridge network, with Grafana bound to `127.0.0.1` only.
@@ -48,6 +55,8 @@ To remove the monitoring data volumes and wipe the local history:
 ```bash
 make monitoring-clean
 ```
+
+This removes only the Prometheus and Grafana volumes; PostgreSQL data is preserved.
 
 ## Files in this directory
 
@@ -74,7 +83,7 @@ The file `.env.monitoring.example` is the source of truth for the local monitori
 - ✅ Prompt 1 — Scaffolding.
 - ✅ Prompt 2 — API instrumentation (`METRICS_ENABLED` gating).
 - ✅ Prompt 3 — Prometheus + Grafana with provisioning.
-- ⏳ Prompt 4 — Exporters (`cAdvisor`, `postgres-exporter`, `blackbox-exporter`).
+- ✅ Prompt 4 — Exporters (`cAdvisor`, `postgres-exporter`, `blackbox-exporter`).
 - ⏳ Prompt 5 — Dashboards and reporting assets.
 - ⏳ Prompt 6 — Optional packet-capture profile.
 
@@ -85,7 +94,18 @@ The file `.env.monitoring.example` is the source of truth for the local monitori
 3. `make monitoring-up`
 4. Open `http://localhost:3001` and log in.
 5. Verify the Prometheus datasource is present under **Connections → Data sources**.
-6. Verify the `gameapi-api` scrape target is **UP** under **Status → Targets** inside Prometheus.
+6. Verify **Status → Targets** shows four jobs, all **UP**: `gameapi-api`, `cadvisor`, `postgres`, and `blackbox`.
+
+## Scrape targets
+
+| Job | Target | Metrics |
+|---|---|---|
+| `gameapi-api` | `api:8080/metrics` | HTTP request rate, latency, and status codes |
+| `cadvisor` | `cadvisor:8080/metrics` | Container CPU, memory, network, and filesystem |
+| `postgres` | `postgres-exporter:9187/metrics` | Connections, locks, table sizes, and index usage |
+| `blackbox` | `blackbox-exporter:9115/probe?target=http://api:8080/health` | Uptime, response time, and HTTP status |
+
+cAdvisor runs with a documented security deviation: it has no Docker socket, but uses `SYS_PTRACE`, a writable container root filesystem, and read-only host mounts including `/var/lib/docker`. See [SECURITY.md](./SECURITY.md) for the rationale and limitations.
 
 ## Troubleshooting
 
@@ -96,6 +116,8 @@ Check that `.env.monitoring` exists and that `GRAFANA_ADMIN_PASSWORD` is set. Th
 ### Prometheus has no data
 
 Confirm the API container started with `METRICS_ENABLED=true` in the overlay and that the API exposes `/metrics` on `http://api:8080/metrics` from inside the monitoring network.
+
+If the `cadvisor` target is **DOWN**, inspect its logs with `docker compose -f docker-compose.yml -f docker-compose.monitoring.yml --env-file .env.monitoring logs cadvisor`. A missing `/dev/kmsg` device on the host is a common cause.
 
 ### Port 3001 is already in use
 
