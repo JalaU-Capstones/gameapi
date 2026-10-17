@@ -12,6 +12,12 @@ class InvalidRefreshTokenError(DomainError):
         super().__init__("Invalid or expired refresh token")
 
 
+class GameInProgressError(DomainError):
+    def __init__(self, user_id: str) -> None:
+        self.user_id = user_id
+        super().__init__(f"User {user_id} has an active game")
+
+
 class UserNotFoundError(DomainError):
     def __init__(self, user_id: str) -> None:
         self.user_id = user_id
