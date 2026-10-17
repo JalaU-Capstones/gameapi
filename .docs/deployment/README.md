@@ -137,6 +137,7 @@ En el dashboard del Web Service, ve a **Environment** y agrega todas las variabl
 | Variable | Valor recomendado | Racional |
 |---|---|---|
 | `POSTGRES_URI` | `postgresql://gameapi:...` | Usa la URL interna de la base de datos de Render. La app normaliza `postgres://` y `postgresql://` a `postgresql+asyncpg://` automáticamente. |
+| `POSTGRES_MIGRATOR_URI` | `sync: false` (configurar manualmente) | URI de migración, separada de la URI de ejecución y provisionada manualmente en Render. |
 | `POSTGRES_USER` | `gameapi` | Usuario de la base de datos creada en Render. |
 | `POSTGRES_PASSWORD` | _valor secreto del rol_ | Debe venir de la DB creada en Render; no lo guardes en el repositorio. |
 | `POSTGRES_DB` | `gameapi` | Nombre de la base de datos. |
@@ -187,6 +188,11 @@ En el dashboard del Web Service, ve a **Environment** y agrega todas las variabl
 | `RATE_LIMIT_CREATE_GAME` | `5/minute` | Compatibiliza la creación de partidas con los límites de invitación y evita spikes de carga. |
 | `RATE_LIMIT_WS_HANDSHAKE` | `10/minute` | Protege los WebSockets de conexiones repetitivas y rotativas. |
 | `RATE_LIMIT_SESSION_TAKEOVER` | `3/minute` | Limita intentos de takeover de sesión. |
+| `METRICS_ENABLED` | `false` | Desactiva `/metrics` en producción. El overlay de monitoreo local lo activa solo en la máquina del desarrollador. |
+
+> **Nota sobre `/metrics` en producción**
+>
+> El backend expone `/metrics` solo cuando `METRICS_ENABLED=true`. En Render no se configura la variable, por lo que `https://<tu-host>/metrics` devuelve **404**. Esto es intencional: `/metrics` es un target de scraping de Prometheus, no un endpoint de consumo público. La documentación operativa vive en `.docs/monitoring/README.md` y no se incluye en el contrato OpenAPI ni en las colecciones de Postman/Insomnia. Si en el futuro se necesita exponerlo en producción, hay que añadirlo explícitamente en `render.yaml` **y** documentar la decisión en `.docs/monitoring/SECURITY.md`.
 
 > **Sobre el formato de `POSTGRES_URI`**
 >
@@ -215,7 +221,94 @@ En el dashboard del Web Service, ve a **Environment** y agrega todas las variabl
 > - La base de datos PostgreSQL tiene una cuota de almacenamiento limitada; revisa el tamaño de `logs` y el tamaño de tablas si el servicio tarda en crecer.
 > - El `cold start` obliga a mantener tiempos de expiración cortos y límites de tarifa razonables para evitar que la primera petición falle por saturación.
 
-## Paso 5 — Configurar GitHub Actions y Render deploy hook
+## Paso 5 — Endurecer la base de datos y el servicio en Render
+
+Un despliegue en Render puede quedar funcional con los valores por defecto y, aun así, ser inseguro. Esta sección cubre los ajustes que **no** son opcionales si la base de datos va a contener datos reales.
+
+### 5.1 — Restringir el acceso externo a la base de datos
+
+Render crea la base de datos con una lista de IPs permitidas que, por defecto, acepta conexiones desde **cualquier dirección** (`0.0.0.0/0`). Eso significa que, mientras la base de datos esté viva, cualquiera en internet puede intentar conectarse al puerto 5432 con las credenciales que conozca. Es una vulnerabilidad real, no un detalle de configuración.
+
+**Por qué el default es peligroso**
+
+- El atacante no necesita comprometer la app: solo necesita alcanzar el host de la base de datos.
+- Las credenciales de la base de datos no se rotan automáticamente.
+- El plan gratuito de Render no incluye auditoría ni alertas de intentos de conexión.
+- Un ataque exitoso compromete todas las partidas, cuentas y logs, no solo un endpoint.
+
+**Cómo restringirlo**
+
+1. Abre <https://dashboard.render.com>, entra al servicio de base de datos (`gameapi-db` en este proyecto).
+2. Pestaña **Access Control** (o la pestaña equivalente de **Connections**, según la versión del panel).
+3. En **Allow access from**, cambia **Anywhere** por **Specific IPs**.
+4. Si el Web Service y la base de datos están en la misma cuenta de Render y en la misma región, la conexión interna usa la red privada de Render y **no requiere ninguna IP externa permitida**. Deja la lista vacía.
+5. Si necesitas conectarte manualmente con `psql` desde tu máquina, agrega únicamente la IP pública de tu red. Puedes obtenerla con:
+   ```bash
+   curl -s https://api.ipify.org
+   ```
+   **Nunca** agregues el rango completo de tu proveedor de internet, ni `0.0.0.0/0`. Si tu IP cambia (IP dinámica), vuelve a consultarla y actualiza la lista.
+6. Confirma que el Web Service sigue funcionando: `curl -fsS https://<tu-host>/health` debe devolver `{"status":"ok"}`. Si falla después del cambio, la app está usando la URL **externa** de la base de datos en lugar de la interna; revisa `POSTGRES_URI` en Render.
+
+**Cómo verificar que quedó cerrado**
+
+Desde tu máquina, intenta conectarte con `psql` usando el **External Database URL**:
+
+```bash
+psql "postgres://gameapi:<password>@<external-host>:5432/gameapi" -c "SELECT 1;"
+```
+
+Debe fallar con `timeout` o `connection refused`. Si responde `1`, la lista de IPs sigue abierta.
+
+### 5.2 — Confirmar los flags de seguridad de la aplicación
+
+El backend ya aborta el arranque si `APP_ENV=production` y alguna de estas condiciones no se cumple. Verifica en el dashboard de Render, en **Environment**:
+
+- `APP_ENV=production`
+- `AUTH_COOKIE_SECURE=true`
+- `CORS_ORIGINS` no es `*`
+- `JWT_SECRET_KEY` no es el valor por defecto
+
+Si Render falla al arrancar con un error de validación de `Settings`, es que alguno de estos cuatro valores está mal. Ese comportamiento es intencional.
+
+### 5.3 — Deshabilitar autoDeploy y proteger el servicio
+
+- En **Settings → Build & Deploy**, deja **Auto-Deploy** en `No`. El deploy se dispara desde GitHub Actions, no desde Render. Si Render se auto-despliega en paralelo, un push a `main` puede crear un deploy con el commit equivocado.
+- Si tu plan lo permite, activa **Protected Environment** para que los cambios en las variables de entorno pasen por revisión.
+- Nunca copies el **Deploy Hook URL** a un repositorio, chat público o screenshot. Si se filtra, cualquiera puede disparar deploys.
+
+### 5.4 — Rotación de secretos y mantenimiento del plan gratuito
+
+- **JWT_SECRET_KEY:** rótala cada 6–12 meses, o inmediatamente si hay sospecha de filtración. Rotarla invalida todos los access tokens vigentes; los usuarios tendrán que re-loguearse.
+- **LOG_ADMIN_EMAILS:** revísala cada vez que cambie el equipo. Un correo que ya no pertenece al proyecto es un admin no autorizado.
+- **Base de datos gratuita:** el plan Free de Render caduca periódicamente. Antes de la fecha de expiración, haz un `pg_dump` con el **External Database URL** y crea una nueva instancia con los datos migrados. No confíes en que la instancia actual sobreviva.
+- **Retención de logs:** el plan gratuito tiene cuota de almacenamiento PostgreSQL pequeña. Mantén `LOG_RETENTION_DAYS` bajo (7 días o menos) y vigila el tamaño de la tabla `logs` con:
+  ```sql
+  SELECT pg_size_pretty(pg_total_relation_size('logs'));
+  ```
+
+### 5.5 — Backups mínimos
+
+Render no ofrece backups automáticos en el plan gratuito. Define una política manual:
+
+- **Antes de cada demo:** `pg_dump` con el **External Database URL** y guarda el archivo fuera del repositorio.
+- **Después de cada demo:** verifica que el dump abra con `pg_restore --list`.
+- **Nunca** commitees un dump. Contiene hashes de contraseñas, emails y tokens de refresh.
+
+```bash
+pg_dump "postgres://gameapi:<password>@<external-host>:5432/gameapi" \
+  --format=custom --no-owner --no-acl \
+  -f gameapi-$(date +%Y%m%d).dump
+```
+
+### 5.6 — Qué **no** hace este stack
+
+Para que el equipo tenga expectativas claras, esto es lo que la configuración **no** cubre y que no debe asumirse:
+
+- **TLS de la base de datos:** el plan gratuito de Render no expone la base de datos con TLS terminado. No hay `sslmode=require` disponible. Es la razón por la que la app usa `sslmode=disable` en el exporter local y por la que el tráfico de la base de datos no debe salir de la red privada de Render.
+- **Firewall a nivel de aplicación:** el rate limiting de slowapi es defensa en profundidad; no sustituye un WAF. Si en algún momento el proyecto se expone a internet con presupuesto, se debe poner Cloudflare o Render's edge en frente.
+- **Escaneo de dependencias:** Dependabot abre PRs semanales, pero no bloquea el deploy. Un deploy con una CVE abierta sigue siendo posible. No es un problema de este prompt.
+
+## Paso 6 — Configurar GitHub Actions y Render deploy hook
 
 1. En el repositorio, crea los secrets de GitHub:
    - `RENDER_DEPLOY_HOOK_API`
