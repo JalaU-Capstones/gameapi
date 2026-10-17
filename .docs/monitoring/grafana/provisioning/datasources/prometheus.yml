@@ -1,0 +1,18 @@
+# Grafana datasource provisioning.
+#
+# Loaded on Grafana's first start. Adding or editing this file after Grafana
+# has already provisioned the datasource requires deleting the grafana_data
+# volume, or updating the datasource via the UI.
+
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
+    jsonData:
+      timeInterval: 15s
+      httpMethod: POST

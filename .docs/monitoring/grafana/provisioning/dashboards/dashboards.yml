@@ -1,0 +1,19 @@
+# Grafana dashboard provisioning.
+#
+# Grafana scans the folder below on startup and on an interval. Any JSON file
+# dropped there is loaded automatically. The folder is intentionally empty in
+# this prompt; dashboards are added in a later step.
+
+apiVersion: 1
+
+providers:
+  - name: gameapi
+    orgId: 1
+    folder: GameAPI
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: false
+    options:
+      path: /etc/grafana/provisioning/dashboards
+      foldersFromFilesStructure: false
