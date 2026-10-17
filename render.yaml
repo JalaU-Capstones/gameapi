@@ -17,6 +17,15 @@ services:
     healthCheckPath: /health
     autoDeploy: false
     envVars:
+      # ---------------------------------------------------------------------
+      # Production overrides and explicit values for every setting the app
+      # reads. Every entry below matches the "Valor recomendado" column of
+      # `.docs/deployment/README.md`.
+      #
+      # `sync: false` means the value must be set manually in the Render
+      # dashboard (secrets, project-specific URLs, admin emails). Everything
+      # else is a deliberate, documented default that should not drift.
+      # ---------------------------------------------------------------------
       - key: POSTGRES_URI
         fromDatabase:
           name: gameapi-db
@@ -59,3 +68,76 @@ services:
         value: "5.0"
       - key: LOG_RETENTION_DAYS
         value: "30"
+      # --- Auth cookie metadata (names, expiry, paths) -----------------------
+      - key: AUTH_ACCESS_COOKIE_NAME
+        value: gameapi_at
+      - key: AUTH_REFRESH_COOKIE_NAME
+        value: gameapi_rt
+      - key: AUTH_ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "15"
+      - key: AUTH_REFRESH_TOKEN_EXPIRE_DAYS
+        value: "7"
+      - key: AUTH_ACCESS_COOKIE_PATH
+        value: /
+      - key: AUTH_REFRESH_COOKIE_PATH
+        value: /api/v2/auth
+      - key: APP_PORT
+        value: "8080"
+
+      # --- Invitation lifecycle ---------------------------------------------
+      - key: INVITATION_PENDING_TTL_SECONDS
+        value: "60"
+      - key: INVITATION_QUEUED_TTL_SECONDS
+        value: "300"
+      - key: INVITATION_EXPIRY_INTERVAL_SECONDS
+        value: "10.0"
+      - key: INVITATION_QUEUED_EXPIRY_INTERVAL_SECONDS
+        value: "30.0"
+      - key: ABANDON_GRACE_SECONDS
+        value: "5.0"
+      - key: INVITATION_PAIR_MAX_ATTEMPTS
+        value: "3"
+      - key: INVITATION_PAIR_WINDOW_SECONDS
+        value: "180"
+
+      # --- Global chat -------------------------------------------------------
+      - key: CHAT_RATE_MAX_MESSAGES
+        value: "10"
+      - key: CHAT_RATE_WINDOW_SECONDS
+        value: "10.0"
+      - key: CHAT_RATE_BLOCK_SECONDS
+        value: "30.0"
+
+      # --- Log service -------------------------------------------------------
+      - key: LOG_QUEUE_MAXSIZE
+        value: "1000"
+
+      # --- Rate limiting (per route and global) -----------------------------
+      - key: RATE_LIMIT_LOGIN
+        value: 5/minute
+      - key: RATE_LIMIT_REGISTER
+        value: 3/minute
+      - key: RATE_LIMIT_REFRESH
+        value: 10/minute
+      - key: RATE_LIMIT_ANONYMOUS_DEFAULT
+        value: 60/minute
+      - key: RATE_LIMIT_AUTHENTICATED_DEFAULT
+        value: 60/minute
+      - key: RATE_LIMIT_AUTH_ME
+        value: 60/minute
+      - key: RATE_LIMIT_LOGS_ME
+        value: 30/minute
+      - key: RATE_LIMIT_LOGS_ADMIN
+        value: 300/minute
+      - key: RATE_LIMIT_CREATE_GAME
+        value: 5/minute
+      - key: RATE_LIMIT_WS_HANDSHAKE
+        value: 10/minute
+      - key: RATE_LIMIT_SESSION_TAKEOVER
+        value: 3/minute
+
+      # --- Observability (Prometheus endpoint gating) ------------------------
+      # Intentionally disabled in production. The local observability
+      # stack in docker-compose.monitoring.yml enables it only for developers.
+      - key: METRICS_ENABLED
+        value: "false"
