@@ -71,6 +71,10 @@ testpaths = ["tests"]
 timeout = 30
 filterwarnings = [
     "ignore:'asyncio\\.iscoroutinefunction' is deprecated:DeprecationWarning:slowapi.*",
+    # starlette.testclient (imported by fastapi.testclient) emits these at
+    # import time. The message-specific filters avoid masking project warnings.
+    "ignore:Using `httpx` with `starlette\\.testclient` is deprecated.*:UserWarning:fastapi\\.testclient",
+    "ignore:The anyio\\.abc\\.BlockingPortal alias is deprecated.*:DeprecationWarning:starlette\\.testclient",
 ]
 
 [tool.coverage.run]
