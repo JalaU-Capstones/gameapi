@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import suppress
 from typing import Any
 
 from fastapi import WebSocket
@@ -28,8 +29,33 @@ class ConnectionManager:
         websocket: WebSocket,
         sid: str | None = None,
     ) -> None:
+        if sid is not None:
+            existing = self._socket_for_session(user_id, sid)
+            if existing is not None and existing is not websocket:
+                with suppress(Exception):
+                    await existing.close(code=1000, reason="reconnected")
+                self.disconnect(user_id, existing)
+        elif self._connections.get(user_id):
+            existing = next(
+                (ws for ws in self._connections[user_id] if self._socket_sessions.get(ws) is None),
+                None,
+            )
+            if existing is not None and existing is not websocket:
+                with suppress(Exception):
+                    await existing.close(code=1000, reason="reconnected")
+                self.disconnect(user_id, existing)
+
         self._connections.setdefault(user_id, set()).add(websocket)
         self._socket_sessions[websocket] = sid
+
+    def _socket_for_session(self, user_id: str, sid: str) -> WebSocket | None:
+        sockets = self._connections.get(user_id)
+        if not sockets:
+            return None
+        for ws in sockets:
+            if self._socket_sessions.get(ws) == sid:
+                return ws
+        return None
 
     def disconnect(self, user_id: str, websocket: WebSocket | None = None) -> None:
         sockets = self._connections.get(user_id)
