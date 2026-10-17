@@ -6,9 +6,9 @@
 #
 # It is never deployed to Render and must not be referenced from render.yaml.
 #
-# Scope: Prometheus and Grafana live on a dedicated `monitoring` bridge network.
-# Only Grafana publishes a port, and only on 127.0.0.1. No monitoring container
-# joins the `frontend` network.
+# Scope: Prometheus, Grafana, and exporters live on a dedicated `monitoring`
+# bridge network. Only Grafana publishes a port, and only on 127.0.0.1. No
+# monitoring container joins the `frontend` network.
 
 networks:
   monitoring:
@@ -120,3 +120,122 @@ services:
       timeout: 5s
       retries: 5
       start_period: 20s
+
+  # ---------------------------------------------------------------------------
+  # cAdvisor: container-level CPU, memory, network, and filesystem metrics.
+  #
+  # The Docker socket is intentionally NOT mounted. cAdvisor reads the host
+  # filesystems in read-only mode and exposes metrics on its own HTTP port.
+  # ---------------------------------------------------------------------------
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: gameapi-cadvisor
+    restart: unless-stopped
+    command:
+      - "--housekeeping_interval=15s"
+      - "--docker_only=true"
+      - "--disable_metrics=advtcp,cpu_topology,cpuset,hugetlb,memory_numa,process,referenced_memory,resctrl,sched,tcp,udp"
+    volumes:
+      - type: bind
+        source: /sys
+        target: /sys
+        read_only: true
+      - type: bind
+        source: /proc
+        target: /proc
+        read_only: true
+      - type: bind
+        source: /var/lib/docker
+        target: /var/lib/docker
+        read_only: true
+      - type: bind
+        source: /dev/disk
+        target: /dev/disk
+        read_only: true
+      - type: bind
+        source: /etc/machine-id
+        target: /etc/machine-id
+        read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    networks:
+      - monitoring
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - SYS_PTRACE
+    read_only: false
+    devices:
+      - /dev/kmsg:/dev/kmsg:rwm
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # ---------------------------------------------------------------------------
+  # postgres-exporter: connections, locks, table sizes, index usage.
+  # Connects to PostgreSQL on the `backend` network and exposes Prometheus
+  # metrics on the `monitoring` network.
+  # ---------------------------------------------------------------------------
+  postgres-exporter:
+    image: quay.io/prometheuscommunity/postgres-exporter:v0.16.0
+    container_name: gameapi-postgres-exporter
+    restart: unless-stopped
+    environment:
+      DATA_SOURCE_NAME: "postgresql://gameapi_app:${GAMEAPI_APP_PASSWORD:-gameapi_app_dev}@postgres:5432/${POSTGRES_DB:-gameapi}?sslmode=disable"
+      PG_EXPORTER_AUTO_DISCOVER_DATABASES: "false"
+      PG_EXPORTER_EXTEND_QUERY_PATH: ""
+    networks:
+      - backend
+      - monitoring
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:size=8m,mode=1777
+    user: "65534:65534"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9187/metrics"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  # ---------------------------------------------------------------------------
+  # blackbox-exporter: probe the API health endpoint independently from the
+  # API's own instrumentation.
+  # ---------------------------------------------------------------------------
+  blackbox-exporter:
+    image: prom/blackbox-exporter:v0.25.0
+    container_name: gameapi-blackbox-exporter
+    restart: unless-stopped
+    command:
+      - "--config.file=/etc/blackbox_exporter/blackbox.yml"
+      - "--web.listen-address=0.0.0.0:9115"
+    volumes:
+      - type: bind
+        source: ./.docs/monitoring/blackbox/blackbox.yml
+        target: /etc/blackbox_exporter/blackbox.yml
+        read_only: true
+    networks:
+      - monitoring
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:size=8m,mode=1777
+    user: "65534:65534"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9115/-/healthy"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
