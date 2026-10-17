@@ -46,6 +46,31 @@ Decision: the socket is not mounted in the secure default. Only the minimum read
 
 Mitigation: the monitoring stack lives in a separate Compose overlay, is never referenced from `render.yaml`, and is intended for local development only. A CI or pre-commit check can later grep for `docker-compose.monitoring.yml` in deployment manifests to prevent accidental inclusion.
 
+### Threat 6: a developer forgets to set Grafana credentials
+
+Mitigation: the Compose overlay fails fast when `.env.monitoring` is missing or incomplete. The Grafana container requires `GF_SECURITY_ADMIN_PASSWORD`, and the value is interpolated from `.env.monitoring`, which is gitignored and never tracked by the repository. This prevents a default or empty password from being accepted by the official image.
+
+### Threat 7: a container on the monitoring network calls Prometheus reload endpoints
+
+Mitigation: Prometheus is started with `--web.enable-lifecycle`, which enables the `POST /-/reload` endpoint for dynamic config reloads. This is acceptable in a local-only developer workflow because Prometheus is not published and only containers on the `monitoring` network can reach it.
+
+## Prompt 3 — Prometheus and Grafana hardening
+
+| Control | Value | Service | Rationale |
+|---|---|---|---|
+| Port binding | `127.0.0.1:3001:3000` | Grafana | Loopback only; not reachable from the LAN |
+| No published port | — | Prometheus | Reachable only from the `monitoring` network |
+| `read_only: true` | Both | Prometheus, Grafana | Filesystem is immutable except for named volumes and tmpfs |
+| `no-new-privileges:true` | Both | Prometheus, Grafana | Blocks setuid/setgid escalation |
+| `cap_drop: [ALL]` | Both | Prometheus, Grafana | No Linux capabilities |
+| Non-root user | `65534:65534` / `472:472` | Prometheus, Grafana | Official image UIDs |
+| Fail-fast on missing password | `:?` in Compose | Grafana | Prevents starting with a default or empty admin password |
+| Anonymous access | Disabled | Grafana | `GF_AUTH_ANONYMOUS_ENABLED=false` |
+| Self-registration | Disabled | Grafana | `GF_USERS_ALLOW_SIGN_UP=false` |
+| Editable datasource | Disabled | Grafana | Provisioned state cannot drift from the file |
+| Editable dashboards | Disabled | Grafana | Provisioned JSON is the source of truth |
+| Retention | 7 days | Prometheus | Caps disk usage for a laptop workflow |
+
 ## Hardening checklist
 
 | Control | Value | Applies to | Rationale |
