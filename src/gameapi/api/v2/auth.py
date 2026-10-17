@@ -1,8 +1,17 @@
+import logging
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import APIRouter, Cookie, HTTPException, Request, Response, status
 
-from gameapi.api.deps import AuthServiceDep, CurrentUser
+from gameapi.api.deps import (
+    AuthHTTPException,
+    AuthServiceDep,
+    CurrentSidDep,
+    CurrentUser,
+    GameplayServiceDep,
+    SessionRepositoryDep,
+)
 from gameapi.api.v2.ws.manager import chat_manager, gameplays_manager, presence_manager
 from gameapi.core.config import settings
 from gameapi.core.idempotency import (
@@ -16,9 +25,12 @@ from gameapi.schemas.auth import LoginRequest, LoginResponse, RefreshResponse
 from gameapi.schemas.user import UserCreate, UserResponse
 from gameapi.services.exceptions import (
     EmailAlreadyExistsError,
+    GameInProgressError,
     InvalidCredentialsError,
     InvalidRefreshTokenError,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -244,6 +256,13 @@ async def logout(
     summary="Force a takeover of all active websocket sessions for the current user",
     responses={
         401: {"description": "Not authenticated"},
+        409: {
+            "description": (
+                "Takeover is unavailable while a game is in progress "
+                "(GAME_IN_PROGRESS), or for legacy tokens without a session "
+                "(SESSION_REQUIRED)."
+            )
+        },
         429: {"description": "Rate limit exceeded"},
     },
 )
@@ -252,19 +271,40 @@ async def takeover_session(
     request: Request,
     response: Response,
     current_user: CurrentUser,
+    current_sid: CurrentSidDep,
+    session_repo: SessionRepositoryDep,
+    gameplay_service: GameplayServiceDep,
 ) -> Response:
     del request
-    revoked = 0
-    for manager in (gameplays_manager, presence_manager, chat_manager):
-        revoked += int(await manager.revoke_all_user_sockets(current_user.id))
+    if current_sid is None:
+        raise AuthHTTPException(409, "A session-bound token is required", "SESSION_REQUIRED")
 
-    logger = __import__("logging").getLogger(__name__)
+    if await gameplay_service.find_active_game_for_user(current_user.id) is not None:
+        error = GameInProgressError(current_user.id)
+        raise AuthHTTPException(
+            409,
+            str(error),
+            "GAME_IN_PROGRESS",
+        ) from error
+
+    current_session = await session_repo.get_by_id(UUID(current_sid))
+    if current_session is None or current_session.revoked_at is not None:
+        raise AuthHTTPException(401, "Session ended", "SESSION_REVOKED")
+
+    revoked_sessions = await session_repo.revoke_all_for_user(
+        UUID(current_user.id),
+        "session_replaced",
+        exclude_session_id=UUID(current_sid),
+    )
+    for manager in (gameplays_manager, presence_manager, chat_manager):
+        await manager.close_sessions_except(current_user.id, current_sid)
+
     logger.info(
         "Session takeover requested",
         extra={
             "event_type": "session_takeover",
-            "user_id": current_user.id,
-            "metadata": {"revoked_sessions": revoked},
+            "player_id": current_user.id,
+            "metadata": {"revoked_sessions": revoked_sessions},
         },
     )
 
