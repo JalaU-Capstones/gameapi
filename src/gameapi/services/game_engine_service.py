@@ -328,15 +328,14 @@ class GameEngineService:
                     "payload": {"game_id": str(gameplay.id), "reason": "timeout"},
                 },
             )
+            expiration_event = {
+                "event": "invitation_expired",
+                "payload": {"game_id": str(gameplay.id), "reason": "timeout"},
+            }
             if host_id:
-                await gameplays_manager.send_to(
-                    host_id,
-                    {
-                        "event": "invitation_expired",
-                        "payload": {"game_id": str(gameplay.id), "reason": "timeout"},
-                    },
-                )
+                await gameplays_manager.send_to(host_id, expiration_event)
             if guest_id:
+                await gameplays_manager.send_to(guest_id, expiration_event)
                 await self._promote_next_queued_for_guest(guest_id, reason="previous_expired")
             count += 1
         return count
@@ -372,17 +371,15 @@ class GameEngineService:
                     "payload": {"game_id": str(gameplay.id), "reason": "timeout"},
                 },
             )
-            await gameplays_manager.send_to(
-                host_id,
-                {
-                    "event": "invitation_expired",
-                    "payload": {"game_id": str(gameplay.id), "reason": "timeout"},
-                },
-            )
+            expiration_event = {
+                "event": "invitation_expired",
+                "payload": {"game_id": str(gameplay.id), "reason": "timeout"},
+            }
+            await gameplays_manager.send_to(host_id, expiration_event)
             if gameplay.guest_player is not None:
-                await self._promote_next_queued_for_guest(
-                    str(gameplay.guest_player), reason="previous_expired"
-                )
+                guest_id = str(gameplay.guest_player)
+                await gameplays_manager.send_to(guest_id, expiration_event)
+                await self._promote_next_queued_for_guest(guest_id, reason="previous_expired")
             count += 1
         return count
 
