@@ -37,7 +37,7 @@ class AccessTokenClaims(BaseModel):
     sub: str
     email: EmailStr
     name: str
-    sid: str
+    sid: str | None = None
     jti: str
     iat: int
     exp: int
@@ -45,24 +45,37 @@ class AccessTokenClaims(BaseModel):
     aud: str
 
 
-def create_access_token_short(*, subject: str, email: str, name: str, sid: str) -> str:
+def create_access_token_short(
+    *,
+    subject: str,
+    email: str,
+    name: str,
+    sid: str | None = None,
+) -> str:
     now = datetime.now(UTC)
     expires_at = now + timedelta(minutes=settings.auth.access_token_expire_minutes)
     claims = {
         "sub": subject,
         "email": email,
         "name": name,
-        "sid": sid,
         "jti": str(uuid4()),
         "iat": int(now.timestamp()),
         "exp": int(expires_at.timestamp()),
         "iss": settings.jwt.issuer,
         "aud": settings.jwt.audience,
     }
+    if sid is not None:
+        claims["sid"] = sid
     return str(jwt.encode(claims, settings.jwt.secret_key, algorithm=settings.jwt.algorithm))
 
 
-def create_access_token(*, subject: str, email: str, name: str) -> str:
+def create_access_token(
+    *,
+    subject: str,
+    email: str,
+    name: str,
+    sid: str | None = None,
+) -> str:
     now = datetime.now(UTC)
     expires_at = now + timedelta(minutes=settings.jwt.expire_minutes)
     claims = {
@@ -75,6 +88,8 @@ def create_access_token(*, subject: str, email: str, name: str) -> str:
         "iss": settings.jwt.issuer,
         "aud": settings.jwt.audience,
     }
+    if sid is not None:
+        claims["sid"] = sid
     return str(jwt.encode(claims, settings.jwt.secret_key, algorithm=settings.jwt.algorithm))
 
 

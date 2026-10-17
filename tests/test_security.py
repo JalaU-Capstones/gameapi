@@ -31,6 +31,18 @@ def test_create_and_decode_access_token() -> None:
     assert claims.iss == "GameAPI"
     assert claims.aud == "GameAPI"
     assert claims.exp > claims.iat
+    assert claims.sid is None
+
+
+def test_access_token_includes_optional_session_id() -> None:
+    token = create_access_token(
+        subject="65f0a1b2c3d4e5f60718293a",
+        email="user@example.com",
+        name="User",
+        sid="session-123",
+    )
+
+    assert decode_access_token(token).sid == "session-123"
 
 
 def test_decode_tampered_token_raises() -> None:

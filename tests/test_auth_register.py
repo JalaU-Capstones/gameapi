@@ -36,7 +36,13 @@ async def test_register_response_shape_matches_login(client: AsyncClient) -> Non
     )
     assert response.status_code == 201, response.text
     body = response.json()
-    assert set(body.keys()) == {"access_token", "token_type", "user"}
+    assert set(body.keys()) == {
+        "access_token",
+        "token_type",
+        "user",
+        "other_active_sessions",
+    }
+    assert body["other_active_sessions"] == 0
     assert body["token_type"] == "bearer"
 
 
