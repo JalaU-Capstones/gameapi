@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help install dev run test test-cov lint format typecheck clean docker-up docker-down docker-logs docker-reset test-clean migrate migrate-create pre-commit pre-commit-install openapi-export openapi-check asyncapi-validate contracts-check
+.PHONY: help install dev run test test-cov lint format typecheck clean docker-up docker-down docker-logs docker-reset test-clean migrate migrate-create pre-commit pre-commit-install openapi-export openapi-check asyncapi-validate contracts-check monitoring-up monitoring-down monitoring-logs monitoring-clean
 
 help:
 	@echo "Comandos disponibles:"
@@ -18,6 +18,10 @@ help:
 	@echo "  make clean       Limpia cachés y artefactos"
 	@echo "  make docker-up   Levanta PostgreSQL y la API con docker-compose"
 	@echo "  make docker-down Detiene los contenedores"
+	@echo "  make monitoring-up     Inicia la API + PostgreSQL + Prometheus + Grafana"
+	@echo "  make monitoring-down   Detiene la pila de monitoreo, conserva volúmenes"
+	@echo "  make monitoring-logs   Sigue los logs de Prometheus y Grafana"
+	@echo "  make monitoring-clean  Para la pila y borra los volúmenes de monitoreo"
 	@echo "  make migrate     Aplica las migraciones de Alembic"
 	@echo "  make migrate-create Crea una migración de Alembic"
 
@@ -54,6 +58,23 @@ docker-logs:
 
 docker-reset:
 	docker compose down -v
+
+# ---------------------------------------------------------------------------
+# Observability stack (local only)
+# ---------------------------------------------------------------------------
+COMPOSE_MONITORING = docker compose -f docker-compose.yml -f docker-compose.monitoring.yml
+
+monitoring-up: ## Start the API + PostgreSQL + Prometheus + Grafana
+	$(COMPOSE_MONITORING) up -d
+
+monitoring-down: ## Stop the monitoring stack, keep volumes
+	$(COMPOSE_MONITORING) down
+
+monitoring-logs: ## Tail logs from the monitoring containers
+	$(COMPOSE_MONITORING) logs -f prometheus grafana
+
+monitoring-clean: ## Stop the monitoring stack and wipe its volumes (destructive)
+	$(COMPOSE_MONITORING) down -v
 
 test:
 	uv run pytest -v
