@@ -7,8 +7,8 @@ REST API para gestión de usuarios y partidas de Tic-Tac-Toe.
 [![Render](https://img.shields.io/badge/Render-production-46E3B7?logo=render&logoColor=white)](https://gameapi-9vos.onrender.com/health)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg)](https://fastapi.tiangolo.com/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![Tests](https://img.shields.io/badge/tests-391%20passed-success.svg)](#pruebas)
-[![Coverage](https://img.shields.io/badge/coverage-92.53%25-orange.svg)](#cobertura)
+[![Tests](https://img.shields.io/badge/tests-402%20passed-success.svg)](#pruebas)
+[![Coverage](https://img.shields.io/badge/coverage-93%25-green.svg)](#cobertura)
 
 **Stack:** Python 3.11+ · FastAPI · PostgreSQL 16 · SQLAlchemy 2.0 async · Pydantic v2 · JWT · WebSocket · uv · Docker
 
@@ -223,6 +223,7 @@ Todas las variables se leen desde `.env` (ver `.env.example`):
 | `CHAT_RATE_WINDOW_SECONDS`          | Ventana de chat en segundos                        | `10.0`                                                         |
 | `CHAT_RATE_BLOCK_SECONDS`           | Bloqueo tras exceder el rate limit de chat         | `30.0`                                                         |
 | `RATE_LIMIT_CREATE_GAME`            | Límite de creación de partidas por host            | `5/minute`                                                     |
+| `METRICS_ENABLED`                   | Expone `/metrics` para Prometheus. Desactivado por defecto. | `false`                                              |
 
 ---
 
@@ -646,8 +647,8 @@ make test
 Salida esperada:
 
 ```
-364 passed in 226.98s
-Required test coverage of 93.0% not reached. Total coverage: 91.00%
+402 passed in 215.40s
+Required test coverage of 93.0% reached. Total coverage: 93.46%
 ```
 
 Los tests usan **PostgreSQL** de dos formas según el entorno:
@@ -717,7 +718,7 @@ El flujo de invitaciones sigue una secuencia simple: la invitación queda `pendi
 
 **Umbral mínimo:** 93% (configurado en `pyproject.toml` → `[tool.coverage.report] fail_under`).
 
-**Cobertura actual:** 91.00% (reporte medido con `pytest-cov` en esta sesión; redondeado a 91% en el badge).
+**Cobertura actual:** 93% (93.46% medido con `pytest-cov`; redondeado hacia abajo en el badge).
 
 | Archivo                                  | Tests | Qué cubre                                                                   |
 |------------------------------------------|-------|-----------------------------------------------------------------------------|
@@ -735,6 +736,10 @@ El flujo de invitaciones sigue una secuencia simple: la invitación queda `pendi
 | `tests/test_ws_gameplays.py`             | 11    | Auth WS, ping/pong, subscribe/unsubscribe, cleanup.                         |
 | `tests/test_ws_game_flow.py`             | 12    | Flujo completo de partida, rechazo, abandono, empate y errores WS.         |
 | `tests/test_ws_presence.py`              | 10    | Presencia en línea y eventos de conexión/desconexión.                       |
+| `tests/test_metrics.py`                  | 5     | Gating de `/metrics`, comportamiento del endpoint y handlers excluidos.     |
+| `tests/test_invitation_retry.py`         | 10    | Retry tracker de ventana deslizante, topes de intentos y reinicio.          |
+| `tests/test_ws_rate_limit.py`            | 13    | Parsing de `UserWindowLimiter`, ventana deslizante y reinicio.              |
+| `tests/test_invitation_expiry.py`        | 2     | Los bucles de expiración llaman al engine con el TTL configurado.           |
 
 **Reporte HTML** (local, tras `make test-cov`):
 
@@ -785,6 +790,23 @@ contexto de las coroutines, y Coverage.py requiere esta declaración explícita
 para rastrear los frames correctamente en Python 3.11–3.14. Sin esta
 configuración, la cobertura se reportaba erróneamente en versiones anteriores
 a 3.14.
+
+---
+
+## Monitoreo
+
+El backend incluye un stack de observabilidad local con Prometheus, Grafana, cAdvisor, postgres-exporter y blackbox-exporter. Es **opt-in** y nunca se despliega a Render.
+
+- **Documentación:** [`.docs/monitoring/README.md`](./.docs/monitoring/README.md)
+- **Modelo de amenaza:** [`.docs/monitoring/SECURITY.md`](./.docs/monitoring/SECURITY.md)
+- **Guion de demo:** [`.docs/monitoring/DEMO.md`](./.docs/monitoring/DEMO.md)
+- **Comandos:** `make monitoring-up`, `make monitoring-down`, `make monitoring-logs`, `make monitoring-clean`, `make monitoring-capture`
+
+### Gating del endpoint `/metrics`
+
+El endpoint `/metrics` solo se registra cuando `METRICS_ENABLED=true`. Por defecto está **desactivado**, incluso en producción. El overlay `docker-compose.monitoring.yml` lo activa únicamente en la máquina del desarrollador. En Render no se configura la variable, por lo que `https://<host>/metrics` devuelve **404**.
+
+`/metrics` **no** forma parte del contrato OpenAPI: en `main.py` se registra con `include_in_schema=False`, y la documentación correcta para operadores vive en `.docs/monitoring/README.md` y `.docs/deployment/README.md`, no en Swagger UI, Postman ni Insomnia.
 
 ---
 
@@ -940,6 +962,7 @@ gameapi/
 │   ├── collections/                   # Colecciones Postman / Insomnia
 │   ├── contracts/                     # OpenAPI + AsyncAPI
 │   ├── deployment/
+│   ├── monitoring/                    # Stack local de observabilidad
 │   └── rate-limiting/
 ├── scripts/
 ├── .python-version
