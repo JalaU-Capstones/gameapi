@@ -83,6 +83,22 @@ services:
       RATE_LIMIT_LOGS_ADMIN: ${RATE_LIMIT_LOGS_ADMIN:-300/minute}
       RATE_LIMIT_WS_HANDSHAKE: ${RATE_LIMIT_WS_HANDSHAKE:-10/minute}
       RATE_LIMIT_SESSION_TAKEOVER: ${RATE_LIMIT_SESSION_TAKEOVER:-3/minute}
+      # --- Invitation lifecycle --------------------------------------------
+      INVITATION_PENDING_TTL_SECONDS: ${INVITATION_PENDING_TTL_SECONDS:-60}
+      INVITATION_QUEUED_TTL_SECONDS: ${INVITATION_QUEUED_TTL_SECONDS:-300}
+      INVITATION_EXPIRY_INTERVAL_SECONDS: ${INVITATION_EXPIRY_INTERVAL_SECONDS:-10.0}
+      INVITATION_QUEUED_EXPIRY_INTERVAL_SECONDS: ${INVITATION_QUEUED_EXPIRY_INTERVAL_SECONDS:-30.0}
+      ABANDON_GRACE_SECONDS: ${ABANDON_GRACE_SECONDS:-5.0}
+      INVITATION_PAIR_MAX_ATTEMPTS: ${INVITATION_PAIR_MAX_ATTEMPTS:-3}
+      INVITATION_PAIR_WINDOW_SECONDS: ${INVITATION_PAIR_WINDOW_SECONDS:-180}
+      # --- Global chat -----------------------------------------------------
+      CHAT_RATE_MAX_MESSAGES: ${CHAT_RATE_MAX_MESSAGES:-10}
+      CHAT_RATE_WINDOW_SECONDS: ${CHAT_RATE_WINDOW_SECONDS:-10.0}
+      CHAT_RATE_BLOCK_SECONDS: ${CHAT_RATE_BLOCK_SECONDS:-30.0}
+      # --- Invitation create rate limit ------------------------------------
+      RATE_LIMIT_CREATE_GAME: ${RATE_LIMIT_CREATE_GAME:-5/minute}
+      # --- Observability ---------------------------------------------------
+      METRICS_ENABLED: ${METRICS_ENABLED:-false}
     depends_on:
       postgres:
         condition: service_healthy
