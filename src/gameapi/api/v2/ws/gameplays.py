@@ -351,26 +351,11 @@ async def _handle_message(
                         "attempt": result["attempt"],
                         "remaining_attempts": result["remaining_attempts"],
                         "idempotent": result["idempotent"],
+                        "updated_at": result["updated_at"],
                     },
                 }
             )
 
-            if not result["idempotent"]:
-                gameplay = await engine_service.gameplay_service.get_by_id(payload_retry.game_id)
-                guest_id = gameplay.guest_player if gameplay else None
-                if guest_id is not None:
-                    host = await engine_service.user_service.get_by_id(user_id)
-                    host_name = host.name if host else "Unknown"
-                    await gameplays_manager.send_to(
-                        guest_id,
-                        {
-                            "event": "invitation_received",
-                            "payload": {
-                                "game_id": payload_retry.game_id,
-                                "host": {"id": user_id, "name": host_name},
-                            },
-                        },
-                    )
             return current_game_id
 
         if event == "play_move":

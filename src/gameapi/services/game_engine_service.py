@@ -162,19 +162,47 @@ class GameEngineService:
         await self._promote_next_queued_for_guest(guest_id, reason="previous_rejected")
 
     async def retry_invitation(self, game_id: str, host_id: str) -> dict[str, Any]:
-        gameplay = await self.gameplay_service.get_by_id(game_id)
+        gameplay = await self.gameplay_service.get_by_id_for_update(game_id)
         if not gameplay:
             raise GameplayNotFoundError(game_id)
 
         if gameplay.host_player != host_id:
             raise NotAParticipantError(host_id, game_id)
 
+        guest_id = str(gameplay.guest_player)
+        host = await self.user_service.get_by_id(host_id)
+        host_name = host.name if host is not None else "Unknown"
+        event = {
+            "event": "invitation_received",
+            "payload": {"game_id": game_id, "host": {"id": host_id, "name": host_name}},
+        }
+
         if gameplay.invitation_state == "pending":
+            updated_at = await self.gameplay_service.touch_updated_date(game_id)
+            if updated_at is None:
+                raise GameplayNotFoundError(game_id)
+            await self.gameplay_service.commit()
+            await self.event_bus.publish(game_id, event)
+            await gameplays_manager.send_to(guest_id, event)
+            logger.info(
+                "Invitation retry idempotent resend",
+                extra={
+                    "event_type": "invitation_retried",
+                    "player_id": host_id,
+                    "gameplay_id": game_id,
+                    "metadata": {
+                        "attempt": 0,
+                        "remaining_attempts": settings.invitation.pair_max_attempts,
+                        "guest_id": guest_id,
+                    },
+                },
+            )
             return {
                 "game_id": game_id,
                 "attempt": 0,
                 "remaining_attempts": settings.invitation.pair_max_attempts,
                 "idempotent": True,
+                "updated_at": updated_at.isoformat(),
             }
 
         if gameplay.invitation_state == "accepted":
@@ -183,10 +211,9 @@ class GameEngineService:
         if gameplay.invitation_state not in {"rejected", "expired", "canceled"}:
             raise InvitationNotPendingError(game_id)
 
-        guest_id = str(gameplay.guest_player)
         attempt, remaining = invitation_retry_tracker.check_and_record(host_id, guest_id)
 
-        await self.gameplay_service.update(
+        updated_gameplay = await self.gameplay_service.update(
             game_id,
             GameplayUpdate(
                 invitation_state="pending",
@@ -196,12 +223,7 @@ class GameEngineService:
             ),
         )
 
-        host = await self.user_service.get_by_id(host_id)
-        host_name = host.name if host is not None else "Unknown"
-        event = {
-            "event": "invitation_received",
-            "payload": {"game_id": game_id, "host": {"id": host_id, "name": host_name}},
-        }
+        await self.gameplay_service.commit()
         await self.event_bus.publish(game_id, event)
         await gameplays_manager.send_to(guest_id, event)
 
@@ -223,6 +245,7 @@ class GameEngineService:
             "attempt": attempt,
             "remaining_attempts": remaining,
             "idempotent": False,
+            "updated_at": updated_gameplay.updated_date.isoformat(),
         }
 
     async def _replace_displaced_invitations(self, guest_id: str, accepted_game_id: str) -> int:
@@ -301,15 +324,12 @@ class GameEngineService:
         expired_rows = await self.gameplay_service.find_expired_pending(cutoff)
         count = 0
         for gameplay in expired_rows:
-            if gameplay.invitation_state != "pending":
-                continue
-            if gameplay.match_result is not None:
-                continue
-            await self.gameplay_service.update_invitation_state(
-                str(gameplay.id),
-                "expired",
-                match_result={"winner": None, "reason": "expired"},
+            updated_at = await self.gameplay_service.expire_if_stale(
+                str(gameplay.id), "pending", cutoff
             )
+            if updated_at is None:
+                continue
+            await self.gameplay_service.commit()
             host_id = str(gameplay.host_player)
             guest_id = str(gameplay.guest_player) if gameplay.guest_player is not None else None
             logger.info(
@@ -325,12 +345,20 @@ class GameEngineService:
                 str(gameplay.id),
                 {
                     "event": "invitation_expired",
-                    "payload": {"game_id": str(gameplay.id), "reason": "timeout"},
+                    "payload": {
+                        "game_id": str(gameplay.id),
+                        "reason": "timeout",
+                        "updated_at": updated_at.isoformat(),
+                    },
                 },
             )
             expiration_event = {
                 "event": "invitation_expired",
-                "payload": {"game_id": str(gameplay.id), "reason": "timeout"},
+                "payload": {
+                    "game_id": str(gameplay.id),
+                    "reason": "timeout",
+                    "updated_at": updated_at.isoformat(),
+                },
             }
             if host_id:
                 await gameplays_manager.send_to(host_id, expiration_event)
@@ -345,15 +373,12 @@ class GameEngineService:
         expired_rows = await self.gameplay_service.find_expired_queued(cutoff)
         count = 0
         for gameplay in expired_rows:
-            if gameplay.invitation_state != "queued":
-                continue
-            if gameplay.match_result is not None:
-                continue
-            await self.gameplay_service.update_invitation_state(
-                str(gameplay.id),
-                "expired",
-                match_result={"winner": None, "reason": "expired"},
+            updated_at = await self.gameplay_service.expire_if_stale(
+                str(gameplay.id), "queued", cutoff
             )
+            if updated_at is None:
+                continue
+            await self.gameplay_service.commit()
             host_id = str(gameplay.host_player)
             logger.info(
                 "Invitation expired",
@@ -368,12 +393,20 @@ class GameEngineService:
                 str(gameplay.id),
                 {
                     "event": "invitation_expired",
-                    "payload": {"game_id": str(gameplay.id), "reason": "timeout"},
+                    "payload": {
+                        "game_id": str(gameplay.id),
+                        "reason": "timeout",
+                        "updated_at": updated_at.isoformat(),
+                    },
                 },
             )
             expiration_event = {
                 "event": "invitation_expired",
-                "payload": {"game_id": str(gameplay.id), "reason": "timeout"},
+                "payload": {
+                    "game_id": str(gameplay.id),
+                    "reason": "timeout",
+                    "updated_at": updated_at.isoformat(),
+                },
             }
             await gameplays_manager.send_to(host_id, expiration_event)
             if gameplay.guest_player is not None:

@@ -2,7 +2,7 @@ import uuid
 from collections.abc import Sequence
 from datetime import datetime
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from gameapi.db.models.gameplay import Gameplay
@@ -26,6 +26,46 @@ class GameplayRepository:
 
     async def get_by_id(self, gameplay_id: uuid.UUID) -> Gameplay | None:
         result = await self._session.execute(select(Gameplay).where(Gameplay.id == gameplay_id))
+        return result.scalar_one_or_none()
+
+    async def get_by_id_for_update(self, gameplay_id: uuid.UUID) -> Gameplay | None:
+        result = await self._session.execute(
+            select(Gameplay)
+            .where(Gameplay.id == gameplay_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+        return result.scalar_one_or_none()
+
+    async def touch_updated_date(self, gameplay_id: uuid.UUID) -> datetime | None:
+        result = await self._session.execute(
+            update(Gameplay)
+            .where(Gameplay.id == gameplay_id)
+            .values(updated_date=func.now())
+            .returning(Gameplay.updated_date)
+            .execution_options(synchronize_session="fetch")
+        )
+        return result.scalar_one_or_none()
+
+    async def expire_if_stale(
+        self, gameplay_id: uuid.UUID, state: str, cutoff: datetime
+    ) -> datetime | None:
+        result = await self._session.execute(
+            update(Gameplay)
+            .where(
+                Gameplay.id == gameplay_id,
+                Gameplay.invitation_state == state,
+                Gameplay.updated_date < cutoff,
+                _NO_RESULT,
+            )
+            .values(
+                invitation_state="expired",
+                match_result={"winner": None, "reason": "expired"},
+                updated_date=func.now(),
+            )
+            .returning(Gameplay.updated_date)
+            .execution_options(synchronize_session="fetch")
+        )
         return result.scalar_one_or_none()
 
     async def list_by_player(self, player_id: uuid.UUID) -> Sequence[Gameplay]:

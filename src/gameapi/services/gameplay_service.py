@@ -76,6 +76,32 @@ class GameplayService:
             return None
         return self._to_response(gameplay)
 
+    async def get_by_id_for_update(self, gameplay_id: str) -> GameplayResponse | None:
+        try:
+            parsed_id = uuid.UUID(gameplay_id)
+        except ValueError:
+            return None
+        gameplay = await self._repo.get_by_id_for_update(parsed_id)
+        if gameplay is None:
+            return None
+        return self._to_response(gameplay)
+
+    async def touch_updated_date(self, gameplay_id: str) -> datetime | None:
+        try:
+            parsed_id = uuid.UUID(gameplay_id)
+        except ValueError:
+            return None
+        return await self._repo.touch_updated_date(parsed_id)
+
+    async def expire_if_stale(
+        self, gameplay_id: str, state: str, cutoff: datetime
+    ) -> datetime | None:
+        try:
+            parsed_id = uuid.UUID(gameplay_id)
+        except ValueError:
+            return None
+        return await self._repo.expire_if_stale(parsed_id, state, cutoff)
+
     async def list_by_player(self, player_id: str) -> list[GameplayResponse]:
         try:
             parsed_id = uuid.UUID(player_id)
@@ -119,6 +145,15 @@ class GameplayService:
 
     async def get_next_queued_for_guest(self, guest_id: str) -> Gameplay | None:
         return await self.find_next_queued_for_guest(guest_id)
+
+    async def commit(self) -> None:
+        """Commit the current session. Used by callers that own the transaction
+        boundary, such as the background expiry loops."""
+        await self._session.commit()
+
+    async def rollback(self) -> None:
+        """Roll back the current session. Paired with `commit` for error paths."""
+        await self._session.rollback()
 
     async def update_invitation_state(
         self,

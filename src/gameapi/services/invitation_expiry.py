@@ -19,10 +19,15 @@ async def run_pending_expiry_loop(
     while True:
         try:
             await engine.expire_pending_invitations(older_than_seconds=ttl_seconds)
+            await engine.gameplay_service.commit()
         except asyncio.CancelledError:
             raise
         except Exception:
             logger.exception("pending_expiry_failed")
+            try:
+                await engine.gameplay_service.rollback()
+            except Exception:
+                logger.exception("pending_expiry_rollback_failed")
         await asyncio.sleep(interval_seconds)
 
 
@@ -35,8 +40,13 @@ async def run_queued_expiry_loop(
     while True:
         try:
             await engine.expire_queued_invitations(older_than_seconds=ttl_seconds)
+            await engine.gameplay_service.commit()
         except asyncio.CancelledError:
             raise
         except Exception:
             logger.exception("queued_expiry_failed")
+            try:
+                await engine.gameplay_service.rollback()
+            except Exception:
+                logger.exception("queued_expiry_rollback_failed")
         await asyncio.sleep(interval_seconds)
