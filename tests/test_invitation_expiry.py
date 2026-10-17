@@ -42,7 +42,7 @@ async def test_run_pending_expiry_loop_logs_exception_and_stops_on_cancel(
 
     assert calls == [42, 42]
     assert sleep_calls == [5.0]
-    assert logged == ["pending_expiry_failed"]
+    assert logged == ["pending_expiry_failed", "pending_expiry_rollback_failed"]
 
 
 async def test_run_queued_expiry_loop_logs_exception_and_stops_on_cancel(
@@ -79,4 +79,4 @@ async def test_run_queued_expiry_loop_logs_exception_and_stops_on_cancel(
 
     assert calls == [120, 120]
     assert sleep_calls == [10.0]
-    assert logged == ["queued_expiry_failed"]
+    assert logged == ["queued_expiry_failed", "queued_expiry_rollback_failed"]

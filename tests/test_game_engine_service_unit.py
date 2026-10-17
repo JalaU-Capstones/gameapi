@@ -446,18 +446,86 @@ async def test_expire_pending_and_queued_invitations_marks_them_expired(
 
 
 async def test_retry_invitation_is_idempotent_for_pending_game(
-    engine_service: GameEngineService, db_session: AsyncSession
+    engine_service: GameEngineService, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     host_id, guest_id = await _create_users(db_session)
     game_id = await engine_service.create_game(host_id, guest_id)
+
+    sent_events: list[tuple[str, dict[str, Any]]] = []
+
+    async def fake_send_to(player_id: str, event: dict[str, Any]) -> None:
+        sent_events.append((player_id, event))
+
+    monkeypatch.setattr(
+        "gameapi.services.game_engine_service.gameplays_manager.send_to",
+        fake_send_to,
+    )
 
     result = await engine_service.retry_invitation(game_id, host_id)
 
     assert result["idempotent"] is True
     assert result["remaining_attempts"] == settings.invitation.pair_max_attempts
+    assert sent_events == [
+        (
+            guest_id,
+            {
+                "event": "invitation_received",
+                "payload": {"game_id": game_id, "host": {"id": host_id, "name": "Host"}},
+            },
+        )
+    ]
     gameplay = await engine_service.gameplay_service.get_by_id(game_id)
     assert gameplay is not None
     assert gameplay.invitation_state == "pending"
+
+
+async def test_retry_after_expiry_refreshes_pending_ttl(
+    engine_service: GameEngineService,
+    db_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    host_id, guest_id = await _create_users(db_session)
+    game_id = await engine_service.create_game(host_id, guest_id)
+    gameplay = await engine_service.gameplay_service.get_by_id(game_id)
+    assert gameplay is not None
+    await db_session.execute(
+        text("UPDATE gameplays SET updated_date = :updated_date WHERE id = :game_id"),
+        {
+            "updated_date": gameplay.updated_date - timedelta(days=2),
+            "game_id": gameplay.id,
+        },
+    )
+    await db_session.commit()
+    await engine_service.expire_pending_invitations(older_than_seconds=1)
+
+    event_order: list[str] = []
+    original_commit = engine_service.gameplay_service.commit
+
+    async def tracked_commit() -> None:
+        await original_commit()
+        event_order.append("commit")
+
+    async def tracked_publish(gameplay_id: str, event: dict[str, Any]) -> None:
+        event_order.append("publish")
+
+    async def fake_send_to(player_id: str, event: dict[str, Any]) -> None:
+        event_order.append("send")
+
+    monkeypatch.setattr(engine_service.gameplay_service, "commit", tracked_commit)
+    monkeypatch.setattr(engine_service.event_bus, "publish", tracked_publish)
+    monkeypatch.setattr(
+        "gameapi.services.game_engine_service.gameplays_manager.send_to",
+        fake_send_to,
+    )
+
+    result = await engine_service.retry_invitation(game_id, host_id)
+    await engine_service.expire_pending_invitations(older_than_seconds=1)
+
+    refreshed = await engine_service.gameplay_service.get_by_id(game_id)
+    assert refreshed is not None
+    assert refreshed.invitation_state == "pending"
+    assert result["updated_at"] == refreshed.updated_date.isoformat()
+    assert event_order == ["commit", "publish", "send"]
 
 
 async def test_retry_invitation_restarts_rejected_invite_and_tracks_attempts(
