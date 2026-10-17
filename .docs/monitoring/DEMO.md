@@ -64,6 +64,30 @@ Prometheus is pre-provisioned as the datasource, and all four dashboards are alr
   ```
   The panel should turn green within 30 seconds.
 
+### Optional: capture API traffic (1 minute)
+
+This is an opt-in demonstration. The capture service shares the API container's network namespace and captures port 8080 only; it does not capture host traffic. The pcap may contain request data and credentials, so do not commit or share it.
+
+In a separate terminal, run `make monitoring-capture`. Generate an API request from another terminal, then press Ctrl+C to stop tcpdump:
+
+```bash
+curl -i http://localhost:8080/health
+```
+
+Export and inspect the pcap with Wireshark:
+
+```bash
+make monitoring-capture-export
+wireshark capture/api.pcap
+```
+
+Afterward, remove the local pcap and the volume-backed capture:
+
+```bash
+rm capture/api.pcap
+make monitoring-capture-clean
+```
+
 ### 7. Render (30 seconds)
 
 Open `https://gameapi-9vos.onrender.com/docs` in a browser.
@@ -75,7 +99,8 @@ Explain that the production API runs the same application code, but `/metrics` i
 Stop the background traffic loop with Ctrl+C, then run:
 
 ```bash
+make monitoring-capture-clean
 make monitoring-clean
 ```
 
-This removes the Prometheus and Grafana data volumes while preserving PostgreSQL data.
+If you exported a pcap, remove `capture/api.pcap` separately. The capture-clean target clears its container and volume; monitoring-clean removes the Prometheus and Grafana data volumes while preserving PostgreSQL data.

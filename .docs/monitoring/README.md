@@ -1,12 +1,12 @@
 # Observability stack (local only)
 
-Local metrics, dashboards, and container health checks for the GameAPI backend.
+Local metrics, dashboards, and container health checks for the GameAPI backend, with an opt-in API packet capture.
 
 ## Scope and non-goals
 
 - Local development only.
 - Never deployed to Render.
-- Metrics only: no logs, no traces.
+- Metrics by default; packet capture is opt-in.
 - Not included in the default Docker Compose stack.
 
 ## Topology
@@ -58,6 +58,33 @@ make monitoring-clean
 
 This removes only the Prometheus and Grafana volumes; PostgreSQL data is preserved.
 
+## Optional API packet capture
+
+The capture service is not part of the default monitoring stack. It uses the `capture` Compose profile and shares the API container's network namespace to capture traffic on port 8080 only.
+
+Start the monitoring stack and API first, then start the capture in a separate terminal:
+
+```bash
+make monitoring-up
+make monitoring-capture
+```
+
+Generate API requests from another terminal. Stop the capture with Ctrl+C, then export the pcap:
+
+```bash
+curl -i http://localhost:8080/health
+make monitoring-capture-export
+```
+
+The file is saved as `capture/api.pcap`, which is gitignored. Open it in Wireshark to inspect the capture. Packet captures may contain personally identifiable information, request and response bodies, authorization headers, JWTs, or other credentials. Treat them as secrets: do not commit or share the file. Remove the exported file and clear the capture container and named volume when finished:
+
+```bash
+rm capture/api.pcap
+make monitoring-capture-clean
+```
+
+`make monitoring-capture-logs` follows tcpdump's packet summary output. `make monitoring-capture-clean` removes the capture container and pcap volume, but does not remove the exported local file.
+
 ## Files in this directory
 
 - `README.md` — overview and commands for the monitoring stack.
@@ -100,7 +127,7 @@ The live cAdvisor configuration has no Docker socket and currently exposes only 
 - ✅ Prompt 3 — Prometheus + Grafana with provisioning.
 - ✅ Prompt 4 — Exporters (`cAdvisor`, `postgres-exporter`, `blackbox-exporter`).
 - ✅ Prompt 5 — Dashboards and demo assets.
-- ⏳ Prompt 6 — Optional packet-capture profile.
+- ✅ Prompt 6 — Optional packet-capture profile.
 
 ## First-run checklist
 
@@ -139,9 +166,14 @@ If the `cadvisor` target is **DOWN**, inspect its logs with `docker compose -f d
 
 Stop the conflicting service or change the bind address locally while keeping the public exposure restricted to `127.0.0.1`.
 
+### Capture cannot join the API network namespace
+
+Start the API with `make monitoring-up` before running `make monitoring-capture`. The capture service uses `network_mode: service:api`, so it requires the API container to be running and cannot be independently attached to a network.
+
 ## Notes
 
 - The monitoring stack is intentionally local-only.
 - It is never deployed to Render and is not referenced from `render.yaml`.
 - Prometheus has no published port. It is only reachable from the `monitoring` network.
 - Grafana is intentionally bound to `127.0.0.1:3001` and is the only monitoring service with a public loopback port.
+- The opt-in capture service shares only the API container's network namespace and filters for port 8080; it does not capture host traffic.
