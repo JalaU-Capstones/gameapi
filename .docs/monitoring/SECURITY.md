@@ -54,6 +54,12 @@ Mitigation: the Compose overlay fails fast when `.env.monitoring` is missing or 
 
 Mitigation: Prometheus is started with `--web.enable-lifecycle`, which enables the `POST /-/reload` endpoint for dynamic config reloads. This is acceptable in a local-only developer workflow because Prometheus is not published and only containers on the `monitoring` network can reach it.
 
+### Threat 8: cAdvisor exposes host information or gains elevated access
+
+Mitigations and accepted limitations: cAdvisor has no Docker socket mount because access to the Docker socket is effectively root-equivalent on the host, even when the mount is read-only, since it permits control of the Docker daemon. cAdvisor receives only read-only mounts of `/sys`, `/proc`, `/var/lib/docker`, `/dev/disk`, and `/etc/machine-id`. It requires `SYS_PTRACE`, `/dev/kmsg`, and a writable container root filesystem for its memory-mapped paths. The `/var/lib/docker` host mount remains read-only. This local-only trade-off can reduce metrics visibility or cause cAdvisor to degrade gracefully on newer kernels; if it fails without the socket, keep the socket unmounted and revisit with an explicitly approved, documented deviation.
+
+The PostgreSQL exporter connects with the least-privilege `gameapi_app` runtime role, not the migrator role. `sslmode=disable` is used only on the isolated local `backend` bridge because the bundled PostgreSQL service does not have TLS configured.
+
 ## Prompt 3 — Prometheus and Grafana hardening
 
 | Control | Value | Service | Rationale |
@@ -71,6 +77,24 @@ Mitigation: Prometheus is started with `--web.enable-lifecycle`, which enables t
 | Editable dashboards | Disabled | Grafana | Provisioned JSON is the source of truth |
 | Retention | 7 days | Prometheus | Caps disk usage for a laptop workflow |
 
+## Prompt 4 — Exporter hardening and deviations
+
+| Control | Value | Service | Rationale |
+|---|---|---|---|
+| No published port | — | cAdvisor, postgres-exporter, blackbox-exporter | Reachable only from the `monitoring` network |
+| `read_only: true` | Yes | postgres-exporter, blackbox-exporter | Filesystem immutable |
+| `read_only: true` | **No** — deviation | cAdvisor | cAdvisor writes to memory-mapped paths; the `/var/lib/docker` host mount itself remains read-only |
+| `cap_drop: [ALL]` | Yes | All three | Minimal capabilities |
+| `cap_add: [SYS_PTRACE]` | **Deviation** | cAdvisor | Needed to inspect `/proc` of other processes |
+| Container user | Root (image default) | cAdvisor | Host-path and device access increase impact; keep this service local-only |
+| Host mounts | Read-only: `/sys`, `/proc`, `/var/lib/docker`, `/dev/disk`, `/etc/machine-id` | cAdvisor | Restricts host filesystem access to the required paths |
+| `/dev/kmsg` device | `rwm` — deviation | cAdvisor | Required by cAdvisor for kernel log reads |
+| Docker socket | **Not mounted** | cAdvisor | Avoids root-equivalent access to the host Docker daemon |
+| DB credentials | `gameapi_app` | postgres-exporter | Least-privilege runtime role |
+| `sslmode=disable` | Yes | postgres-exporter | Acceptable on the isolated `backend` network; revisit if TLS is added |
+| Non-root user | `65534:65534` | postgres-exporter, blackbox-exporter | Runs exporters as an unprivileged user |
+| Healthcheck | Yes | All three | Detects early failures |
+
 ## Hardening checklist
 
 | Control | Value | Applies to | Rationale |
@@ -82,6 +106,7 @@ Mitigation: Prometheus is started with `--web.enable-lifecycle`, which enables t
 | `restart: unless-stopped` | Enabled | All monitoring services | Minimal resilience for developer environments. Prompt 3. |
 | Retention limit | `PROMETHEUS_RETENTION` | Prometheus | Keeps local disk usage bounded. Prompt 3. |
 | Grafana auth | Admin credentials from `.env.monitoring` | Grafana | Ensures local authentication for the dashboard UI. Prompt 3. |
+| cAdvisor host mounts | Read-only host paths; no Docker socket | cAdvisor | Limits host visibility while avoiding Docker daemon control. Prompt 4. |
 
 ## What is explicitly out of scope
 
