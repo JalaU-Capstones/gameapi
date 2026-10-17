@@ -81,7 +81,10 @@ async def _clean_tables(db_session: AsyncSession) -> AsyncIterator[None]:
     finally:
         await db_session.rollback()
         await db_session.execute(
-            text("TRUNCATE TABLE logs, gameplays, users RESTART IDENTITY CASCADE")
+            text(
+                "TRUNCATE TABLE refresh_tokens, sessions, logs, gameplays, users "
+                "RESTART IDENTITY CASCADE"
+            )
         )
         await db_session.commit()
 

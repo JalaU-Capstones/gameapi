@@ -37,6 +37,7 @@ class AccessTokenClaims(BaseModel):
     sub: str
     email: EmailStr
     name: str
+    sid: str
     jti: str
     iat: int
     exp: int
@@ -44,13 +45,14 @@ class AccessTokenClaims(BaseModel):
     aud: str
 
 
-def create_access_token_short(*, subject: str, email: str, name: str) -> str:
+def create_access_token_short(*, subject: str, email: str, name: str, sid: str) -> str:
     now = datetime.now(UTC)
     expires_at = now + timedelta(minutes=settings.auth.access_token_expire_minutes)
     claims = {
         "sub": subject,
         "email": email,
         "name": name,
+        "sid": sid,
         "jti": str(uuid4()),
         "iat": int(now.timestamp()),
         "exp": int(expires_at.timestamp()),

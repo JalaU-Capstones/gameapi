@@ -77,7 +77,10 @@ async def login(
     service: AuthServiceDep,
 ) -> LoginResponse:
     try:
-        access_token, refresh_token, user = await service.login(payload.email, payload.password)
+        access_token, refresh_token, user, _session, other_active_sessions = await service.login(
+            payload.email,
+            payload.password,
+        )
     except InvalidCredentialsError as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -90,6 +93,7 @@ async def login(
         access_token=access_token,
         token_type="bearer",
         user=user,
+        other_active_sessions=other_active_sessions,
     )
 
 
@@ -124,11 +128,14 @@ async def register(
             return LoginResponse.model_validate(payload_json)
 
     try:
-        access_token, refresh_token, user = await service.register(payload)
+        access_token, refresh_token, user, _session, other_active_sessions = await service.register(
+            payload
+        )
         result = LoginResponse(
             access_token=access_token,
             token_type="bearer",
             user=UserResponse.model_validate(user, from_attributes=True),
+            other_active_sessions=other_active_sessions,
         )
         if idem_key:
             remember_response(
@@ -143,6 +150,7 @@ async def register(
                         "user": UserResponse.model_validate(user, from_attributes=True).model_dump(
                             mode="json"
                         ),
+                        "other_active_sessions": other_active_sessions,
                         "refresh_token": refresh_token,
                     },
                 },

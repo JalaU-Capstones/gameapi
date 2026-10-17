@@ -170,9 +170,13 @@ async def http_exception_handler(
     _: Request,
     exc: HTTPException,
 ) -> JSONResponse:
+    content: dict[str, object] = {"message": exc.detail}
+    code = getattr(exc, "code", None)
+    if code is not None:
+        content["code"] = code
     return JSONResponse(
         status_code=exc.status_code,
-        content={"message": exc.detail},
+        content=content,
         headers=getattr(exc, "headers", None),
     )
 

@@ -15,6 +15,11 @@ class LoginResponse(ApiModel):
         default="bearer", serialization_alias="token_type", validation_alias="token_type"
     )
     user: UserResponse
+    other_active_sessions: int = Field(
+        default=0,
+        serialization_alias="other_active_sessions",
+        validation_alias="other_active_sessions",
+    )
 
 
 class RefreshResponse(ApiModel):
