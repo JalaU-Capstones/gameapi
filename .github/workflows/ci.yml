@@ -114,7 +114,7 @@ jobs:
       - name: Run tests with coverage
         run: |
           uv run coverage run -m pytest -o addopts=""
-          uv run coverage report --fail-under=93
+          uv run coverage report --fail-under=94
           uv run coverage xml
 
       - name: Upload coverage to Codecov
