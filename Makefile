@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help install dev run test test-cov lint format typecheck clean docker-up docker-down docker-logs docker-reset test-clean migrate migrate-create pre-commit pre-commit-install openapi-export openapi-check asyncapi-validate contracts-check monitoring-up monitoring-down monitoring-logs monitoring-clean
+.PHONY: help install dev run test test-cov lint format typecheck clean docker-up docker-down docker-logs docker-reset test-clean migrate migrate-create pre-commit pre-commit-install openapi-export openapi-check asyncapi-validate contracts-check monitoring-up monitoring-down monitoring-logs monitoring-clean monitoring-capture monitoring-capture-logs monitoring-capture-export monitoring-capture-clean
 
 help:
 	@echo "Comandos disponibles:"
@@ -22,6 +22,10 @@ help:
 	@echo "  make monitoring-down   Detiene la pila de monitoreo, conserva volúmenes"
 	@echo "  make monitoring-logs   Sigue los logs de Prometheus y Grafana"
 	@echo "  make monitoring-clean  Para la pila y borra solo volúmenes de monitoreo"
+	@echo "  make monitoring-capture Inicia captura de tráfico del API (opt-in)"
+	@echo "  make monitoring-capture-logs  Sigue el log de paquetes de tcpdump"
+	@echo "  make monitoring-capture-export Copia el pcap a ./capture/api.pcap"
+	@echo "  make monitoring-capture-clean Elimina el contenedor y volumen pcap"
 	@echo "  make migrate     Aplica las migraciones de Alembic"
 	@echo "  make migrate-create Crea una migración de Alembic"
 
@@ -86,6 +90,22 @@ monitoring-clean: ## Stop the monitoring stack and wipe monitoring volumes only
 			docker volume rm "$$volume"; \
 		fi; \
 	done
+
+monitoring-capture: ## Capture API traffic with tcpdump (opt-in, Ctrl+C to stop)
+	$(COMPOSE_MONITORING) --profile capture up capture
+
+monitoring-capture-logs: ## Follow the live tcpdump output for the capture container
+	$(COMPOSE_MONITORING) --profile capture logs -f capture
+
+monitoring-capture-export: ## Copy the pcap to ./capture/api.pcap
+	@mkdir -p capture
+	docker cp gameapi-capture:/capture/api.pcap capture/api.pcap
+
+monitoring-capture-clean: ## Remove the capture container and the pcap volume
+	$(COMPOSE_MONITORING) --profile capture rm -sf capture
+	@if docker volume inspect gameapi_capture_data >/dev/null 2>&1; then \
+		docker volume rm gameapi_capture_data; \
+	fi
 
 test:
 	uv run pytest -v
