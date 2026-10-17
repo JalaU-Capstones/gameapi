@@ -1,9 +1,6 @@
 # Prometheus configuration for the local observability stack.
 #
-# The API job is the only active scrape target in this prompt. The three
-# exporter jobs below are commented out because those services are added in a
-# later step. Do not uncomment them until the corresponding containers exist,
-# otherwise Prometheus will log "no such host" errors on every scrape cycle.
+# The API and exporter jobs scrape the local monitoring stack.
 
 global:
   scrape_interval: 15s
@@ -24,32 +21,38 @@ scrape_configs:
           service: api
 
   # ---------------------------------------------------------------------------
-  # Exporters — activated in a later prompt.
+  # cAdvisor: container-level metrics.
   # ---------------------------------------------------------------------------
-  # - job_name: cadvisor
-  #   static_configs:
-  #     - targets: ["cadvisor:8080"]
-  #       labels:
-  #         service: cadvisor
-  #
-  # - job_name: postgres
-  #   static_configs:
-  #     - targets: ["postgres-exporter:9187"]
-  #       labels:
-  #         service: postgres
-  #
-  # - job_name: blackbox
-  #   metrics_path: /probe
-  #   params:
-  #     module: [http_2xx]
-  #   static_configs:
-  #     - targets: ["http://api:8080/health"]
-  #       labels:
-  #         service: blackbox
-  #   relabel_configs:
-  #     - source_labels: [__address__]
-  #       target_label: __param_target
-  #     - source_labels: [__param_target]
-  #       target_label: instance
-  #     - target_label: __address__
-  #       replacement: blackbox-exporter:9115
+  - job_name: cadvisor
+    static_configs:
+      - targets: ["cadvisor:8080"]
+        labels:
+          service: cadvisor
+
+  # ---------------------------------------------------------------------------
+  # postgres-exporter: database metrics.
+  # ---------------------------------------------------------------------------
+  - job_name: postgres
+    static_configs:
+      - targets: ["postgres-exporter:9187"]
+        labels:
+          service: postgres
+
+  # ---------------------------------------------------------------------------
+  # blackbox-exporter: external probe of the API health endpoint.
+  # ---------------------------------------------------------------------------
+  - job_name: blackbox
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets: ["http://api:8080/health"]
+        labels:
+          service: blackbox
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
