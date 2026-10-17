@@ -110,7 +110,8 @@ resources:
     \ \u2014 rotates the refresh token and issues a new access token.\n- `POST /api/v2/auth/logout`\
     \ \u2014 revokes the refresh token and clears both cookies.\n- `GET /api/v2/auth/me`\
     \ \u2014 returns the current user using either the cookie or the Authorization\
-    \ header."
+    \ header.\n- `POST /api/v2/auth/session/takeover` \u2014 revokes other active\
+    \ sessions and closes their WebSockets with code `4409` (`session_replaced`)."
   environment: {}
   environmentPropertyOrder: null
   metaSortKey: -1790553600001
@@ -320,7 +321,8 @@ resources:
     \ user tracking and `list_online_users`.\n\n## Tips\n\n- Run **Users \u2192 Login**\
     \ before connecting so `{{ _.token }}` is populated.\n- Most match steps require\
     \ **two sockets open at the same time** (host and guest). Duplicate the Gameplays\
-    \ WS request with `Ctrl+D`."
+    \ WS request with `Ctrl+D`.\n\nA session takeover closes sockets from replaced\
+    \ sessions with WebSocket close code `4409` and reason `session_replaced`."
   environment: {}
   environmentPropertyOrder: null
   metaSortKey: -1790553600000
@@ -492,6 +494,40 @@ resources:
     \ initial state on app load."
   authentication: {}
   metaSortKey: -1790553600000
+  isPrivate: false
+  settingStoreCookies: true
+  settingSendCookies: true
+  settingDisableRenderRequestBody: false
+  settingEncodeUrl: true
+  settingRebuildPath: true
+  settingFollowRedirects: global
+  _type: request
+- _id: req_session_takeover_v2
+  parentId: fld_auth_v2
+  modified: 1790553600000
+  created: 1790553600000
+  name: Session takeover
+  url: http://{{ _.baseUrl }}/api/v2/auth/session/takeover
+  method: POST
+  body:
+    mimeType: null
+    text: ''
+  parameters: []
+  headers: []
+  description: "# Session takeover\n\nRevokes other active sessions for the authenticated\
+    \ user and closes their WebSocket connections, while keeping the current session\
+    \ active.\n\n- **Method**: `POST`\n- **Path**: `/api/v2/auth/session/takeover`\n\
+    - **Auth**: Required (session-bound access token or auth cookie)\n- **Body**: None\n\
+    \n## Response \u2014 `204 No Content`\n\nThe current session remains active.\
+    \ Replaced WebSockets close with code `4409` and reason `session_replaced`.\n\
+    \n## Errors\n\n| Status | Cause |\n|--------|-------|\n| `401` | Session\
+    \ is revoked or missing |\n| `409` | A game is in progress (`GAME_IN_PROGRESS`)\
+    \ or the token has no session (`SESSION_REQUIRED`) |\n| `429` | Rate limit exceeded |"
+  authentication:
+    type: bearer
+    token: '{{ _.access_token }}'
+    prefix: ''
+  metaSortKey: -1790553599999
   isPrivate: false
   settingStoreCookies: true
   settingSendCookies: true

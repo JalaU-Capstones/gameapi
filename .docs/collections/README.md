@@ -118,6 +118,11 @@ For these reasons, Insomnia is the reference tool for testing the **entire** API
 
 **Every request has full documentation** in Insomnia's **Docs** panel (book icon in the center panel). The folders and workspace are documented as well.
 
+The **Session takeover** request is available under **Auth (v2)** in both
+collections. It revokes other active sessions for the authenticated user and
+closes their WebSocket connections with code `4409` and reason
+`session_replaced`; use Insomnia to observe the WebSocket close behavior.
+
 ---
 
 ## Directory contents

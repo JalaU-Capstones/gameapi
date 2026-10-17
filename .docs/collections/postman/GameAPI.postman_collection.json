@@ -254,6 +254,32 @@
           }
         },
         {
+          "name": "Session takeover",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "http://{{baseUrl}}/api/v2/auth/session/takeover",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v2",
+                "auth",
+                "session",
+                "takeover"
+              ]
+            },
+            "description": "# Session takeover\n\nForces a takeover of all active WebSocket sessions for the current user while keeping the current session bound to the active access token.\n\n- **Method**: `POST`\n- **Path**: `/api/v2/auth/session/takeover`\n- **Auth**: Required (session cookie or JWT)\n- **Body**: None\n\n## Response - `204 No Content`\n\nThe current session remains active and all other active sockets for the same user are closed with `4409` and reason `session_replaced`.\n\n## Errors\n\n- `401`: session is revoked or missing\n- `409`: a game is in progress or the request has no session-bound token"
+          }
+        },
+        {
           "name": "Me",
           "request": {
             "method": "GET",
