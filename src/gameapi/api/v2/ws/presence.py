@@ -52,15 +52,16 @@ async def _handle_message(user_id: str, message: dict[str, Any], websocket: WebS
 
 @router.websocket("/presence")
 async def presence_websocket(websocket: WebSocket) -> None:
-    user_id = await authenticate_websocket(websocket)
-    if user_id is None:
+    auth = await authenticate_websocket(websocket)
+    if auth is None:
         return
+    user_id, sid = auth
 
     if presence_manager.get_user_socket(user_id) is not None:
         await websocket.close(code=4409, reason="session_already_active")
         return
 
-    await presence_manager.connect(user_id, websocket)
+    await presence_manager.connect(user_id, websocket, sid)
     await websocket.send_json({"event": "auth_ok", "payload": {"user_id": user_id}})
     await presence_manager.broadcast(
         {"event": "user_online", "payload": {"user_id": user_id}},

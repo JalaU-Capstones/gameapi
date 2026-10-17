@@ -7,11 +7,9 @@ from time import monotonic
 from uuid import UUID
 
 from fastapi import WebSocket
-from jose import JWTError, jwt
-from pydantic import ValidationError
 
 from gameapi.core.config import settings
-from gameapi.core.security import AccessTokenClaims, TokenDecodeError, decode_access_token
+from gameapi.core.security import TokenDecodeError, decode_access_token
 from gameapi.db.session import PostgresDatabase
 from gameapi.repositories.session_repository import SessionRepository
 
@@ -61,12 +59,12 @@ async def authenticate_websocket(
     websocket: WebSocket,
     *,
     timeout_seconds: float = 10.0,
-) -> str | None:
+) -> tuple[str, str | None] | None:
     """
     Read the first message from the WS, validate JWT.
 
-    Returns the user_id (str) on success, None if auth failed (the connection
-    has already been closed with the appropriate code).
+    Returns the user_id and session id on success, None if auth failed (the
+    connection has already been closed with the appropriate code).
     """
     await websocket.accept()
 
@@ -101,49 +99,21 @@ async def authenticate_websocket(
         await websocket.close(code=WS_CLOSE_UNAUTHORIZED)
         return None
 
-    legacy_token = False
     try:
         claims = decode_access_token(token)
-    except (TokenDecodeError, ValidationError):
-        try:
-            payload = jwt.decode(
-                token,
-                settings.jwt.secret_key,
-                algorithms=[settings.jwt.algorithm],
-                audience=settings.jwt.audience,
-                issuer=settings.jwt.issuer,
-            )
-        except JWTError:
-            await websocket.send_json(
-                {
-                    "event": "auth_error",
-                    "payload": {"reason": "invalid_token"},
-                }
-            )
-            await websocket.close(code=WS_CLOSE_UNAUTHORIZED)
-            return None
+    except TokenDecodeError:
+        await websocket.send_json(
+            {
+                "event": "auth_error",
+                "payload": {"reason": "invalid_token"},
+            }
+        )
+        await websocket.close(code=WS_CLOSE_UNAUTHORIZED)
+        return None
 
-        if "sid" not in payload:
-            logger.warning(
-                "Legacy websocket token used without sid",
-                extra={"event_type": "legacy_token_used", "player_id": payload.get("sub")},
-            )
-            claims = AccessTokenClaims.model_validate({**payload, "sid": ""})
-            legacy_token = True
-        else:
-            await websocket.send_json(
-                {
-                    "event": "auth_error",
-                    "payload": {"reason": "invalid_token"},
-                }
-            )
-            await websocket.close(code=WS_CLOSE_UNAUTHORIZED)
-            return None
-
-    sid = None if legacy_token else claims.sid
-    if sid is not None:
+    if claims.sid is not None:
         async with PostgresDatabase.session_factory()() as session:
-            session_record = await SessionRepository(session).get_by_id(UUID(str(sid)))
+            session_record = await SessionRepository(session).get_by_id(UUID(claims.sid))
         if session_record is None or session_record.revoked_at is not None:
             await websocket.send_json(
                 {
@@ -153,6 +123,11 @@ async def authenticate_websocket(
             )
             await websocket.close(code=WS_CLOSE_SESSION_CONFLICT, reason="session_replaced")
             return None
+    else:
+        logger.warning(
+            "Legacy websocket token used without sid",
+            extra={"event_type": "legacy_token_used", "player_id": claims.sub},
+        )
 
     if not _check_ws_rate_limit(str(claims.sub)):
         await websocket.send_json(
@@ -164,4 +139,4 @@ async def authenticate_websocket(
         await websocket.close(code=WS_CLOSE_RATE_LIMITED, reason="rate_limited")
         return None
 
-    return str(claims.sub)
+    return str(claims.sub), claims.sid

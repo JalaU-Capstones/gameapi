@@ -130,9 +130,10 @@ async def _handle_message(
 
 @router.websocket("/chat")
 async def chat_websocket(websocket: WebSocket) -> None:
-    user_id = await authenticate_websocket(websocket)
-    if user_id is None:
+    auth = await authenticate_websocket(websocket)
+    if auth is None:
         return
+    user_id, sid = auth
 
     if chat_manager.get_user_socket(user_id) is not None:
         await websocket.close(code=4409, reason="session_already_active")
@@ -142,7 +143,7 @@ async def chat_websocket(websocket: WebSocket) -> None:
         user = await UserService(session).get_by_id(user_id)
     user_name = user.name if user is not None else "Unknown"
 
-    await chat_manager.connect(user_id, websocket)
+    await chat_manager.connect(user_id, websocket, sid)
     logger.info(
         "Chat websocket connected",
         extra={"event_type": "chat_connected", "player_id": user_id},
