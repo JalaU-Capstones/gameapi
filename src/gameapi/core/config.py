@@ -134,6 +134,13 @@ class AuthSettings(BaseSettings):
     refresh_cookie_path: str = "/api/v2/auth"
     access_cookie_path: str = "/"
 
+    @field_validator("cookie_samesite", mode="before")
+    @classmethod
+    def _normalize_cookie_samesite(cls, value: object) -> object:
+        if isinstance(value, str):
+            return value.lower()
+        return value
+
     @model_validator(mode="after")
     def _validate_samesite(self) -> "AuthSettings":
         if self.cookie_samesite == "none" and not self.cookie_secure:
@@ -144,8 +151,19 @@ class AuthSettings(BaseSettings):
     def _require_secure_cookies_in_production(self) -> "AuthSettings":
         import os
 
-        if os.getenv("APP_ENV", "development") == "production" and not self.cookie_secure:
-            raise ValueError("AUTH_COOKIE_SECURE must be True in production (HTTPS-only cookies)")
+        if os.getenv("APP_ENV", "development") == "production":
+            if not self.cookie_secure:
+                raise ValueError(
+                    "AUTH_COOKIE_SECURE must be True in production (HTTPS-only cookies)"
+                )
+            if self.cookie_samesite.lower() != "none":
+                raise ValueError(
+                    "AUTH_COOKIE_SAMESITE must be 'none' when APP_ENV=production so that "
+                    "cross-site cookie authentication works between distinct origins "
+                    "(for example a Render Static Site frontend and a Render Web Service "
+                    "backend). Got: "
+                    f"{self.cookie_samesite!r}."
+                )
         return self
 
 

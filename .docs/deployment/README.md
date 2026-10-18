@@ -152,8 +152,8 @@ En el dashboard del Web Service, ve a **Environment** y agrega todas las variabl
 | `AUTH_ACCESS_TOKEN_EXPIRE_MINUTES` | `15` | Reduce la ventana de robo de tokens y respeta la experiencia de sesión web. |
 | `AUTH_REFRESH_TOKEN_EXPIRE_DAYS` | `7` | Balance razonable para sesiones persistentes en producción. |
 | `AUTH_COOKIE_SECURE` | `true` | Render usa HTTPS; esta opción evita cookies sobre texto plano. |
-| `AUTH_COOKIE_SAMESITE` | `lax` | Es el valor más seguro y compatible para un frontend en dominio separado. |
-| `AUTH_COOKIE_DOMAIN` | `""` o vacío | En Render, normalmente no necesitas fijar este valor salvo un dominio específico. |
+| `AUTH_COOKIE_SAMESITE` | `none` | Requerido para cookies cross-site con `fetch(..., { credentials: 'include' })` cuando frontend y backend viven en sitios distintos. |
+| `AUTH_COOKIE_DOMAIN` | `""` o vacío | No se debe fijar a `.onrender.com`; el dominio del PSL es inválido para cookies y browsers lo rechazan. |
 | `AUTH_REFRESH_COOKIE_PATH` | `/api/v2/auth` | Coincide con la ruta real de refresh en la API. |
 | `AUTH_ACCESS_COOKIE_PATH` | `/` | Permite que la sesión principal se use en toda la app. |
 | `INVITATION_PENDING_TTL_SECONDS` | `60` | Mantiene el flujo de invitación vivo pero evita esperas indefinidas. |
@@ -220,6 +220,26 @@ En el dashboard del Web Service, ve a **Environment** y agrega todas las variabl
 > - No existe Redis en el plan gratuito; usa `RATE_LIMIT_STORAGE_URI=memory://` y no dependas de un broker externo.
 > - La base de datos PostgreSQL tiene una cuota de almacenamiento limitada; revisa el tamaño de `logs` y el tamaño de tablas si el servicio tarda en crecer.
 > - El `cold start` obliga a mantener tiempos de expiración cortos y límites de tarifa razonables para evitar que la primera petición falle por saturación.
+
+## Cross-site cookie authentication
+
+When the frontend and backend live on distinct sites (for example, a Render Static Site like `https://gameclient-2msz.onrender.com` and a Render Web Service like `https://gameapi-9vos.onrender.com`), auth cookies must be emitted with `SameSite=None; Secure`. `SameSite=Lax` blocks cookies on cross-origin `fetch` requests, which produces the classic "login succeeds but the user is immediately logged out" symptom: the login request returns 200, but the next `GET /api/v2/auth/me` returns 401 because the browser never sends the auth cookie.
+
+`AUTH_COOKIE_DOMAIN=.onrender.com` is invalid because `.onrender.com` is on the Public Suffix List (PSL). Browsers reject cookies scoped to public suffixes. Leave `AUTH_COOKIE_DOMAIN` empty unless you intentionally own and control a parent domain.
+
+The backend Render service must be configured with these values:
+
+| Env var | Required value (production) | Why |
+|---|---|---|
+| `APP_ENV` | `production` | Enables the production hardening checks. |
+| `AUTH_COOKIE_SECURE` | `true` | `SameSite=None` requires `Secure`. |
+| `AUTH_COOKIE_SAMESITE` | `none` | Required for cross-site `fetch` with credentials. |
+| `AUTH_COOKIE_DOMAIN` | *(empty)* | `.onrender.com` is on the PSL; browsers reject it. |
+| `CORS_ORIGINS` | `https://gameclient-2msz.onrender.com` | Exact origin, no wildcard, no trailing slash. |
+
+The backend refuses to start in `APP_ENV=production` if `AUTH_COOKIE_SAMESITE != 'none'`.
+
+> Do not use `/health` as the auth smoke test. It does not exercise the cookie-based login flow. To verify the fix after deploy, log in from the static frontend, inspect the cookies in DevTools, and confirm `GET /api/v2/auth/me` returns `200` with both cookies attached.
 
 ## Paso 5 — Endurecer la base de datos y el servicio en Render
 

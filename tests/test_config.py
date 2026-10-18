@@ -50,6 +50,7 @@ def test_production_settings_valid_config(monkeypatch: pytest.MonkeyPatch) -> No
     monkeypatch.setenv("APP_ENV", "production")
     monkeypatch.setenv("JWT_SECRET_KEY", "x" * 64)
     monkeypatch.setenv("AUTH_COOKIE_SECURE", "true")
+    monkeypatch.setenv("AUTH_COOKIE_SAMESITE", "none")
     monkeypatch.setenv("CORS_ORIGINS", "https://app.example.com")
     monkeypatch.setenv("POSTGRES_URI", "postgresql://db.example:5432/gameapi")
 
@@ -57,6 +58,7 @@ def test_production_settings_valid_config(monkeypatch: pytest.MonkeyPatch) -> No
 
     assert settings.app.env == "production"
     assert settings.auth.cookie_secure is True
+    assert settings.auth.cookie_samesite == "none"
     assert settings.app.cors_origins == ["https://app.example.com"]
 
 
@@ -81,6 +83,28 @@ def test_production_rejects_insecure_cookies(monkeypatch: pytest.MonkeyPatch) ->
 
     with pytest.raises(ValidationError, match="AUTH_COOKIE_SECURE must be True"):
         Settings()
+
+
+def test_production_requires_samesite_none(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("JWT_SECRET_KEY", "x" * 64)
+    monkeypatch.setenv("AUTH_COOKIE_SECURE", "true")
+    monkeypatch.setenv("AUTH_COOKIE_SAMESITE", "lax")
+    monkeypatch.setenv("CORS_ORIGINS", "https://app.example.com")
+
+    with pytest.raises(ValidationError, match="AUTH_COOKIE_SAMESITE must be 'none'"):
+        Settings()
+
+
+def test_production_accepts_samesite_none(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("JWT_SECRET_KEY", "x" * 64)
+    monkeypatch.setenv("AUTH_COOKIE_SECURE", "true")
+    monkeypatch.setenv("AUTH_COOKIE_SAMESITE", "none")
+    monkeypatch.setenv("CORS_ORIGINS", "https://app.example.com")
+
+    settings = Settings()
+    assert settings.auth.cookie_samesite == "none"
 
 
 def test_production_rejects_wildcard_cors(monkeypatch: pytest.MonkeyPatch) -> None:
