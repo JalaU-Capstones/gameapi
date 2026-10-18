@@ -116,6 +116,23 @@ app = FastAPI(
 )
 
 
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    logger.error("Unhandled exception", exc_info=(type(exc), exc, exc.__traceback__))
+    origin = request.headers.get("origin")
+    headers: dict[str, str] = {}
+    allowed_origins = settings.app.cors_origins
+    if origin and ("*" in allowed_origins or origin in allowed_origins):
+        headers["Access-Control-Allow-Origin"] = origin
+        headers["Access-Control-Allow-Credentials"] = "true"
+        headers["Vary"] = "Origin"
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={"detail": "Internal server error"},
+        headers=headers,
+    )
+
+
 async def _rate_limit_handler(
     request: Request,
     exc: Exception,
