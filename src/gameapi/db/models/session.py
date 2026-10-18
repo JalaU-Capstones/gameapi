@@ -40,8 +40,10 @@ class Session(Base):
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     revoked_reason: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
-    user: Mapped["User"] = relationship("User", backref="sessions")
+    user: Mapped["User"] = relationship("User", back_populates="sessions")
     refresh_tokens: Mapped[list["RefreshToken"]] = relationship(
         "RefreshToken",
         back_populates="session",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )

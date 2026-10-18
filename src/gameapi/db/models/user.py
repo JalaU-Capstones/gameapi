@@ -10,6 +10,7 @@ from gameapi.db.base import Base
 
 if TYPE_CHECKING:
     from gameapi.db.models.gameplay import Gameplay
+    from gameapi.db.models.session import Session
 
 
 class User(Base):
@@ -38,6 +39,12 @@ class User(Base):
         "Gameplay",
         foreign_keys="Gameplay.guest_player",
         back_populates="guest",
+    )
+    sessions: Mapped[list["Session"]] = relationship(
+        "Session",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
 
     @property
