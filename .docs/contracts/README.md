@@ -81,7 +81,7 @@ A diferencia de OpenAPI, este archivo se mantiene a mano. Cuando agregues o modi
 make asyncapi-validate
 ```
 
-Usa el AsyncAPI CLI para verificar que el documento cumple con la especificación 3.0.0.
+Usa el AsyncAPI CLI para verificar que el documento cumple con la especificación 3.1.0.
 
 ## Versionado
 
@@ -89,7 +89,7 @@ Usa el AsyncAPI CLI para verificar que el documento cumple con la especificació
 |---|---|---|
 | REST v1 | 1.0.0 | 🔒 Congelado |
 | REST v2 | 2.0.0 | 🟢 Activo |
-| WebSocket v2 | 2.2.0 | 🟢 Activo |
+| WebSocket v2 | 2.3.0 | 🟢 Activo |
 
 ### Changelog
 
@@ -97,6 +97,7 @@ Usa el AsyncAPI CLI para verificar que el documento cumple con la especificació
 |---|---|
 | 2.1.0 | Se agrega el canal global `chat` a AsyncAPI y se documenta la integración con `chat_manager` y el takeover de sesión; se eliminan referencias a `game_message` / `broadcast_to_game` del gameplay channel. |
 | 2.2.0 | Se documentan los eventos de ciclo de vida de invitación (`retry_invitation`, `invitation_replaced`, `invitation_promoted`, `invitation_retry_accepted`) y el nuevo rate-limit del host para `create_game`, junto con la advertencia `retry_after_seconds` en errores del gameplay channel. |
+| 2.3.0 | Se agregan `updated_at` a los eventos de expiración y retry de invitación, se precisa `target_busy` como motivo de `invitation_replaced` y se documentan los cierres WebSocket `reconnected` y `session_replaced`. |
 
 Política de cambios:
 
@@ -126,6 +127,6 @@ npx @asyncapi/cli start studio .docs/contracts/asyncapi/asyncapi.json
 Los pipelines verifican:
 
 1. `openapi.json` generado coincide con el commiteado.
-2. `asyncapi.json` es válido según AsyncAPI 3.0.0.
+2. `asyncapi.json` es válido según AsyncAPI 3.1.0.
 
 Si falla cualquiera, el MR no se puede mergear hasta resolver.
