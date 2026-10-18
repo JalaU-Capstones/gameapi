@@ -2,7 +2,7 @@
   "asyncapi": "3.1.0",
   "info": {
     "title": "GameAPI WebSocket Contract",
-    "version": "2.2.0",
+    "version": "2.3.0",
     "description": "Real-time contract for Tic-Tac-Toe gameplay, user presence, and the global in-memory chat. The three channels share a common envelope {event, payload}; the gameplay channel also carries the invitation lifecycle events retry_invitation, invitation_replaced, invitation_promoted, and invitation_retry_accepted.",
     "contact": {
       "name": "The Three Musketeers",
@@ -31,7 +31,7 @@
     "gameplays": {
       "address": "/gameplays",
       "title": "Gameplays channel",
-      "description": "Real-time gameplay events: invitations, moves, turn changes, and game endings. A session takeover closes sockets from other sessions with WebSocket close code 4409 and reason `session_replaced`.",
+      "description": "Real-time gameplay events: invitations, moves, turn changes, and game endings. Reconnecting with the same session closes the previous socket with WebSocket close code 1000 and reason `reconnected`; a session takeover closes sockets from other sessions with code 4409 and reason `session_replaced`.",
       "bindings": {
         "ws": {
           "method": "GET"
@@ -127,7 +127,7 @@
     "presence": {
       "address": "/presence",
       "title": "Presence channel",
-      "description": "Real-time user presence: online users, joins, and leaves. A session takeover closes sockets from other sessions with WebSocket close code 4409 and reason `session_replaced`.",
+      "description": "Real-time user presence: online users, joins, and leaves. Reconnecting with the same session closes the previous socket with WebSocket close code 1000 and reason `reconnected`; a session takeover closes sockets from other sessions with code 4409 and reason `session_replaced`.",
       "bindings": {
         "ws": {
           "method": "GET"
@@ -175,7 +175,7 @@
     "chat": {
       "address": "/chat",
       "title": "Global chat channel",
-      "description": "Authenticated, single-room, in-memory global chat. History is not persisted; the buffer is lost on process restart. Rate-limited per user. A session takeover closes sockets from other sessions with WebSocket close code 4409 and reason `session_replaced`.",
+      "description": "Authenticated, single-room, in-memory global chat. History is not persisted; the buffer is lost on process restart. Rate-limited per user. Reconnecting with the same session closes the previous socket with WebSocket close code 1000 and reason `reconnected`; a session takeover closes sockets from other sessions with code 4409 and reason `session_replaced`.",
       "bindings": {
         "ws": {
           "method": "GET"
@@ -1202,7 +1202,6 @@
           "reason": {
             "type": "string",
             "enum": [
-              "target_busy",
               "host_busy"
             ],
             "description": "Why the invitation was queued."
@@ -1213,7 +1212,8 @@
         "type": "object",
         "required": [
           "game_id",
-          "reason"
+          "reason",
+          "updated_at"
         ],
         "properties": {
           "game_id": {
@@ -1224,10 +1224,14 @@
           "reason": {
             "type": "string",
             "enum": [
-              "timeout",
-              "target_busy"
+              "timeout"
             ],
-            "description": "Expiration reason."
+            "description": "Expiration reason. Displacement by another accepted invitation is reported as invitation_replaced instead."
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 timestamp of the persisted expiration transition."
           }
         }
       },
@@ -1432,7 +1436,8 @@
           "game_id",
           "attempt",
           "remaining_attempts",
-          "idempotent"
+          "idempotent",
+          "updated_at"
         ],
         "properties": {
           "game_id": {
@@ -1449,7 +1454,12 @@
           },
           "idempotent": {
             "type": "boolean",
-            "description": "True when the gameplay was already pending and no server-side state changed."
+            "description": "True when the gameplay was already pending; the server resends the invitation without incrementing the retry attempt."
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 timestamp for the pending invitation after the retry or idempotent resend."
           }
         }
       }
