@@ -1,7 +1,16 @@
 import json
+from uuid import UUID
 
 import pytest
-from httpx import AsyncClient
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy import select
+
+from gameapi.core.config import settings
+from gameapi.db.models.refresh_token import RefreshToken
+from gameapi.db.models.session import Session
+from gameapi.main import app, global_exception_handler
+from gameapi.services.exceptions import UserNotFoundError
+from gameapi.services.user_service import UserService
 
 VALID_BOARD = '{"board": [[0,0,0],[0,0,0],[0,0,0]], "lastMove": null}'
 
@@ -131,3 +140,94 @@ async def test_v1_delete_also_refuses_with_an_active_game(
         f"/api/v1/users/{registered_user_b['id']}", headers=_bearer(auth_token_b)
     )
     assert deleted.status_code == 409, deleted.text
+
+
+async def test_delete_user_cascades_sessions_and_tokens(
+    client: AsyncClient,
+    db_session,
+    registered_user_a: dict,
+) -> None:
+    login = await client.post(
+        "/api/v2/auth/login",
+        json={
+            "email": registered_user_a["email"],
+            "password": "password123",
+        },
+    )
+    assert login.status_code == 200, login.text
+    user_id = UUID(str(registered_user_a["id"]))
+
+    sessions_before_delete = (
+        (await db_session.execute(select(Session).where(Session.user_id == user_id)))
+        .scalars()
+        .all()
+    )
+    tokens_before_delete = (
+        (await db_session.execute(select(RefreshToken).where(RefreshToken.user_id == user_id)))
+        .scalars()
+        .all()
+    )
+    assert sessions_before_delete
+    assert tokens_before_delete
+
+    deleted = await client.delete(
+        f"/api/v2/users/{user_id}",
+        headers={"Authorization": f"Bearer {login.json()['access_token']}"},
+    )
+    assert deleted.status_code == 204, deleted.text
+
+    sessions_after_delete = (
+        (await db_session.execute(select(Session).where(Session.user_id == user_id)))
+        .scalars()
+        .all()
+    )
+    tokens_after_delete = (
+        (await db_session.execute(select(RefreshToken).where(RefreshToken.user_id == user_id)))
+        .scalars()
+        .all()
+    )
+    assert sessions_after_delete == []
+    assert tokens_after_delete == []
+
+
+@pytest.mark.parametrize("user_id", ["not-a-uuid", str(UUID(int=0))])
+async def test_delete_unknown_user_raises_not_found(db_session, user_id: str) -> None:
+    with pytest.raises(UserNotFoundError):
+        await UserService(db_session).delete(user_id)
+
+
+async def test_unhandled_exception_response_includes_cors_headers(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings.app, "cors_origins", ["https://allowed.example"])
+
+    async def fail() -> None:
+        raise RuntimeError("Unexpected failure")
+
+    path = "/__test/unhandled-exception"
+    assert not any(getattr(route, "path", None) == path for route in app.router.routes)
+    app.add_api_route(path, fail, methods=["GET"])
+    try:
+        async with AsyncClient(
+            transport=ASGITransport(app=app, raise_app_exceptions=False),
+            base_url="http://test",
+        ) as test_client:
+            for origin, expected_origin in (
+                ("https://allowed.example", "https://allowed.example"),
+                ("https://unallowed.example", None),
+                (None, None),
+            ):
+                headers = {"Origin": origin} if origin is not None else {}
+                response = await test_client.get(path, headers=headers)
+
+                assert response.status_code == 500
+                assert response.json() == {"detail": "Internal server error"}
+                assert response.headers.get("access-control-allow-origin") == expected_origin
+                if expected_origin is not None:
+                    assert response.headers["access-control-allow-credentials"] == "true"
+                    assert response.headers["vary"] == "Origin"
+                assert app.exception_handlers[Exception] is global_exception_handler
+    finally:
+        app.router.routes[:] = [
+            route for route in app.router.routes if getattr(route, "path", None) != path
+        ]
