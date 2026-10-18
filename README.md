@@ -464,7 +464,8 @@ Los endpoints WebSocket operan bajo `/api/v2/ws` y requieren autenticación JWT 
 - `invitation_rejected` — el guest rechazó (al host).
 - `invitation_replaced` — el guest aceptó otra invitación y el host desplazado queda fuera del flujo. Payload: `{"game_id": "<uuid>", "reason": "target_busy"}`.
 - `invitation_promoted` — una invitación en cola pasó a `pending`. Payload idéntico a `invitation_received`.
-- `invitation_retry_accepted` — ack del `retry_invitation`. Payload: `{"game_id": "<uuid>", "attempt": 1, "remaining_attempts": 2, "idempotent": false}`.
+- `invitation_retry_accepted` — ack del `retry_invitation`. Incluye `updated_at` (fecha ISO 8601 de la transición a `pending` o del reenvío idempotente): `{"game_id": "<uuid>", "attempt": 1, "remaining_attempts": 2, "idempotent": false, "updated_at": "2026-09-26T21:12:51.971090+00:00"}`.
+- `invitation_expired` — una invitación pendiente o en cola alcanzó su TTL. Incluye `updated_at` (fecha ISO 8601 de la transición persistida) y `reason: "timeout"`.
 - `board_updated` — jugada realizada. Incluye `board`, `turn` y `last_move`.
 - `game_ended` — partida terminada. Incluye `game_id`, `board`, `winner`, `reason`, y `winner_line` (`null` para empate/abandono, una lista de coordenadas para victoria).
 - `subscribed` / `unsubscribed` — confirmación de suscripción al canal.
@@ -493,6 +494,16 @@ Errores:
 ```json
 {"event": "auth_error", "payload": {"reason": "invalid_token"}}
 ```
+
+#### Cierres de conexión WebSocket
+
+| Código | Motivo | Comportamiento |
+|---|---|---|
+| `1000` | `reconnected` | Una nueva conexión del mismo usuario y sesión reemplaza el socket anterior. Para tokens legacy sin `sid`, solo otra conexión legacy sin `sid` reemplaza al socket anterior. |
+| `4409` | `session_replaced` | El socket pertenece a una sesión revocada, normalmente por un takeover; el cliente no debe reintentar esa sesión. |
+
+Los tokens legacy sin `sid` siguen siendo aceptados, pero no participan del
+takeover de sesiones.
 
 Eventos soportados:
 
@@ -722,9 +733,14 @@ El flujo de invitaciones sigue una secuencia simple: la invitación queda `pendi
 | `pending` | timeout TTL | `expired` (`reason: timeout`) | Host: `invitation_expired` |
 | `pending` | guest rechaza | `rejected` | Host: `invitation_rejected` |
 | `pending` | host se va | `canceled` (`host_left`) | Guest: `invitation_canceled` |
-| `pending` | otro host gana al guest | `expired` (`target_busy`) | Host desplazado: `invitation_replaced` |
+| `pending` | otro host gana al guest | `expired` | Host desplazado: `invitation_replaced` (`reason: target_busy`) |
 | `queued` | invitación previa termina | `pending` | Guest: `invitation_promoted` |
 | `rejected` / `expired` / `canceled` | `retry_invitation` del host | `pending` (mismo `game_id`) | Guest: `invitation_received` |
+
+El evento `invitation_expired` incluye `updated_at` en formato ISO 8601. Al
+reintentar, `invitation_retry_accepted` incluye el timestamp actualizado de la
+invitación pendiente; los clientes pueden ignorar expiraciones anteriores a ese
+timestamp para no restaurar un estado obsoleto.
 
 ### Cobertura
 
