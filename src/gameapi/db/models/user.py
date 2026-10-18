@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, String, func
+from sqlalchemy import Boolean, DateTime, String, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -21,7 +21,10 @@ class User(Base):
         primary_key=True,
         default=uuid.uuid4,
     )
-    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    username: Mapped[str] = mapped_column(String(30), nullable=False)
+    username_modified_by_system: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False
+    )
     email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     register_date: Mapped[datetime] = mapped_column(
@@ -46,6 +49,14 @@ class User(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
+
+    @property
+    def name(self) -> str:
+        return self.username
+
+    @name.setter
+    def name(self, value: str) -> None:
+        self.username = value
 
     @property
     def password(self) -> str:
