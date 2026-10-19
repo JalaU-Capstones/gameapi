@@ -20,6 +20,15 @@ class LoginResponse(ApiModel):
         serialization_alias="other_active_sessions",
         validation_alias="other_active_sessions",
     )
+    username_was_auto_generated: bool = Field(
+        default=False,
+        serialization_alias="username_was_auto_generated",
+        validation_alias="username_was_auto_generated",
+    )
+
+
+class RegisterResponse(LoginResponse):
+    pass
 
 
 class RefreshResponse(ApiModel):

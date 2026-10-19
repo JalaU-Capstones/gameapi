@@ -21,13 +21,14 @@ from gameapi.core.idempotency import (
     request_idempotency_store,
 )
 from gameapi.core.rate_limit import rate_limit
-from gameapi.schemas.auth import LoginRequest, LoginResponse, RefreshResponse
+from gameapi.schemas.auth import LoginRequest, LoginResponse, RefreshResponse, RegisterResponse
 from gameapi.schemas.user import UserCreate, UserResponse
 from gameapi.services.exceptions import (
     EmailAlreadyExistsError,
     GameInProgressError,
     InvalidCredentialsError,
     InvalidRefreshTokenError,
+    UsernameAlreadyExistsError,
 )
 
 logger = logging.getLogger(__name__)
@@ -106,12 +107,13 @@ async def login(
         token_type="bearer",
         user=user,
         other_active_sessions=other_active_sessions,
+        username_was_auto_generated=user.username_modified_by_system,
     )
 
 
 @router.post(
     "/register",
-    response_model=LoginResponse,
+    response_model=RegisterResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Register a new user and log them in",
     responses={429: {"description": "Rate limit exceeded"}},
@@ -122,7 +124,7 @@ async def register(
     response: Response,
     payload: UserCreate,
     service: AuthServiceDep,
-) -> LoginResponse:
+) -> RegisterResponse:
     idem_key = request.headers.get("Idempotency-Key")
     identity = normalize_registration_identity(payload.email)
     cache_namespace = "register"
@@ -137,17 +139,18 @@ async def register(
             payload_json = cached["payload"]
             response.status_code = cached["status_code"]
             _set_auth_cookies(response, payload_json["access_token"], payload_json["refresh_token"])
-            return LoginResponse.model_validate(payload_json)
+            return RegisterResponse.model_validate(payload_json)
 
     try:
         access_token, refresh_token, user, _session, other_active_sessions = await service.register(
             payload
         )
-        result = LoginResponse(
+        result = RegisterResponse(
             access_token=access_token,
             token_type="bearer",
             user=UserResponse.model_validate(user, from_attributes=True),
             other_active_sessions=other_active_sessions,
+            username_was_auto_generated=user.username_modified_by_system,
         )
         if idem_key:
             remember_response(
@@ -163,6 +166,7 @@ async def register(
                             mode="json"
                         ),
                         "other_active_sessions": other_active_sessions,
+                        "username_was_auto_generated": user.username_modified_by_system,
                         "refresh_token": refresh_token,
                     },
                 },
@@ -188,6 +192,8 @@ async def register(
                 ttl_seconds=86400,
             )
         raise HTTPException(409, "Email is currently registered") from exc
+    except UsernameAlreadyExistsError as exc:
+        raise HTTPException(409, "Username is already taken") from exc
 
     _set_auth_cookies(response, access_token, refresh_token)
     return result
