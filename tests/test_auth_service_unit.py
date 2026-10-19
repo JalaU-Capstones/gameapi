@@ -217,7 +217,7 @@ async def test_register_response_includes_auto_generated_username_flag(
     response = await client.post(
         "/api/v2/auth/register",
         json={
-            "name": "Generated Register",
+            "name": "Generated-Register",
             "email": "generated-register@example.com",
             "password": "password123",
         },
