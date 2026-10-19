@@ -57,7 +57,7 @@ async def test_register_user_normalizes_email_to_lowercase(client: AsyncClient) 
 async def test_register_user_with_invalid_email_returns_400(client: AsyncClient) -> None:
     response = await client.post(
         "/api/v1/users",
-        json={"name": "X", "email": "not-an-email", "password": "password123"},
+        json={"name": "Valid", "email": "not-an-email", "password": "password123"},
     )
     assert response.status_code == 400
     assert "message" in response.json()
@@ -66,7 +66,7 @@ async def test_register_user_with_invalid_email_returns_400(client: AsyncClient)
 async def test_register_user_with_short_password_returns_400(client: AsyncClient) -> None:
     response = await client.post(
         "/api/v1/users",
-        json={"name": "X", "email": "x@example.com", "password": "123"},
+        json={"name": "Valid", "email": "x@example.com", "password": "123"},
     )
     assert response.status_code == 400
     assert "message" in response.json()
@@ -191,13 +191,40 @@ async def test_update_user_with_token(
     user_id = registered_user["id"]
     response = await client.put(
         f"/api/v1/users/{user_id}",
-        json={"name": "Updated Name"},
+        json={"name": "Updated-Name"},
         headers=auth_headers,
     )
     assert response.status_code == 204
 
     fetched = await client.get(f"/api/v1/users/{user_id}", headers=auth_headers)
-    assert fetched.json()["name"] == "Updated Name"
+    assert fetched.json()["name"] == "Updated-Name"
+
+
+async def test_v1_create_rejects_invalid_username(client: AsyncClient) -> None:
+    response = await client.post(
+        "/api/v1/users",
+        json={
+            "name": "sandra dee",
+            "email": "invalid-v1-username@example.com",
+            "password": "password123",
+        },
+    )
+
+    assert response.status_code == 422, response.text
+
+
+async def test_v2_update_rejects_invalid_username(
+    client: AsyncClient,
+    registered_user: dict[str, object],
+    auth_headers: dict[str, str],
+) -> None:
+    response = await client.put(
+        f"/api/v2/users/{registered_user['id']}",
+        json={"username": "sandra dee"},
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 422, response.text
 
 
 async def test_v1_update_duplicate_username_returns_409(
@@ -234,8 +261,8 @@ async def test_user_update_resets_username_system_flag(
     await db_session.commit()
 
     response = await client.put(
-        f"/api/v1/users/{registered_user['id']}",
-        json={"name": "UpdatedUsername"},
+        f"/api/v2/users/{registered_user['id']}",
+        json={"username": "UpdatedUsername"},
         headers=auth_headers,
     )
     assert response.status_code == 204

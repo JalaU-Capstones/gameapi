@@ -1,3 +1,4 @@
+import pytest
 from httpx import AsyncClient
 
 
@@ -18,7 +19,7 @@ async def test_register_creates_user_and_returns_201(client: AsyncClient) -> Non
 async def test_register_sets_httponly_cookies(client: AsyncClient) -> None:
     response = await client.post(
         "/api/v2/auth/register",
-        json={"name": "Cookie User", "email": "cookie@example.com", "password": "password123"},
+        json={"name": "Cookie-User", "email": "cookie@example.com", "password": "password123"},
     )
     assert response.status_code == 201, response.text
     assert "gameapi_at" in response.cookies
@@ -32,7 +33,7 @@ async def test_register_sets_httponly_cookies(client: AsyncClient) -> None:
 async def test_register_response_shape_matches_login(client: AsyncClient) -> None:
     response = await client.post(
         "/api/v2/auth/register",
-        json={"name": "Login Shape", "email": "shape@example.com", "password": "password123"},
+        json={"name": "Login-Shape", "email": "shape@example.com", "password": "password123"},
     )
     assert response.status_code == 201, response.text
     body = response.json()
@@ -50,7 +51,7 @@ async def test_register_response_shape_matches_login(client: AsyncClient) -> Non
 async def test_register_replays_idempotent_response(client: AsyncClient) -> None:
     headers = {"Idempotency-Key": "same-registration"}
     payload = {
-        "name": "Idempotent User",
+        "name": "Idempotent-User",
         "email": "idempotent@example.com",
         "password": "password123",
     }
@@ -67,14 +68,14 @@ async def test_register_replays_idempotent_response(client: AsyncClient) -> None
 async def test_register_returns_same_user_as_me(client: AsyncClient) -> None:
     response = await client.post(
         "/api/v2/auth/register",
-        json={"name": "Me User", "email": "me@example.com", "password": "password123"},
+        json={"name": "Me-User", "email": "me@example.com", "password": "password123"},
     )
     assert response.status_code == 201, response.text
 
     me_response = await client.get("/api/v2/auth/me")
     assert me_response.status_code == 200, me_response.text
     assert me_response.json()["email"] == "me@example.com"
-    assert me_response.json()["name"] == "Me User"
+    assert me_response.json()["name"] == "Me-User"
 
 
 async def test_register_duplicate_email_returns_409(client: AsyncClient) -> None:
@@ -90,7 +91,7 @@ async def test_register_duplicate_email_returns_409(client: AsyncClient) -> None
 async def test_register_invalid_email_returns_400(client: AsyncClient) -> None:
     response = await client.post(
         "/api/v2/auth/register",
-        json={"name": "Bad", "email": "not-an-email", "password": "password123"},
+        json={"name": "Valid", "email": "not-an-email", "password": "password123"},
     )
     assert response.status_code == 400, response.text
 
@@ -98,7 +99,7 @@ async def test_register_invalid_email_returns_400(client: AsyncClient) -> None:
 async def test_register_short_password_returns_400(client: AsyncClient) -> None:
     response = await client.post(
         "/api/v2/auth/register",
-        json={"name": "Short", "email": "short@example.com", "password": "123"},
+        json={"name": "Valid", "email": "short@example.com", "password": "123"},
     )
     assert response.status_code == 400, response.text
 
@@ -129,3 +130,44 @@ async def test_register_user_can_immediately_call_authenticated_endpoints(
     user_response = await client.get(f"/api/v2/users/{user_id}")
     assert user_response.status_code == 200, user_response.text
     assert user_response.json() == {"id": user_id, "name": "Authed"}
+
+
+@pytest.mark.parametrize(
+    "username",
+    [
+        "sandra dee",
+        "ab",
+        "a" * 31,
+        "-sandra",
+        "sandra-",
+        "sandra!",
+    ],
+)
+async def test_register_rejects_invalid_username(
+    client: AsyncClient,
+    username: str,
+) -> None:
+    response = await client.post(
+        "/api/v2/auth/register",
+        json={
+            "username": username,
+            "email": "invalid-username@example.com",
+            "password": "password123",
+        },
+    )
+
+    assert response.status_code == 422, response.text
+
+
+async def test_register_accepts_valid_username(client: AsyncClient) -> None:
+    response = await client.post(
+        "/api/v2/auth/register",
+        json={
+            "username": "sandra-dee_99",
+            "email": "valid-username@example.com",
+            "password": "password123",
+        },
+    )
+
+    assert response.status_code == 201, response.text
+    assert response.json()["user"]["username"] == "sandra-dee_99"
