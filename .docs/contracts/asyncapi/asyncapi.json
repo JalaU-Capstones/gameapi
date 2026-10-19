@@ -451,6 +451,7 @@
         "name": "create_game",
         "title": "Create game",
         "summary": "Host invites another user to a new game.",
+        "description": "If `guest_username` is provided, it must match the guest's actual username. Mismatches return `USERNAME_MISMATCH`.",
         "payload": {
           "$ref": "#/components/schemas/CreateGamePayload"
         }
@@ -803,6 +804,10 @@
             "type": "string",
             "format": "uuid",
             "description": "Identifier of the opponent invited to the new game."
+          },
+          "guest_username": {
+            "type": "string",
+            "description": "Optional username of the guest. If provided, the server will verify it matches the guest_id to prevent UUID spoofing."
           }
         }
       },
@@ -1168,6 +1173,7 @@
               "INVITATION_NOT_PENDING",
               "CANNOT_INVITE_SELF",
               "OPPONENT_OFFLINE",
+              "USERNAME_MISMATCH",
               "UNKNOWN_ERROR",
               "HOST_BUSY",
               "USER_BUSY",
