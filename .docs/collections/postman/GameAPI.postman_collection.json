@@ -105,7 +105,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Sandra Dee\",\n  \"email\": \"sandra@mail.com\",\n  \"password\": \"password123\"\n}"
+              "raw": "{\n  \"username\": \"sandra-dee\",\n  \"email\": \"sandra@mail.com\",\n  \"password\": \"password123\"\n}"
             },
             "url": {
               "raw": "http://{{baseUrl}}/api/v2/auth/register",
@@ -120,7 +120,7 @@
                 "register"
               ]
             },
-            "description": "# Register\n\nCreates an account and immediately starts a session.\n\n- **Method**: `POST`\n- **Path**: `/api/v2/auth/register`\n- **Auth**: Not required\n- **Body**: JSON with `name`, `email`, and `password` (8-128 characters)\n\n## Response - `201 Created`\n\nReturns `access_token`, `token_type`, and the new `user`. HttpOnly access and refresh cookies are also set; the refresh token is not returned in JSON.\n\n## Errors\n\n- `400`: invalid email, password, or fields\n- `409`: email already registered"
+            "description": "# Register\n\nCreates an account and immediately starts a session.\n\n- **Method**: `POST`\n- **Path**: `/api/v2/auth/register`\n- **Auth**: Not required\n- **Body**: JSON with `username`, `email`, and `password` (8-128 characters)\n\n## Response - `201 Created`\n\nReturns `access_token`, `token_type`, `user`, and `username_was_auto_generated`. The flag is true when the system had to modify the supplied username. HttpOnly access and refresh cookies are also set; the refresh token is not returned in JSON.\n\n## Errors\n\n- `400`: invalid email, password, or fields\n- `409`: email or username already taken"
           },
           "event": [
             {
@@ -169,7 +169,7 @@
                 "login"
               ]
             },
-            "description": "# Login\n\nAuthenticates an existing user and starts a cookie session.\n\n- **Method**: `POST`\n- **Path**: `/api/v2/auth/login`\n- **Auth**: Not required\n- **Body**: JSON with `email` and `password`\n\n## Response - `200 OK`\n\nReturns `access_token`, `token_type`, and `user`; sets HttpOnly access and refresh cookies. The refresh token is not included in JSON.\n\n## Errors\n\n- `401`: credentials are invalid"
+            "description": "# Login\n\nAuthenticates an existing user and starts a cookie session.\n\n- **Method**: `POST`\n- **Path**: `/api/v2/auth/login`\n- **Auth**: Not required\n- **Body**: JSON with `email` and `password`\n\n## Response - `200 OK`\n\nReturns `access_token`, `token_type`, `user`, and `username_was_auto_generated`. The flag is true when the username was modified by the system. Sets HttpOnly access and refresh cookies; the refresh token is not included in JSON.\n\n## Errors\n\n- `401`: credentials are invalid"
           },
           "event": [
             {
@@ -336,7 +336,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Sandra Dee\",\n  \"email\": \"sandra@mail.com\",\n  \"password\": \"password123\"\n}"
+              "raw": "{\n  \"name\": \"sandra-dee\",\n  \"email\": \"sandra@mail.com\",\n  \"password\": \"password123\"\n}"
             },
             "url": {
               "raw": "http://{{baseUrl}}/api/v1/users",
@@ -489,7 +489,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Sandra Dee Updated\"\n}"
+              "raw": "{\n  \"name\": \"sandra-dee\"\n}"
             },
             "url": {
               "raw": "http://{{baseUrl}}/api/v1/users/{{userId}}",
@@ -852,7 +852,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Sandra Dee Updated\"\n}"
+              "raw": "{\n  \"username\": \"sandra-dee\"\n}"
             },
             "url": {
               "raw": "http://{{baseUrl}}/api/v2/users/{{userId}}",
@@ -867,7 +867,7 @@
                 "{{userId}}"
               ]
             },
-            "description": "# Update user\n\nPartially updates the authenticated user's own account.\n\n- **Method**: `PUT`\n- **Path**: `/api/v2/users/{user_id}`\n- **Auth**: Required (Bearer JWT)\n- **Body**: Optional `name`, `email`, or `password` fields; passwords must be at least 8 characters\n\n## Response - `204 No Content`\n\nEmpty response body.\n\n## Errors\n\n- `400`: invalid email or password\n- `401`: token is missing or invalid\n- `403`: path user ID does not match the authenticated user\n- `404`: user not found\n- `409`: email already registered"
+            "description": "# Update user\n\nPartially updates the authenticated user's own account.\n\n- **Method**: `PUT`\n- **Path**: `/api/v2/users/{user_id}`\n- **Auth**: Required (Bearer JWT)\n- **Body**: Optional `username`, `email`, or `password` fields; passwords must be at least 8 characters\n\n## Response - `204 No Content`\n\nEmpty response body.\n\n## Errors\n\n- `400`: invalid email or password\n- `401`: token is missing or invalid\n- `403`: path user ID does not match the authenticated user\n- `404`: user not found\n- `409`: email already registered or username already taken"
           }
         },
         {
