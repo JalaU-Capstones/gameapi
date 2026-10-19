@@ -2,13 +2,21 @@ from datetime import datetime
 
 from pydantic import AliasChoices, EmailStr, Field, field_validator
 
+from gameapi.core.username import USERNAME_MAX_LENGTH, USERNAME_MIN_LENGTH, USERNAME_PATTERN
 from gameapi.schemas.base import ApiModel, ObjectIdStr
+
+_USERNAME_DESCRIPTION = (
+    "Unique username: 3-30 chars, alphanumeric, hyphens, and underscores. "
+    "Must begin and end with a letter or digit."
+)
 
 
 class UserCreate(ApiModel):
     username: str = Field(
-        min_length=3,
-        max_length=30,
+        min_length=USERNAME_MIN_LENGTH,
+        max_length=USERNAME_MAX_LENGTH,
+        pattern=USERNAME_PATTERN,
+        description=_USERNAME_DESCRIPTION,
         validation_alias=AliasChoices("username", "name"),
     )
     email: EmailStr
@@ -27,8 +35,10 @@ class UserCreate(ApiModel):
 class UserUpdate(ApiModel):
     username: str | None = Field(
         default=None,
-        min_length=3,
-        max_length=30,
+        min_length=USERNAME_MIN_LENGTH,
+        max_length=USERNAME_MAX_LENGTH,
+        pattern=USERNAME_PATTERN,
+        description=_USERNAME_DESCRIPTION,
         validation_alias=AliasChoices("username", "name"),
     )
     email: EmailStr | None = None
