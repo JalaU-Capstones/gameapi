@@ -73,10 +73,12 @@ resources:
     userId: ''
     gameplayId: ''
     guestId: ''
+    guestUsername: guest-player
     guestEmail: guest@mail.com
     guestPassword: password123
     guestToken: ''
     testEmail: sandra@mail.com
+    testUsername: sandra-dee
     testPassword: password123
     access_token: ''
     refresh_token: ''
@@ -87,10 +89,12 @@ resources:
     - userId
     - gameplayId
     - guestId
+    - guestUsername
     - guestEmail
     - guestPassword
     - guestToken
     - testEmail
+    - testUsername
     - testPassword
     - access_token
     - refresh_token
@@ -336,7 +340,7 @@ resources:
   method: POST
   body:
     mimeType: application/json
-    text: "{\n  \"name\": \"Sandra Dee\",\n  \"email\": \"{{ _.testEmail }}\",\n \
+    text: "{\n  \"username\": \"{{ _.testUsername }}\",\n  \"email\": \"{{ _.testEmail }}\",\n\
       \ \"password\": \"{{ _.testPassword }}\"\n}"
   parameters: []
   headers:
@@ -346,16 +350,15 @@ resources:
   description: "# Register\n\nCreates a user account and immediately starts an authenticated\
     \ session.\n\n- **Method**: `POST`\n- **Path**: `/api/v2/auth/register`\n- **Auth**:\
     \ Not required\n\n## Request body\n\n| Field | Type | Required | Constraints |\n\
-    |-------|------|----------|-------------|\n| `name` | string | Yes | Non-empty,\
-    \ maximum 100 characters |\n| `email` | string | Yes | Valid email; stored in\
+    |-------|------|----------|-------------|\n| `username` | string | Yes | 3-30 characters; unique, sanitized username |\n| `email` | string | Yes | Valid email; stored in\
     \ lowercase |\n| `password` | string | Yes | 8\u2013128 characters |\n\n## Response\
     \ \u2014 `201 Created`\n\n```json\n{\"access_token\":\"...\",\"token_type\":\"\
-    bearer\",\"user\":{\"id\":\"...\",\"name\":\"Sandra Dee\",\"email\":\"sandra@mail.com\"\
-    ,\"registerDate\":\"...\"}}\n```\n\nThe response also sets the HttpOnly access\
+    bearer\",\"user\":{\"id\":\"...\",\"username\":\"sandra-dee\",\"email\":\"sandra@mail.com\"\
+    ,\"registerDate\":\"...\"},\"username_was_auto_generated\":false}\n```\n\nThe response also sets the HttpOnly access\
     \ and refresh cookies. The **After-response script** stores `userId` and `access_token`;\
     \ the refresh token is never included in the JSON body.\n\n## Errors\n\n| Status\
     \ | Cause |\n|--------|-------|\n| `400` | Invalid email, short password, or missing/invalid\
-    \ fields |\n| `409` | Email already registered |"
+    \ fields |\n| `409` | Email or username already taken |"
   authentication: {}
   metaSortKey: -1790553600004
   isPrivate: false
@@ -815,7 +818,7 @@ resources:
   method: PUT
   body:
     mimeType: application/json
-    text: "{\n  \"name\": \"Sandra Dee Updated\"\n}"
+    text: "{\n  \"username\": \"sandra-dee\"\n}"
   parameters: []
   headers:
   - name: Content-Type
@@ -823,13 +826,13 @@ resources:
     id: pair_ct_update_user_v2
   description: "# Update user\n\nPartially updates the authenticated user's own account.\n\
     \n- **Method**: `PUT`\n- **Path**: `/api/v2/users/{userId}`\n- **Auth**: Required\
-    \ (Bearer JWT)\n\n## Request body\n\nAll fields are optional: `name`, `email`,\
-    \ and `password`. Email must be unique; passwords must contain at least 8 characters.\n\
+    \ (Bearer JWT)\n\n## Request body\n\nAll fields are optional: `username`, `email`,\
+    \ and `password`. Usernames are unique and 3-30 characters; passwords must contain at least 8 characters.\n\
     \n## Response \u2014 `204 No Content`\n\nEmpty body.\n\n## Errors\n\n| Status\
     \ | Cause |\n|--------|-------|\n| `400` | Invalid email or password |\n| `401`\
     \ | Missing, invalid, or expired token |\n| `403` | Path user ID does not match\
-    \ the authenticated user |\n| `404` | User not found |\n| `409` | Email already\
-    \ registered |"
+    \ the authenticated user |\n| `404` | User not found |\n| `409` | Email or username already\
+    \ taken |"
   authentication:
     type: bearer
     token: '{{ _.access_token }}'
@@ -1454,7 +1457,7 @@ resources:
     :{\"user_id\":\"8df1c70b-...\"}}\n```\n\nFailure response:\n\n```json\n{\"event\"\
     :\"auth_error\",\"payload\":{\"reason\":\"invalid_token\"}}\n```\n\n### Step 2\
     \ \u2014 Create game (host \u2192 server)\n\n```json\n{\"event\":\"create_game\"\
-    ,\"payload\":{\"guest_id\":\"{{ _.guestId }}\"}}\n```\n\nResponse to the **host**:\n\
+    ,\"payload\":{\"guest_id\":\"{{ _.guestId }}\",\"guest_username\":\"{{ _.guestUsername }}\"}}\n```\n\nIf `guest_username` is provided, it must match the guest's actual username. Mismatches return `USERNAME_MISMATCH`.\n\nResponse to the **host**:\n\
     \n```json\n{\"event\":\"game_created\",\"payload\":{\"game_id\":\"cd820ba6-...\"\
     ,\"guest_id\":\"9a02d81c-...\",\"board\":[[0,0,0],[0,0,0],[0,0,0]],\"turn\":\"\
     8df1c70b-...\"}}\n```\n\nResponse to the **guest**:\n\n```json\n{\"event\":\"\
@@ -1508,7 +1511,7 @@ resources:
     \ pending |\n| `NOT_A_PARTICIPANT` | Caller is neither host nor guest |\n| `INVITATION_NOT_PENDING`\
     \ | Accept/reject called on a game that is not pending |\n| `CANNOT_INVITE_SELF`\
     \ | `guest_id` equals the host |\n| `OPPONENT_OFFLINE` | Guest is not connected\
-    \ via WebSocket |\n| `RETRY_LIMIT_EXCEEDED` | The host exceeded the per-pair retry\
+    \ via WebSocket |\n| `USERNAME_MISMATCH` | The provided guest username does not match the user ID |\n| `RETRY_LIMIT_EXCEEDED` | The host exceeded the per-pair retry\
     \ window |\n| `CREATE_GAME_RATE_LIMITED` | The host exceeded the `create_game`\
     \ sliding window |\n| `UNKNOWN_ERROR` | Any other domain error |\n\n## Disconnect\
     \ behavior\n\n- Closing the socket while a game is active \u2192 the opponent\
