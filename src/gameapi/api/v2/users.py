@@ -11,6 +11,7 @@ from gameapi.api.deps import CurrentUser, UserServiceDep, get_current_user
 from gameapi.api.v2.ws.manager import presence_manager
 from gameapi.schemas.user import PublicUserResponse, UserUpdate
 from gameapi.services import EmailAlreadyExistsError, UserHasOpenGameplaysError, UserNotFoundError
+from gameapi.services.exceptions import UsernameAlreadyExistsError
 
 router = APIRouter(
     prefix="/users",
@@ -80,7 +81,9 @@ async def update_user(
         raise HTTPException(404, "User not found") from exc
     except EmailAlreadyExistsError as exc:
         raise HTTPException(409, "Email is currently registered") from exc
-    if payload.name is not None:
+    except UsernameAlreadyExistsError as exc:
+        raise HTTPException(409, "Username is already taken") from exc
+    if payload.username is not None:
         await presence_manager.broadcast({"event": "user_updated", "payload": {"user_id": user_id}})
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
