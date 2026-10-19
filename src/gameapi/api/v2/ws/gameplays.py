@@ -202,6 +202,19 @@ async def _handle_message(
             create_payload = CreateGamePayload(**payload_raw)
             if create_payload.guest_id == user_id:
                 raise CannotInviteSelfError(user_id)
+            if create_payload.guest_username:
+                guest_user = await engine_service.user_service.get_by_id(create_payload.guest_id)
+                if not guest_user or guest_user.username != create_payload.guest_username:
+                    await websocket.send_json(
+                        {
+                            "event": "error",
+                            "payload": {
+                                "code": "USERNAME_MISMATCH",
+                                "message": "The username provided does not match the user ID.",
+                            },
+                        }
+                    )
+                    return current_game_id
             if not gameplays_manager.is_online(create_payload.guest_id):
                 raise OpponentOfflineError(create_payload.guest_id)
 
