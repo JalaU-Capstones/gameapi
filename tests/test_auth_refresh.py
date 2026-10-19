@@ -17,7 +17,7 @@ from gameapi.services.user_service import UserService
 async def test_refresh_returns_new_access_token(client: AsyncClient) -> None:
     await client.post(
         "/api/v1/users",
-        json={"name": "Test User", "email": "test@example.com", "password": "password123"},
+        json={"name": "Test-User", "email": "test@example.com", "password": "password123"},
     )
     login = await client.post(
         "/api/v2/auth/login",
@@ -35,7 +35,7 @@ async def test_refresh_returns_new_access_token(client: AsyncClient) -> None:
 async def test_refresh_rotates_refresh_token(client: AsyncClient) -> None:
     await client.post(
         "/api/v1/users",
-        json={"name": "Test User", "email": "test@example.com", "password": "password123"},
+        json={"name": "Test-User", "email": "test@example.com", "password": "password123"},
     )
     login = await client.post(
         "/api/v2/auth/login",
@@ -56,7 +56,7 @@ async def test_refresh_without_cookie_returns_401(client: AsyncClient) -> None:
 async def test_refresh_with_revoked_token_returns_401(client: AsyncClient) -> None:
     await client.post(
         "/api/v1/users",
-        json={"name": "Test User", "email": "test@example.com", "password": "password123"},
+        json={"name": "Test-User", "email": "test@example.com", "password": "password123"},
     )
     login = await client.post(
         "/api/v2/auth/login",
@@ -80,12 +80,12 @@ async def test_refresh_with_revoked_token_returns_401(client: AsyncClient) -> No
 async def test_refresh_with_expired_token_returns_401(client: AsyncClient, db_session) -> None:
     await client.post(
         "/api/v1/users",
-        json={"name": "Test User", "email": "test@example.com", "password": "password123"},
+        json={"name": "Test-User", "email": "test@example.com", "password": "password123"},
     )
     raw_refresh = "known-raw-refresh-token"
     created = await client.post(
         "/api/v1/users",
-        json={"name": "Other User", "email": "other@example.com", "password": "password123"},
+        json={"name": "Other-User", "email": "other@example.com", "password": "password123"},
     )
     db_session.add(
         RefreshToken(
@@ -172,7 +172,7 @@ async def test_auth_service_rejects_invalid_credentials_and_refresh_tokens(db_se
     auth_service = AuthService(user_service, RefreshTokenRepository(db_session))
 
     await user_service.create(
-        UserCreate(name="Test User", email="valid@example.com", password="password123")
+        UserCreate(name="Test-User", email="valid@example.com", password="password123")
     )
 
     with pytest.raises(InvalidCredentialsError):

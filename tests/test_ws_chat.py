@@ -50,7 +50,7 @@ async def test_ws_chat_count_notifications_on_join_and_leave(
     registered_user: dict[str, object],
 ) -> None:
     other_payload = {
-        "name": "Chat User B",
+        "name": "Chat-User-B",
         "email": "chat-b@example.com",
         "password": "password123",
     }
@@ -131,7 +131,7 @@ async def test_ws_chat_send_broadcasts_message_and_sanitization(
     registered_user: dict[str, object],
 ) -> None:
     other_payload = {
-        "name": "Chat User B",
+        "name": "Chat-User-B",
         "email": "chat-b2@example.com",
         "password": "password123",
     }
@@ -226,7 +226,7 @@ async def test_ws_chat_rate_limit_and_unknown_event_and_invalid_payload(
     monkeypatch.setattr("gameapi.services.chat_service.chat_service._monotonic_fn", lambda: now[0])
 
     other_payload = {
-        "name": "Chat User B",
+        "name": "Chat-User-B",
         "email": "chat-b3@example.com",
         "password": "password123",
     }

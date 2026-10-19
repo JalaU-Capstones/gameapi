@@ -298,10 +298,10 @@ async def test_create_game_rejects_host_busy_and_active_guest_game(
     host_id, guest_id = await _create_users(db_session)
     user_service = UserService(db_session)
     other_host = await user_service.create(
-        UserCreate(name="Other Host", email="otherhost@example.com", password="password123")
+        UserCreate(name="Other-Host", email="otherhost@example.com", password="password123")
     )
     other_guest = await user_service.create(
-        UserCreate(name="Other Guest", email="otherguest@example.com", password="password123")
+        UserCreate(name="Other-Guest", email="otherguest@example.com", password="password123")
     )
     await db_session.commit()
 
@@ -325,7 +325,7 @@ async def test_accept_invitation_expires_other_pending_requests_for_guest(
     host_id, guest_id = await _create_users(db_session)
     user_service = UserService(db_session)
     other_host = await user_service.create(
-        UserCreate(name="Other Host", email="otherhost2@example.com", password="strongpass")
+        UserCreate(name="Other-Host", email="otherhost2@example.com", password="strongpass")
     )
     await db_session.commit()
 
@@ -346,10 +346,10 @@ async def test_reject_invitation_promotes_next_queued_game_for_guest(
     _, guest_id = await _create_users(db_session)
     user_service = UserService(db_session)
     first_host = await user_service.create(
-        UserCreate(name="First Host", email="firsthost@example.com", password="supersecret")
+        UserCreate(name="First-Host", email="firsthost@example.com", password="supersecret")
     )
     second_host = await user_service.create(
-        UserCreate(name="Second Host", email="secondhost@example.com", password="supersecret")
+        UserCreate(name="Second-Host", email="secondhost@example.com", password="supersecret")
     )
     await db_session.commit()
 

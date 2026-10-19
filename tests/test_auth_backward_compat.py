@@ -4,7 +4,7 @@ from httpx import AsyncClient
 async def test_v1_login_still_returns_token_in_body(client: AsyncClient) -> None:
     await client.post(
         "/api/v1/users",
-        json={"name": "Test User", "email": "test@example.com", "password": "password123"},
+        json={"name": "Test-User", "email": "test@example.com", "password": "password123"},
     )
     response = await client.post(
         "/api/v1/users/login",
@@ -21,7 +21,7 @@ async def test_v1_login_still_returns_token_in_body(client: AsyncClient) -> None
 async def test_v1_endpoints_work_with_bearer_header(client: AsyncClient) -> None:
     created = await client.post(
         "/api/v1/users",
-        json={"name": "Test User", "email": "test@example.com", "password": "password123"},
+        json={"name": "Test-User", "email": "test@example.com", "password": "password123"},
     )
     login = await client.post(
         "/api/v1/users/login",
@@ -35,4 +35,4 @@ async def test_v1_endpoints_work_with_bearer_header(client: AsyncClient) -> None
         headers={"Authorization": f"Bearer {login.json()['token']}"},
     )
     assert response.status_code == 200, response.text
-    assert response.json() == {"id": created.json()["id"], "name": "Test User"}
+    assert response.json() == {"id": created.json()["id"], "name": "Test-User"}

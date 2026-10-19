@@ -121,7 +121,7 @@ async def test_ws_gameplays_queued_invitation_does_not_send_invitation_received(
     client: AsyncClient,
 ) -> None:
     payload = {
-        "name": "User C",
+        "name": "User-C",
         "email": "c@example.com",
         "password": "password123",
     }

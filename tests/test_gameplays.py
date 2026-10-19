@@ -418,7 +418,7 @@ async def test_update_gameplay_with_new_player_turn(
     gameplay = await _create_gameplay(client, auth_headers, registered_user["id"])
     other = await client.post(
         "/api/v1/users",
-        json={"name": "Turn User", "email": "turn@example.com", "password": "password123"},
+        json={"name": "Turn-User", "email": "turn@example.com", "password": "password123"},
     )
     assert other.status_code == 201
 

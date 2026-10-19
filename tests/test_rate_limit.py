@@ -6,7 +6,7 @@ from gameapi.api.v2.ws.auth import authenticate_websocket
 from gameapi.core.config import settings
 
 
-async def _register_user(client: AsyncClient, *, email: str, name: str = "Rate Limit User") -> str:
+async def _register_user(client: AsyncClient, *, email: str, name: str = "Rate-Limit-User") -> str:
     response = await client.post(
         "/api/v2/auth/register",
         json={"name": name, "email": email, "password": "password123"},
@@ -56,7 +56,7 @@ async def test_register_returns_429_after_3_attempts(client: AsyncClient) -> Non
         response = await client.post(
             "/api/v2/auth/register",
             json={
-                "name": f"Rate Limit {index}",
+                "name": f"Rate-Limit-{index}",
                 "email": f"rate-register-{index}@example.com",
                 "password": "password123",
             },
@@ -86,8 +86,8 @@ async def test_refresh_returns_429_after_10_attempts(client: AsyncClient) -> Non
 
 
 async def test_authenticated_users_have_separate_limits(client: AsyncClient) -> None:
-    token_a = await _register_user(client, email="user-a@example.com", name="User A")
-    token_b = await _register_user(client, email="user-b@example.com", name="User B")
+    token_a = await _register_user(client, email="user-a@example.com", name="User-A")
+    token_b = await _register_user(client, email="user-b@example.com", name="User-B")
 
     for _ in range(60):
         response = await client.get(
@@ -110,7 +110,7 @@ async def test_authenticated_users_have_separate_limits(client: AsyncClient) -> 
 
 
 async def test_logs_me_returns_429_after_30_requests(client: AsyncClient) -> None:
-    token = await _register_user(client, email="logs-me@example.com", name="Logs Me")
+    token = await _register_user(client, email="logs-me@example.com", name="Logs-Me")
 
     for index in range(31):
         response = await client.get(
@@ -124,7 +124,7 @@ async def test_logs_me_returns_429_after_30_requests(client: AsyncClient) -> Non
 
 
 async def test_logs_admin_returns_429_after_300_requests(client: AsyncClient, monkeypatch) -> None:
-    token = await _register_user(client, email="logs-admin@example.com", name="Logs Admin")
+    token = await _register_user(client, email="logs-admin@example.com", name="Logs-Admin")
     monkeypatch.setattr(settings.log, "admin_emails", ["logs-admin@example.com"])
 
     for index in range(301):
@@ -173,7 +173,7 @@ async def test_v1_register_rate_limited(client: AsyncClient) -> None:
         response = await client.post(
             "/api/v1/users",
             json={
-                "name": f"V1 Rate Limit {index}",
+                "name": f"V1-Rate-Limit-{index}",
                 "email": f"v1-rate-register-{index}@example.com",
                 "password": "password123",
             },
@@ -189,7 +189,7 @@ async def test_v1_list_users_rate_limited(client: AsyncClient) -> None:
     response = await client.post(
         "/api/v1/users",
         json={
-            "name": "V1 List Rate User",
+            "name": "V1-List-Rate-User",
             "email": "v1-list-rate@example.com",
             "password": "password123",
         },
@@ -213,7 +213,7 @@ async def test_v1_list_users_rate_limited(client: AsyncClient) -> None:
 
 
 async def test_ws_handshake_returns_4429_after_10_attempts(client: AsyncClient) -> None:
-    token = await _register_user(client, email="ws@example.com", name="WS User")
+    token = await _register_user(client, email="ws@example.com", name="WS-User")
 
     class FakeSocket:
         def __init__(self, auth_token: str) -> None:

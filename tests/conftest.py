@@ -203,7 +203,7 @@ def _reset_chat_service() -> Iterator[None]:
 @pytest_asyncio.fixture
 async def registered_user(client: AsyncClient) -> dict[str, object]:
     payload = {
-        "name": "Test User",
+        "name": "Test-User",
         "email": "test@example.com",
         "password": "password123",
     }
@@ -262,7 +262,7 @@ async def authed_client_bearer(
 @pytest_asyncio.fixture
 async def registered_user_a(client: AsyncClient) -> dict[str, object]:
     payload = {
-        "name": "User A",
+        "name": "User-A",
         "email": "a@example.com",
         "password": "password123",
     }
@@ -287,7 +287,7 @@ async def auth_token_a(client: AsyncClient, registered_user_a: dict[str, object]
 @pytest_asyncio.fixture
 async def registered_user_b(client: AsyncClient) -> dict[str, object]:
     payload = {
-        "name": "User B",
+        "name": "User-B",
         "email": "b@example.com",
         "password": "password123",
     }

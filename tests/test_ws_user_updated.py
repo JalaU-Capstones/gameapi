@@ -24,7 +24,7 @@ async def test_name_change_broadcasts_user_updated(
 
         response = await client.put(
             f"/api/v2/users/{user_id}",
-            json={"name": "New Name"},
+            json={"name": "New-Name"},
             headers=auth_headers,
         )
         assert response.status_code == 204

@@ -6,7 +6,7 @@ from gameapi.core.config import settings
 async def test_logout_clears_cookies(client: AsyncClient) -> None:
     await client.post(
         "/api/v1/users",
-        json={"name": "Test User", "email": "test@example.com", "password": "password123"},
+        json={"name": "Test-User", "email": "test@example.com", "password": "password123"},
     )
     login = await client.post(
         "/api/v2/auth/login",
@@ -25,7 +25,7 @@ async def test_logout_clears_cookies(client: AsyncClient) -> None:
 async def test_logout_revokes_refresh_token(client: AsyncClient) -> None:
     await client.post(
         "/api/v1/users",
-        json={"name": "Test User", "email": "test@example.com", "password": "password123"},
+        json={"name": "Test-User", "email": "test@example.com", "password": "password123"},
     )
     login = await client.post(
         "/api/v2/auth/login",
@@ -49,7 +49,7 @@ async def test_logout_revokes_refresh_token(client: AsyncClient) -> None:
 async def test_logout_is_idempotent(client: AsyncClient) -> None:
     await client.post(
         "/api/v1/users",
-        json={"name": "Test User", "email": "test@example.com", "password": "password123"},
+        json={"name": "Test-User", "email": "test@example.com", "password": "password123"},
     )
     await client.post(
         "/api/v2/auth/login",

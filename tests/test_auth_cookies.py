@@ -31,7 +31,7 @@ def test_hierarchical_key_uses_configured_access_cookie_name(monkeypatch) -> Non
 async def test_login_sets_httponly_access_cookie(client: AsyncClient) -> None:
     await client.post(
         "/api/v1/users",
-        json={"name": "Test User", "email": "test@example.com", "password": "password123"},
+        json={"name": "Test-User", "email": "test@example.com", "password": "password123"},
     )
     response = await client.post(
         "/api/v2/auth/login",
@@ -47,7 +47,7 @@ async def test_login_sets_httponly_access_cookie(client: AsyncClient) -> None:
 async def test_login_sets_httponly_refresh_cookie(client: AsyncClient) -> None:
     await client.post(
         "/api/v1/users",
-        json={"name": "Test User", "email": "test@example.com", "password": "password123"},
+        json={"name": "Test-User", "email": "test@example.com", "password": "password123"},
     )
     response = await client.post(
         "/api/v2/auth/login",
@@ -64,7 +64,7 @@ async def test_login_sets_httponly_refresh_cookie(client: AsyncClient) -> None:
 async def test_login_returns_access_token_in_body_but_not_refresh(client: AsyncClient) -> None:
     await client.post(
         "/api/v1/users",
-        json={"name": "Test User", "email": "test@example.com", "password": "password123"},
+        json={"name": "Test-User", "email": "test@example.com", "password": "password123"},
     )
     response = await client.post(
         "/api/v2/auth/login",
@@ -90,7 +90,7 @@ async def test_login_with_invalid_credentials_returns_401(client: AsyncClient) -
 async def test_get_me_works_with_cookie(client: AsyncClient) -> None:
     await client.post(
         "/api/v1/users",
-        json={"name": "Test User", "email": "test@example.com", "password": "password123"},
+        json={"name": "Test-User", "email": "test@example.com", "password": "password123"},
     )
     login = await client.post(
         "/api/v2/auth/login",
@@ -106,7 +106,7 @@ async def test_get_me_works_with_cookie(client: AsyncClient) -> None:
 async def test_get_me_works_with_bearer_header(client: AsyncClient) -> None:
     await client.post(
         "/api/v1/users",
-        json={"name": "Test User", "email": "test@example.com", "password": "password123"},
+        json={"name": "Test-User", "email": "test@example.com", "password": "password123"},
     )
     login = await client.post(
         "/api/v2/auth/login",

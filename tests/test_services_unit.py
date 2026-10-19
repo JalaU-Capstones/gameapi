@@ -251,7 +251,7 @@ async def test_user_service_get_by_id_invalid_uuid(db_session) -> None:
 async def test_user_service_update_nonexistent_uuid(db_session) -> None:
     service = UserService(db_session)
     with pytest.raises(UserNotFoundError):
-        await service.update(str(uuid.uuid4()), UserUpdate(name="Updated Name"))
+        await service.update(str(uuid.uuid4()), UserUpdate(name="Updated-Name"))
 
 
 async def test_user_service_delete_nonexistent_uuid(db_session) -> None:

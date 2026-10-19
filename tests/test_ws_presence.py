@@ -182,7 +182,7 @@ async def test_ws_presence_notifies_other_connections(
     registered_user: dict[str, object],
 ) -> None:
     other_payload = {
-        "name": "Presence User B",
+        "name": "Presence-User-B",
         "email": "presence-b@example.com",
         "password": "password123",
     }
@@ -230,7 +230,7 @@ async def test_ws_presence_user_offline_notification(
     registered_user: dict[str, object],
 ) -> None:
     other_payload = {
-        "name": "Presence User B",
+        "name": "Presence-User-B",
         "email": "presence-b@example.com",
         "password": "password123",
     }
