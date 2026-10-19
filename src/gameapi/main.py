@@ -176,8 +176,23 @@ async def validation_exception_handler(
         message = f"{location}: {first.get('msg', 'Invalid request')}".strip(": ")
     else:
         message = "Invalid request"
+    username_validation_error = any(
+        {"username", "name"}.intersection(str(part) for part in error.get("loc", []))
+        and error.get("type")
+        in {
+            "string_pattern_mismatch",
+            "string_too_short",
+            "string_too_long",
+            "string_type",
+        }
+        for error in errors
+    )
     return JSONResponse(
-        status_code=status.HTTP_400_BAD_REQUEST,
+        status_code=(
+            status.HTTP_422_UNPROCESSABLE_CONTENT
+            if username_validation_error
+            else status.HTTP_400_BAD_REQUEST
+        ),
         content={"message": message},
     )
 
