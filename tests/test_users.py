@@ -1,11 +1,19 @@
+import uuid
+
 import pytest
 from fastapi import HTTPException
 from httpx import AsyncClient
+from sqlalchemy import select, update
 
 from gameapi.api.v1.users import _require_self
 from gameapi.api.v2.users import delete_user, get_user, update_user
+from gameapi.db.models.user import User
 from gameapi.schemas.user import UserResponse, UserUpdate
-from gameapi.services.exceptions import EmailAlreadyExistsError, UserNotFoundError
+from gameapi.services.exceptions import (
+    EmailAlreadyExistsError,
+    UsernameAlreadyExistsError,
+    UserNotFoundError,
+)
 
 
 def test_require_self_rejects_user_without_persisted_id() -> None:
@@ -76,6 +84,40 @@ async def test_register_duplicate_email_returns_409(client: AsyncClient) -> None
     second = await client.post("/api/v1/users", json=payload)
     assert second.status_code == 409
     assert second.json()["message"] == "Email is currently registered"
+
+
+async def test_v1_create_duplicate_username_returns_409(
+    client: AsyncClient,
+    registered_user: dict[str, object],
+) -> None:
+    response = await client.post(
+        "/api/v1/users",
+        json={
+            "name": registered_user["name"],
+            "email": "duplicate-name-v1@example.com",
+            "password": "password123",
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["message"] == "Username is already taken"
+
+
+async def test_v2_register_duplicate_username_returns_409(
+    client: AsyncClient,
+    registered_user: dict[str, object],
+) -> None:
+    response = await client.post(
+        "/api/v2/auth/register",
+        json={
+            "username": registered_user["username"],
+            "email": "duplicate-name-v2@example.com",
+            "password": "password123",
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["message"] == "Username is already taken"
 
 
 async def test_list_users_v1_returns_410(
@@ -156,6 +198,75 @@ async def test_update_user_with_token(
 
     fetched = await client.get(f"/api/v1/users/{user_id}", headers=auth_headers)
     assert fetched.json()["name"] == "Updated Name"
+
+
+async def test_v1_update_duplicate_username_returns_409(
+    client: AsyncClient,
+    registered_user: dict[str, object],
+    auth_headers: dict[str, str],
+) -> None:
+    await client.post(
+        "/api/v1/users",
+        json={"name": "TakenName", "email": "taken-v1@example.com", "password": "password123"},
+    )
+
+    response = await client.put(
+        f"/api/v1/users/{registered_user['id']}",
+        json={"name": "TakenName"},
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 409
+    assert response.json()["message"] == "Username is already taken"
+
+
+async def test_user_update_resets_username_system_flag(
+    client: AsyncClient,
+    registered_user: dict[str, object],
+    auth_headers: dict[str, str],
+    db_session,
+) -> None:
+    await db_session.execute(
+        update(User)
+        .where(User.id == uuid.UUID(str(registered_user["id"])))
+        .values(username_modified_by_system=True)
+    )
+    await db_session.commit()
+
+    response = await client.put(
+        f"/api/v1/users/{registered_user['id']}",
+        json={"name": "UpdatedUsername"},
+        headers=auth_headers,
+    )
+    assert response.status_code == 204
+
+    db_session.expire_all()
+    user = await db_session.scalar(
+        select(User).where(User.id == uuid.UUID(str(registered_user["id"])))
+    )
+    assert user is not None
+    assert user.username == "UpdatedUsername"
+    assert user.username_modified_by_system is False
+
+
+async def test_v2_update_duplicate_username_returns_409(
+    client: AsyncClient,
+    registered_user: dict[str, object],
+    auth_headers: dict[str, str],
+) -> None:
+    await client.post(
+        "/api/v1/users",
+        json={"name": "TakenName", "email": "taken-v2@example.com", "password": "password123"},
+    )
+
+    response = await client.put(
+        f"/api/v2/users/{registered_user['id']}",
+        json={"username": "TakenName"},
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 409
+    assert response.json()["message"] == "Username is already taken"
 
 
 async def test_update_user_with_email_only_updates_email(
@@ -318,6 +429,19 @@ async def test_v2_user_routes_cover_ownership_and_service_errors() -> None:
             UserUpdate(email="taken@example.com"),
             current_user,
             DuplicateEmailService(),
+        )
+    assert exc.value.status_code == 409
+
+    class DuplicateUsernameService:
+        async def update(self, user_id: str, payload: UserUpdate):
+            raise UsernameAlreadyExistsError()
+
+    with pytest.raises(HTTPException) as exc:
+        await update_user(
+            str(current_user.id),
+            UserUpdate(username="taken"),
+            current_user,
+            DuplicateUsernameService(),
         )
     assert exc.value.status_code == 409
 

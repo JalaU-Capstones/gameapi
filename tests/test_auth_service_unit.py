@@ -5,13 +5,15 @@ from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from gameapi.core.security import hash_refresh_token
 from gameapi.db.models.refresh_token import RefreshToken
 from gameapi.db.models.session import Session
+from gameapi.db.models.user import User
 from gameapi.repositories.refresh_token_repository import RefreshTokenRepository
 from gameapi.repositories.session_repository import SessionRepository
+from gameapi.schemas.auth import LoginResponse
 from gameapi.schemas.user import UserCreate
 from gameapi.services.auth_service import AuthService
 from gameapi.services.exceptions import InvalidRefreshTokenError
@@ -170,3 +172,56 @@ async def test_auth_service_refresh_returns_new_tokens_for_valid_token(db_sessio
     stored = await repo.get_by_hash(hash_refresh_token(new_refresh))
     assert stored is not None
     assert stored.session_id == session.id
+
+
+async def test_login_response_includes_auto_generated_username_flag(
+    client,
+    db_session,
+) -> None:
+    user_service = UserService(db_session)
+    user = await user_service.create(
+        UserCreate(name="Generated", email="generated@example.com", password="password123")
+    )
+    await db_session.execute(
+        update(User).where(User.id == user.id).values(username_modified_by_system=True)
+    )
+    await db_session.commit()
+
+    response = await client.post(
+        "/api/v2/auth/login",
+        json={"email": "generated@example.com", "password": "password123"},
+    )
+
+    assert response.status_code == 200
+    login_response = LoginResponse.model_validate(response.json())
+    assert login_response.username_was_auto_generated is True
+
+
+async def test_register_response_includes_auto_generated_username_flag(
+    client,
+    db_session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    original_create = UserService.create
+
+    async def create_auto_generated_username(self, data):
+        user_response = await original_create(self, data)
+        user_response.username_modified_by_system = True
+        await db_session.execute(
+            update(User).where(User.id == user_response.id).values(username_modified_by_system=True)
+        )
+        return user_response
+
+    monkeypatch.setattr(UserService, "create", create_auto_generated_username)
+
+    response = await client.post(
+        "/api/v2/auth/register",
+        json={
+            "name": "Generated Register",
+            "email": "generated-register@example.com",
+            "password": "password123",
+        },
+    )
+
+    assert response.status_code == 201
+    assert response.json()["username_was_auto_generated"] is True

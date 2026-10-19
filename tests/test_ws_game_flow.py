@@ -136,6 +136,38 @@ async def test_rejection_flow(
         assert res_a["event"] == "invitation_rejected"
 
 
+@pytest.mark.asyncio
+async def test_create_game_rejects_mismatched_guest_username(
+    ws_client_factory: Callable[[], AsyncClient],
+    registered_user_b: dict,
+    auth_token_a: str,
+    auth_token_b: str,
+) -> None:
+    async with (
+        ws_client_factory() as ca,
+        aconnect_ws("ws://test/api/v2/ws/gameplays", client=ca) as wsa,
+        ws_client_factory() as cb,
+        aconnect_ws("ws://test/api/v2/ws/gameplays", client=cb) as wsb,
+    ):
+        await _send_recv(wsa, {"event": "auth", "payload": {"token": auth_token_a}})
+        await _send_recv(wsb, {"event": "auth", "payload": {"token": auth_token_b}})
+
+        response = await _send_recv(
+            wsa,
+            {
+                "event": "create_game",
+                "payload": {
+                    "guest_id": registered_user_b["id"],
+                    "guest_username": "spoofed_username",
+                },
+            },
+        )
+
+        assert response["event"] == "error"
+        assert response["payload"]["code"] == "USERNAME_MISMATCH"
+        assert response["payload"]["message"] == "The username provided does not match the user ID."
+
+
 # ---------------------------------------------------------------------------
 # NOT_YOUR_TURN error
 # ---------------------------------------------------------------------------
