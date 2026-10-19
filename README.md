@@ -7,8 +7,8 @@ REST API para gestión de usuarios y partidas de Tic-Tac-Toe.
 [![Render](https://img.shields.io/badge/Render-production-46E3B7?logo=render&logoColor=white)](https://gameapi-9vos.onrender.com/health)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg)](https://fastapi.tiangolo.com/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![Tests](https://img.shields.io/badge/tests-456%20passed-success.svg)](#pruebas)
-[![Coverage](https://img.shields.io/badge/coverage-94.26%25-green.svg)](#cobertura)
+[![Tests](https://img.shields.io/badge/tests-465%20passed-success.svg)](#pruebas)
+[![Coverage](https://img.shields.io/badge/coverage-94.27%25-green.svg)](#cobertura)
 
 **Stack:** Python 3.11+ · FastAPI · PostgreSQL 16 · SQLAlchemy 2.0 async · Pydantic v2 · JWT · WebSocket · uv · Docker
 
@@ -329,8 +329,9 @@ El login tradicional sigue devolviendo el access token en el body. Se puede usar
 `name` in the legacy v1 request bodies and `username` in v2 represent the same
 unique, sanitized username. Usernames are 3-30 characters and may contain only
 letters, digits, hyphens, and underscores; spaces are not allowed. A username
-must not begin or end with a hyphen. Uniqueness is case-insensitive. Duplicate
-usernames return `409 Conflict` (`Username is already taken`).
+must begin and end with a letter or digit. Uniqueness is case-insensitive.
+Malformed usernames return `422 Unprocessable Entity`; duplicate usernames
+return `409 Conflict` (`Username is already taken`).
 
 ```bash
 # v1 keeps the legacy "name" field
@@ -733,8 +734,8 @@ make test
 Salida esperada:
 
 ```
-456 passed in 300s
-Required test coverage of 94.0% reached. Total coverage: 94.26%
+465 passed in 274s
+Required test coverage of 94.0% reached. Total coverage: 94.27%
 ```
 
 > El gate de CI está en 94% desde las mejoras de sesiones y takeover.
@@ -810,12 +811,12 @@ timestamp para no restaurar un estado obsoleto.
 ### Cobertura
 
 **Umbral mínimo:** 94% (configurado en `pyproject.toml` → `[tool.coverage.report] fail_under`).
-**Cobertura actual:** 94% (94.0% medido con `pytest-cov`).
+**Cobertura actual:** 94.27% medido con `pytest-cov`.
 | Archivo                                  | Tests | Qué cubre                                                                   |
 |------------------------------------------|-------|-----------------------------------------------------------------------------|
 | `tests/test_security.py`                 | 4     | Hashing bcrypt, JWT create/decode, token manipulado.                        |
 | `tests/test_health.py`                   | 2     | Endpoint `/health` y ciclo de vida de la aplicación.                        |
-| `tests/test_users.py`                    | 21    | CRUD de usuarios, validación, permisos e invariantes de identidad.          |
+| `tests/test_users.py`                    | 30    | CRUD de usuarios, validación, permisos e invariantes de identidad.          |
 | `tests/test_gameplays.py`                | 23    | CRUD de gameplays + validación JSON + permisos + UUID válido inexistente.   |
 | `tests/test_edge_cases.py`               | 16    | UUIDs inválidos, errores de auth, validaciones.                             |
 | `tests/test_services_unit.py`            | 16    | Servicios, configuración, entrypoint y repositorio de logs.                 |
