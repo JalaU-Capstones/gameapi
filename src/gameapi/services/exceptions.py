@@ -30,6 +30,11 @@ class EmailAlreadyExistsError(DomainError):
         super().__init__(f"Email already registered: {email}")
 
 
+class UsernameAlreadyExistsError(DomainError):
+    def __init__(self) -> None:
+        super().__init__("Username is already taken")
+
+
 class GameplayNotFoundError(DomainError):
     def __init__(self, gameplay_id: str) -> None:
         self.gameplay_id = gameplay_id

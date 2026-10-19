@@ -12,10 +12,24 @@ from gameapi.schemas.user import UserCreate, UserResponse, UserUpdate
 from gameapi.services.exceptions import (
     EmailAlreadyExistsError,
     UserHasOpenGameplaysError,
+    UsernameAlreadyExistsError,
     UserNotFoundError,
 )
 
 logger = logging.getLogger(__name__)
+
+USERNAME_UNIQUE_INDEX = "ix_users_username_lower"
+
+
+def _is_username_unique_violation(exc: IntegrityError) -> bool:
+    if exc.orig is None or getattr(exc.orig, "pgcode", None) != "23505":
+        return False
+    driver_error = getattr(exc.orig, "orig", None) or exc.orig
+    diagnostic = getattr(driver_error, "diag", None)
+    constraint_name = getattr(diagnostic, "constraint_name", None) or getattr(
+        driver_error, "constraint_name", None
+    )
+    return constraint_name == USERNAME_UNIQUE_INDEX
 
 
 class UserService:
@@ -45,7 +59,7 @@ class UserService:
 
     async def create(self, data: UserCreate) -> UserResponse:
         user = User(
-            name=data.name,
+            username=data.username,
             email=data.email.lower(),
             password_hash=hash_password(data.password),
         )
@@ -53,6 +67,8 @@ class UserService:
             created = await self._repo.create(user)
         except IntegrityError as exc:
             await self._session.rollback()
+            if _is_username_unique_violation(exc):
+                raise UsernameAlreadyExistsError() from exc
             if exc.orig is not None and getattr(exc.orig, "pgcode", None) == "23505":
                 raise EmailAlreadyExistsError(data.email) from exc
             # Defensive branch: PostgreSQL unique constraint violations are the only
@@ -81,8 +97,9 @@ class UserService:
             raise UserNotFoundError(user_id)
 
         update_fields: dict[str, object] = {}
-        if data.name is not None:
-            update_fields["name"] = data.name
+        if data.username is not None:
+            update_fields["username"] = data.username
+            update_fields["username_modified_by_system"] = False
         if data.email is not None:
             update_fields["email"] = data.email.lower()
         if data.password is not None:
@@ -98,6 +115,8 @@ class UserService:
             await self._repo.update(user)
         except IntegrityError as exc:
             await self._session.rollback()
+            if _is_username_unique_violation(exc):
+                raise UsernameAlreadyExistsError() from exc
             if exc.orig is not None and getattr(exc.orig, "pgcode", None) == "23505":
                 raise EmailAlreadyExistsError(data.email or user.email) from exc
             # Defensive branch: PostgreSQL unique constraint violations are the only
