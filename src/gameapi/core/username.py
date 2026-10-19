@@ -4,7 +4,8 @@ import uuid
 
 USERNAME_MIN_LENGTH = 3
 USERNAME_MAX_LENGTH = 30
-USERNAME_REGEX = re.compile(r"^[a-zA-Z0-9](?:[a-zA-Z0-9_-]{1,28}[a-zA-Z0-9])?$")
+USERNAME_PATTERN = r"^[a-zA-Z0-9](?:[a-zA-Z0-9_-]{1,28}[a-zA-Z0-9])?$"
+USERNAME_REGEX = re.compile(USERNAME_PATTERN)
 
 
 def sanitize_username(raw: str) -> str:
