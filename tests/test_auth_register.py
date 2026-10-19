@@ -41,9 +41,27 @@ async def test_register_response_shape_matches_login(client: AsyncClient) -> Non
         "token_type",
         "user",
         "other_active_sessions",
+        "username_was_auto_generated",
     }
     assert body["other_active_sessions"] == 0
     assert body["token_type"] == "bearer"
+
+
+async def test_register_replays_idempotent_response(client: AsyncClient) -> None:
+    headers = {"Idempotency-Key": "same-registration"}
+    payload = {
+        "name": "Idempotent User",
+        "email": "idempotent@example.com",
+        "password": "password123",
+    }
+
+    first = await client.post("/api/v2/auth/register", json=payload, headers=headers)
+    replay = await client.post("/api/v2/auth/register", json=payload, headers=headers)
+
+    assert first.status_code == 201, first.text
+    assert replay.status_code == 201, replay.text
+    assert replay.json()["user"]["id"] == first.json()["user"]["id"]
+    assert replay.json()["username_was_auto_generated"] is False
 
 
 async def test_register_returns_same_user_as_me(client: AsyncClient) -> None:
