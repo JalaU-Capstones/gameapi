@@ -7,8 +7,8 @@ REST API para gestión de usuarios y partidas de Tic-Tac-Toe.
 [![Render](https://img.shields.io/badge/Render-production-46E3B7?logo=render&logoColor=white)](https://gameapi-9vos.onrender.com/health)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg)](https://fastapi.tiangolo.com/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![Tests](https://img.shields.io/badge/tests-424%20passed-success.svg)](#pruebas)
-[![Coverage](https://img.shields.io/badge/coverage-94%25-green.svg)](#cobertura)
+[![Tests](https://img.shields.io/badge/tests-456%20passed-success.svg)](#pruebas)
+[![Coverage](https://img.shields.io/badge/coverage-94.26%25-green.svg)](#cobertura)
 
 **Stack:** Python 3.11+ · FastAPI · PostgreSQL 16 · SQLAlchemy 2.0 async · Pydantic v2 · JWT · WebSocket · uv · Docker
 
@@ -324,6 +324,36 @@ El login tradicional sigue devolviendo el access token en el body. Se puede usar
 | `GET`  | `/api/v2/auth/me`      | ✅   | Usuario actual (desde cookie o header).     |
 | `POST` | `/api/v2/auth/session/takeover` | ✅ | Revoca las otras sesiones activas del usuario. |
 
+#### Username contract
+
+`name` in the legacy v1 request bodies and `username` in v2 represent the same
+unique, sanitized username. Usernames are 3-30 characters and may contain only
+letters, digits, hyphens, and underscores; spaces are not allowed. A username
+must not begin or end with a hyphen. Uniqueness is case-insensitive. Duplicate
+usernames return `409 Conflict` (`Username is already taken`).
+
+```bash
+# v1 keeps the legacy "name" field
+curl -X POST http://localhost:8080/api/v1/users \
+  -H "Content-Type: application/json" \
+  -d '{"name":"sandra-dee","email":"sandra@mail.com","password":"password123"}'
+
+curl -X PUT http://localhost:8080/api/v1/users/USER_ID \
+  -H "Authorization: Bearer ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"sandra-dee"}'
+
+# v2 uses "username"
+curl -X POST http://localhost:8080/api/v2/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"username":"sandra-dee","email":"sandra@mail.com","password":"password123"}'
+
+curl -X PUT http://localhost:8080/api/v2/users/USER_ID \
+  -H "Authorization: Bearer ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"username":"sandra-dee"}'
+```
+
 #### Sesiones y takeover multi-navegador
 
 El login crea una sesión independiente por navegador o dispositivo. Para cerrar
@@ -422,6 +452,9 @@ En `/api/v2/logs/me` no existe el parámetro `player_id`: siempre filtra por el 
 
 Los endpoints WebSocket operan bajo `/api/v2/ws` y requieren autenticación JWT mediante el primer mensaje JSON.
 
+The v2 username returned to clients uses the same unique, sanitized username
+concept as the legacy v1 `name` field.
+
 | Ruta                   | Descripción                                                                       |
 |------------------------|-----------------------------------------------------------------------------------|
 | `/api/v2/ws/gameplays` | Canal de eventos de partidas. Requiere el evento `auth` con `{ "token": "..." }`. |
@@ -446,7 +479,10 @@ Los endpoints WebSocket operan bajo `/api/v2/ws` y requieren autenticación JWT 
 **Cliente → Servidor (gameplays):**
 - `auth` — primer mensaje obligatorio con el JWT.
 - `ping` — keepalive.
-- `create_game` — crear partida e invitar. Payload: `{"guest_id": "<uuid>"}`.
+- `create_game` — crear partida e invitar. Payload:
+  `{"guest_id": "<uuid>", "guest_username": "<username>"}`. `guest_username` is
+  optional; when supplied it must exactly match the username belonging to
+  `guest_id`, otherwise the server returns `USERNAME_MISMATCH`.
 - `accept_invitation` — aceptar invitación. Payload: `{"game_id": "<uuid>"}`.
 - `reject_invitation` — rechazar invitación. Payload: `{"game_id": "<uuid>"}`.
 - `play_move` — jugar. Payload: `{"game_id": "<uuid>", "row": 0-2, "col": 0-2}`.
@@ -475,7 +511,10 @@ Los endpoints WebSocket operan bajo `/api/v2/ws` y requieren autenticación JWT 
 
 `NOT_YOUR_TURN`, `INVALID_MOVE`, `GAME_NOT_FOUND`, `GAME_NOT_ACTIVE`,
 `NOT_A_PARTICIPANT`, `INVITATION_NOT_PENDING`, `CANNOT_INVITE_SELF`,
-`OPPONENT_OFFLINE`, `INVALID_PAYLOAD`, `INVALID_EVENT`, `NOT_IMPLEMENTED`, `RETRY_LIMIT_EXCEEDED`, `CREATE_GAME_RATE_LIMITED`. Estos errores aportan `retry_after_seconds` cuando el cliente debe esperar para volver a intentarlo.
+`OPPONENT_OFFLINE`, `USERNAME_MISMATCH`, `INVALID_PAYLOAD`, `INVALID_EVENT`,
+`NOT_IMPLEMENTED`, `RETRY_LIMIT_EXCEEDED`, `CREATE_GAME_RATE_LIMITED`. Estos
+errores aportan `retry_after_seconds` cuando el cliente debe esperar para volver
+a intentarlo.
 
 #### Protocolo de autenticación WS
 
@@ -527,12 +566,38 @@ HttpOnly).
 ```bash
 curl -i -c cookies.txt -X POST http://localhost:8080/api/v2/auth/register \
   -H "Content-Type: application/json" \
-  -d '{"name":"Sandra Dee","email":"sandra@mail.com","password":"password123"}'
+  -d '{"username":"sandra-dee","email":"sandra@mail.com","password":"password123"}'
 ```
 
 Respuesta `201 Created` con `Set-Cookie: gameapi_at` y
 `Set-Cookie: gameapi_rt`. También incluye un `access_token` en el body para
 clientes basados en header.
+
+#### Login response (`POST /api/v2/auth/login`)
+
+The login response includes the user's `username` and
+`username_was_auto_generated`. The flag is `true` if the system had to modify
+the submitted username, and `false` otherwise.
+
+```json
+{
+  "access_token": "<access-token>",
+  "token_type": "bearer",
+  "user": {
+    "id": "<user-id>",
+    "username": "sandra-dee",
+    "email": "sandra@mail.com"
+  },
+  "username_was_auto_generated": false
+}
+```
+
+#### Username field compatibility
+
+Use `name` for v1 create/update requests and `username` for v2
+register/update requests. Both fields use the same case-insensitive uniqueness
+and sanitization rules: 3-30 characters, letters, digits, hyphens, and
+underscores only, with no leading or trailing hyphen.
 
 #### Login (v2)
 
@@ -668,8 +733,8 @@ make test
 Salida esperada:
 
 ```
-424 passed in 247.50s
-Required test coverage of 94.0% reached. Total coverage: 94.0%
+456 passed in 300s
+Required test coverage of 94.0% reached. Total coverage: 94.26%
 ```
 
 > El gate de CI está en 94% desde las mejoras de sesiones y takeover.
@@ -1064,6 +1129,9 @@ La conversión es **automática** vía `pydantic.alias_generators.to_camel` en `
 - Contraseñas hasheadas con **bcrypt** (con pre-hash SHA-256 para soportar passwords largas).
 - Tokens JWT firmados con **HS256**; validación de `iss`, `aud`, `exp`, `iat`, `jti`.
 - Validación de email único (constraint `UNIQUE` en PostgreSQL).
+- Usernames sanitized to 3-30 alphanumeric characters, hyphens, or underscores;
+  case-insensitive uniqueness is enforced in the database. Legacy v1 uses the
+  request field `name`, while v2 uses `username`.
 - Endpoints protegidos con `HTTPBearer`.
 - Ownership check: un usuario solo puede modificar/eliminar sus propios recursos.
 - CORS configurable por entorno.
