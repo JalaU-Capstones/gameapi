@@ -863,7 +863,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/gameapi__schemas__auth__LoginResponse"
+                  "$ref": "#/components/schemas/RegisterResponse"
                 }
               }
             }
@@ -2176,13 +2176,45 @@
         ],
         "title": "RefreshResponse"
       },
+      "RegisterResponse": {
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "title": "Access Token"
+          },
+          "token_type": {
+            "type": "string",
+            "title": "Token Type",
+            "default": "bearer"
+          },
+          "user": {
+            "$ref": "#/components/schemas/UserResponse"
+          },
+          "other_active_sessions": {
+            "type": "integer",
+            "title": "Other Active Sessions",
+            "default": 0
+          },
+          "username_was_auto_generated": {
+            "type": "boolean",
+            "title": "Username Was Auto Generated",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "access_token",
+          "user"
+        ],
+        "title": "RegisterResponse"
+      },
       "UserCreate": {
         "properties": {
-          "name": {
+          "username": {
             "type": "string",
-            "maxLength": 100,
-            "minLength": 1,
-            "title": "Name"
+            "maxLength": 30,
+            "minLength": 3,
+            "title": "Username"
           },
           "email": {
             "type": "string",
@@ -2198,7 +2230,7 @@
         },
         "type": "object",
         "required": [
-          "name",
+          "username",
           "email",
           "password"
         ],
@@ -2213,6 +2245,15 @@
           "name": {
             "type": "string",
             "title": "Name"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "usernameModifiedBySystem": {
+            "type": "boolean",
+            "title": "Usernamemodifiedbysystem",
+            "default": false
           },
           "email": {
             "type": "string",
@@ -2229,6 +2270,7 @@
         "required": [
           "id",
           "name",
+          "username",
           "email",
           "registerDate"
         ],
@@ -2237,18 +2279,18 @@
       },
       "UserUpdate": {
         "properties": {
-          "name": {
+          "username": {
             "anyOf": [
               {
                 "type": "string",
-                "maxLength": 100,
-                "minLength": 1
+                "maxLength": 30,
+                "minLength": 3
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Name"
+            "title": "Username"
           },
           "email": {
             "anyOf": [
@@ -2337,6 +2379,11 @@
             "type": "integer",
             "title": "Other Active Sessions",
             "default": 0
+          },
+          "username_was_auto_generated": {
+            "type": "boolean",
+            "title": "Username Was Auto Generated",
+            "default": false
           }
         },
         "type": "object",
