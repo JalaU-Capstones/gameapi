@@ -2214,7 +2214,9 @@
             "type": "string",
             "maxLength": 30,
             "minLength": 3,
-            "title": "Username"
+            "pattern": "^[a-zA-Z0-9](?:[a-zA-Z0-9_-]{1,28}[a-zA-Z0-9])?$",
+            "title": "Username",
+            "description": "Unique username: 3-30 chars, alphanumeric, hyphens, and underscores. Must begin and end with a letter or digit."
           },
           "email": {
             "type": "string",
@@ -2284,13 +2286,15 @@
               {
                 "type": "string",
                 "maxLength": 30,
-                "minLength": 3
+                "minLength": 3,
+                "pattern": "^[a-zA-Z0-9](?:[a-zA-Z0-9_-]{1,28}[a-zA-Z0-9])?$"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Username"
+            "title": "Username",
+            "description": "Unique username: 3-30 chars, alphanumeric, hyphens, and underscores. Must begin and end with a letter or digit."
           },
           "email": {
             "anyOf": [
