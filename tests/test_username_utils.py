@@ -79,7 +79,7 @@ def test_generate_unique_username_truncates_prefix_before_suffix(
 
     result = generate_unique_username("x" * 30, {"x" * 30})
 
-    assert result == f'{"x" * 26}-482'
+    assert result == f"{'x' * 26}-482"
     assert len(result) <= USERNAME_MAX_LENGTH
     assert re.fullmatch(USERNAME_REGEX, result)
 
