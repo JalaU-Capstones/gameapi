@@ -358,7 +358,7 @@ resources:
     \ and refresh cookies. The **After-response script** stores `userId` and `access_token`;\
     \ the refresh token is never included in the JSON body.\n\n## Errors\n\n| Status\
     \ | Cause |\n|--------|-------|\n| `400` | Invalid email, short password, or missing/invalid\
-    \ fields |\n| `409` | Email or username already taken |"
+    \ fields |\n| `409` | Email or username already taken |\n\nUsername validation: 3-30 characters, `[a-zA-Z0-9_-]`, beginning and ending with a letter or digit. Invalid usernames return `422 Unprocessable Entity`."
   authentication: {}
   metaSortKey: -1790553600004
   isPrivate: false
@@ -548,7 +548,7 @@ resources:
   method: POST
   body:
     mimeType: application/json
-    text: "{\n  \"name\": \"Sandra Dee\",\n  \"email\": \"{{ _.testEmail }}\",\n \
+    text: "{\n  \"name\": \"sandra-dee\",\n  \"email\": \"{{ _.testEmail }}\",\n \
       \ \"password\": \"{{ _.testPassword }}\"\n}"
   parameters: []
   headers:
@@ -558,17 +558,17 @@ resources:
   description: "# Register user\n\nCreates a new user account.\n\n- **Method**: `POST`\n\
     - **Path**: `/api/v1/users`\n- **Auth**: Not required\n\n## Request body\n\n|\
     \ Field | Type | Required | Constraints |\n|-------|------|----------|-------------|\n\
-    | `name` | string | Yes | Non-empty |\n| `email` | string | Yes | Valid email;\
+    | `name` | string | Yes | 3-30 chars, `[a-zA-Z0-9_-]`, begins and ends with a letter or digit |\n| `email` | string | Yes | Valid email;\
     \ stored in lowercase |\n| `password` | string | Yes | Minimum 8 characters |\n\
     \n## Response \u2014 `201 Created`\n\n```json\n{\n  \"id\": \"8df1c70b-e4e4-4dc6-80fb-2ce6404ee28f\"\
-    ,\n  \"name\": \"Sandra Dee\",\n  \"email\": \"sandra@mail.com\",\n  \"registerDate\"\
+    ,\n  \"name\": \"sandra-dee\",\n  \"email\": \"sandra@mail.com\",\n  \"registerDate\"\
     : \"2026-09-26T21:12:51.971090Z\"\n}\n```\n\n## Errors\n\n| Status | Cause |\n\
     |--------|-------|\n| `400` | Invalid email, short password, missing fields |\n\
     | `409` | Email already registered (`{\"message\": \"Email is currently registered\"\
     }`) |\n\n## Side effects\n\nThe **After-response script** stores `userId` and\
     \ `testEmail` in the environment.\n\n> **Guest setup**: duplicate this request\
     \ to register the guest user with `guestEmail` / `guestPassword`, then duplicate\
-    \ **Login** with the same credentials and copy the returned token into `guestToken`."
+    \ **Login** with the same credentials and copy the returned token into `guestToken`.\n\nUsername validation: 3-30 characters, `[a-zA-Z0-9_-]`, beginning and ending with a letter or digit. Invalid usernames return `422 Unprocessable Entity`."
   authentication: {}
   metaSortKey: -1790553600006
   isPrivate: false
@@ -707,7 +707,7 @@ resources:
   method: PUT
   body:
     mimeType: application/json
-    text: "{\n  \"name\": \"Sandra Dee Updated\"\n}"
+    text: "{\n  \"name\": \"sandra-dee\"\n}"
   parameters: []
   headers:
   - name: Content-Type
@@ -718,16 +718,15 @@ resources:
     \ Required (Bearer JWT)\n\n## Ownership rule\n\nThe JWT `sub` claim **must match**\
     \ the `id` in the path. Updating another user's account returns `403 Forbidden`.\n\
     \n## Request body\n\nAll fields are optional. Only the fields you send are updated.\n\
-    \n| Field | Type | Notes |\n|-------|------|-------|\n| `name` | string | New\
-    \ display name |\n| `email` | string | Must be unique; stored lowercase |\n| `password`\
+    \n| Field | Type | Notes |\n|-------|------|-------|\n| `name` | string | Unique username: 3-30 chars, `[a-zA-Z0-9_-]`, begins and ends with a letter or digit |\n| `email` | string | Must be unique; stored lowercase |\n| `password`\
     \ | string | Minimum 8 characters; re-hashed server-side |\n\n## Response \u2014\
     \ `204 No Content`\n\nEmpty body. Fetch the user with **Get user by ID** to verify\
     \ the changes.\n\n## Errors\n\n| Status | Cause |\n|--------|-------|\n| `400`\
-    \ | Invalid email format, short password |\n| `401` | Missing/invalid token |\n\
+    \ | Invalid email format, short password |\n| `422` | Invalid username format or length |\n| `401` | Missing/invalid token |\n\
     | `403` | `id` does not match `sub` |\n| `404` | User not found, or malformed\
-    \ UUID |\n| `409` | Email already used by another account |\n\n## Notes\n\n- Sending\
+    \ UUID |\n| `409` | Email or username already taken |\n\n## Notes\n\n- Sending\
     \ `{}` returns `204` without modifying the record (no-op).\n- If you change your\
-    \ email, **future logins must use the new email**."
+    \ email, **future logins must use the new email**.\n\nUsername validation: 3-30 characters, `[a-zA-Z0-9_-]`, beginning and ending with a letter or digit. Invalid usernames return `422 Unprocessable Entity`."
   authentication:
     type: bearer
     token: '{{ _.token }}'
@@ -827,12 +826,12 @@ resources:
   description: "# Update user\n\nPartially updates the authenticated user's own account.\n\
     \n- **Method**: `PUT`\n- **Path**: `/api/v2/users/{userId}`\n- **Auth**: Required\
     \ (Bearer JWT)\n\n## Request body\n\nAll fields are optional: `username`, `email`,\
-    \ and `password`. Usernames are unique and 3-30 characters; passwords must contain at least 8 characters.\n\
+    \ and `password`. Usernames must be unique, 3-30 characters, and match `[a-zA-Z0-9_-]` while beginning and ending with a letter or digit. Invalid usernames return `422 Unprocessable Entity`; passwords must contain at least 8 characters.\n\
     \n## Response \u2014 `204 No Content`\n\nEmpty body.\n\n## Errors\n\n| Status\
     \ | Cause |\n|--------|-------|\n| `400` | Invalid email or password |\n| `401`\
     \ | Missing, invalid, or expired token |\n| `403` | Path user ID does not match\
     \ the authenticated user |\n| `404` | User not found |\n| `409` | Email or username already\
-    \ taken |"
+    \ taken |\n| `422` | Invalid username format or length |"
   authentication:
     type: bearer
     token: '{{ _.access_token }}'
